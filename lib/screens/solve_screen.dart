@@ -56,7 +56,7 @@ class SolveScreen extends StatefulWidget {
   State<SolveScreen> createState() => _SolveScreenState();
 }
 
-class _SolveScreenState extends State<SolveScreen> {
+class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   late List<Problem> _problems;
   int _index = 0;
   final Map<int, GradedAnswer> _graded = {};
@@ -83,7 +83,22 @@ class _SolveScreenState extends State<SolveScreen> {
   void initState() {
     super.initState();
     _problems = List<Problem>.of(widget.problems);
+    WidgetsBinding.instance.addObserver(this);
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.paused || s == AppLifecycleState.hidden) {
+      _pauseTimer(); // time in the background does not count
+      _saveDraftNow();
+      _backgrounded = true;
+    } else if (s == AppLifecycleState.resumed && _backgrounded) {
+      _backgrounded = false;
+      _since = DateTime.now();
+    }
+  }
+
+  bool _backgrounded = false;
 
   @override
   void didChangeDependencies() {
@@ -98,6 +113,7 @@ class _SolveScreenState extends State<SolveScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pauseTimer();
     _saveDraftNow();
     _draftTimer?.cancel();
@@ -149,7 +165,7 @@ class _SolveScreenState extends State<SolveScreen> {
     final p = _problems[i];
     final draft = await _app.loadDraft(p.id);
     if (!mounted || _ink != ink) return;
-    if (draft != null) ink.load(draft);
+    if (draft != null && ink.isEmpty) ink.load(draft); // never wipe strokes written while loading
     final live = _app.live;
     if (live != null) {
       ink.sink = live;
@@ -212,7 +228,11 @@ class _SolveScreenState extends State<SolveScreen> {
       for (var i = 0; i < _problems.length; i++)
         SessionItem(problem: _problems[i], graded: _graded[i], timeMs: _elapsed[i] ?? 0),
     ];
-    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
+    final nav = Navigator.of(context);
+    final route = ModalRoute.of(context);
+    // close anything above this screen (e.g. the "finish exam?" dialog when time runs out)
+    if (route != null) nav.popUntil((r) => r == route);
+    nav.pushReplacement(MaterialPageRoute<void>(
       builder: (_) => ResultScreen(title: widget.title, items: results, mode: widget.mode),
     ));
   }

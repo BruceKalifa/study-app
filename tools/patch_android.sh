@@ -39,10 +39,38 @@ import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity() {
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-            val tool = ev.getToolType(0)
+        val action = ev.actionMasked
+        // Low latency: ask for unbuffered (un-batched) pen events, also when a palm touched first.
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+            val tool = ev.getToolType(ev.actionIndex)
             if (tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER) {
                 window.decorView.requestUnbufferedDispatch(ev)
+            }
+        }
+        // Some firmware reports the S Pen side button as BUTTON_SECONDARY; Flutter only maps
+        // BUTTON_STYLUS_PRIMARY, so translate it (the app then switches to the eraser).
+        val bs = ev.buttonState
+        if ((bs and MotionEvent.BUTTON_SECONDARY) != 0 && (bs and MotionEvent.BUTTON_STYLUS_PRIMARY) == 0) {
+            var stylus = false
+            for (i in 0 until ev.pointerCount) {
+                if (ev.getToolType(i) == MotionEvent.TOOL_TYPE_STYLUS) stylus = true
+            }
+            if (stylus) {
+                val n = ev.pointerCount
+                val props = Array(n) { MotionEvent.PointerProperties() }
+                val coords = Array(n) { MotionEvent.PointerCoords() }
+                for (i in 0 until n) {
+                    ev.getPointerProperties(i, props[i])
+                    ev.getPointerCoords(i, coords[i])
+                }
+                val copy = MotionEvent.obtain(
+                    ev.downTime, ev.eventTime, ev.action, n, props, coords, ev.metaState,
+                    bs or MotionEvent.BUTTON_STYLUS_PRIMARY, ev.xPrecision, ev.yPrecision,
+                    ev.deviceId, ev.edgeFlags, ev.source, ev.flags
+                )
+                val handled = super.dispatchTouchEvent(copy)
+                copy.recycle()
+                return handled
             }
         }
         return super.dispatchTouchEvent(ev)

@@ -63,9 +63,18 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   Size _viewport = Size.zero;
 
   final Map<int, _Ptr> _touches = {};
+  final Set<int> _ignored = {}; // pointers judged to be a palm / resting hand
   int? _drawPointer;
+  bool _drawIsStylus = false;
   bool _drawIsEraser = false;
-  int _lastStylusActivity = 0;
+  Offset _drawLast = Offset.zero;
+
+  // Palm-rejection state is shared by every canvas on screen (page + answer pad):
+  // a palm resting on the answer pad must be rejected while the pen writes on the page.
+  static int _lastStylusContact = 0;
+  static int _lastHover = 0;
+  static Offset? _penGlobal;
+  static bool _stylusSeen = false;
 
   // pinch/pan state
   double _gestureStartZoom = 1;
@@ -73,12 +82,14 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   Offset _gestureStartFocal = Offset.zero;
   Offset _gestureStartOffset = Offset.zero;
   bool _multiTouchMoved = false;
+  bool _tapEligible = true;
   int _maxTouchesInGesture = 0;
   int _gestureStartedAt = 0;
 
-  // fling
+  // fling (velocity in px per ms)
   late final Ticker _ticker;
   Offset _velocity = Offset.zero;
+  Duration _lastFlingTick = Duration.zero;
   final List<(int, Offset)> _panTrail = [];
 
   double get _fit => _viewport.width <= 0 ? 1 : _viewport.width / kPageWidth;
@@ -156,8 +167,10 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   // ---------------- pointer handling ----------------
   bool _isStylus(PointerDeviceKind k) => k == PointerDeviceKind.stylus || k == PointerDeviceKind.invertedStylus;
 
+  /// S Pen side button (Android BUTTON_STYLUS_PRIMARY → kPrimaryStylusButton) or eraser tip.
   bool _wantsEraser(PointerEvent e) =>
-      e.kind == PointerDeviceKind.invertedStylus || (e.buttons & kSecondaryStylusButton) != 0;
+      e.kind == PointerDeviceKind.invertedStylus ||
+      (_isStylus(e.kind) && (e.buttons & (kPrimaryStylusButton | kSecondaryStylusButton)) != 0);
 
   double _pressure(PointerEvent e) {
     if (!_isStylus(e.kind)) return 0.55;
@@ -168,53 +181,94 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
 
   int get _now => DateTime.now().millisecondsSinceEpoch;
 
+  void _markPen(PointerEvent e) {
+    _lastStylusContact = _now;
+    _penGlobal = e.position;
+    _stylusSeen = true;
+  }
+
+  /// A touch is treated as a palm if the pen just touched, if it lands near the hovering pen,
+  /// or if the contact patch is large.
+  bool _isPalm(PointerEvent e) {
+    final now = _now;
+    if (now - _lastStylusContact < 300) return true;
+    final pen = _penGlobal;
+    if (now - _lastHover < 600 && pen != null && (e.position - pen).distance < 320) return true;
+    if (e.radiusMajor > 32) return true;
+    return false;
+  }
+
+  void _resetGesture(int now) {
+    _maxTouchesInGesture = 0;
+    _multiTouchMoved = false;
+    _tapEligible = true;
+    _gestureStartedAt = now;
+  }
+
   void _onDown(PointerDownEvent e) {
     _ticker.stop();
+    final now = _now;
     final isStylus = _isStylus(e.kind);
     final isMouse = e.kind == PointerDeviceKind.mouse;
-    if (isStylus) _lastStylusActivity = _now;
 
-    final canDrawWithFinger = c.settings.fingerDraws && _touches.isEmpty && _drawPointer == null;
-    final drawThis = !widget.readOnly &&
-        _drawPointer == null &&
-        (isStylus || isMouse || (e.kind == PointerDeviceKind.touch && canDrawWithFinger && !_stylusRecentlyActive));
-
-    if (drawThis) {
-      _drawPointer = e.pointer;
-      _stylusPointerIsStylus = isStylus || isMouse;
-      _drawIsEraser = _wantsEraser(e);
+    if (isStylus || isMouse) {
+      if (isStylus) _markPen(e);
+      if (widget.readOnly) return;
+      if (_drawPointer != null) {
+        if (_drawIsStylus) return;
+        // a finger / palm stroke was running: the pen takes over
+        c.pointerCancel();
+        _ignored.add(_drawPointer!);
+        _drawPointer = null;
+      }
+      // hands already resting on the screen must not pan while the pen writes
+      _ignored.addAll(_touches.keys);
+      _touches.clear();
+      _startDraw(e, stylus: isStylus || isMouse);
       if (isStylus) widget.onStylusDown?.call();
-      c.pointerDown(toPage(e.localPosition), _pressure(e), forceEraser: _drawIsEraser);
       return;
     }
 
-    if (e.kind == PointerDeviceKind.touch) {
-      if (_stylusRecentlyActive || _isStylusPointerActive) return; // palm
-      // a finger-drawing stroke becomes a pinch when a second finger lands
-      if (_drawPointer != null && !_isStylusPointerActive) {
-        c.pointerCancel();
-        final p = _drawPointer!;
-        _drawPointer = null;
-        _touches[p] = _Ptr(PointerDeviceKind.touch, e.localPosition, _now);
-      }
-      _touches[e.pointer] = _Ptr(e.kind, e.localPosition, _now);
-      if (_touches.length == 1) {
-        _maxTouchesInGesture = 1;
-        _multiTouchMoved = false;
-        _gestureStartedAt = _now;
-      }
-      _maxTouchesInGesture = math.max(_maxTouchesInGesture, _touches.length);
-      _beginGesture();
+    if (e.kind != PointerDeviceKind.touch) return;
+    if ((_drawPointer != null && _drawIsStylus) || _isPalm(e)) {
+      _ignored.add(e.pointer);
+      return;
     }
+    final fingerDraw = c.settings.fingerDraws && !_stylusSeen && !widget.readOnly;
+    if (fingerDraw && _drawPointer == null && _touches.isEmpty) {
+      _startDraw(e, stylus: false);
+      return;
+    }
+    if (_drawPointer != null && !_drawIsStylus) {
+      // a finger-drawing stroke becomes a pinch when a second finger lands
+      c.pointerCancel();
+      final p = _drawPointer!;
+      _drawPointer = null;
+      _resetGesture(now);
+      _touches[p] = _Ptr(PointerDeviceKind.touch, _drawLast, now);
+      _tapEligible = false;
+    }
+    if (_touches.isEmpty) {
+      _resetGesture(now);
+    } else if (now - _gestureStartedAt > 150) {
+      _tapEligible = false; // fingers must land together for tap-undo
+    }
+    _touches[e.pointer] = _Ptr(e.kind, e.localPosition, now);
+    _maxTouchesInGesture = math.max(_maxTouchesInGesture, _touches.length);
+    _beginGesture();
   }
 
-  bool _stylusPointerIsStylus = false;
-  bool get _isStylusPointerActive => _drawPointer != null && _stylusPointerIsStylus;
-
-  bool get _stylusRecentlyActive => _now - _lastStylusActivity < 450;
+  void _startDraw(PointerEvent e, {required bool stylus}) {
+    _drawPointer = e.pointer;
+    _drawIsStylus = stylus;
+    _drawLast = e.localPosition;
+    _drawIsEraser = _wantsEraser(e);
+    c.pointerDown(toPage(e.localPosition), _pressure(e), forceEraser: _drawIsEraser);
+  }
 
   void _beginGesture() {
     final pts = _touches.values.map((t) => t.last).toList();
+    if (pts.isEmpty) return;
     _gestureStartZoom = _zoom;
     _gestureStartOffset = _offset;
     _gestureStartFocal = _centroid(pts);
@@ -241,8 +295,10 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   }
 
   void _onMove(PointerMoveEvent e) {
+    if (_ignored.contains(e.pointer)) return;
     if (e.pointer == _drawPointer) {
-      if (_isStylus(e.kind)) _lastStylusActivity = _now;
+      if (_isStylus(e.kind)) _markPen(e);
+      _drawLast = e.localPosition;
       final wantEraser = _wantsEraser(e);
       final pos = toPage(e.localPosition);
       if (wantEraser != _drawIsEraser) {
@@ -258,6 +314,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     t.last = e.localPosition;
     if ((t.last - t.start).distance > 14) _multiTouchMoved = true;
     if (!widget.interactive) return;
+    if (_drawPointer != null && _drawIsStylus) return; // never move the page under the pen
     final pts = _touches.values.map((t) => t.last).toList();
     final focal = _centroid(pts);
     setState(() {
@@ -278,8 +335,9 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   }
 
   void _onUp(PointerEvent e, {bool cancelled = false}) {
+    if (_ignored.remove(e.pointer)) return;
     if (e.pointer == _drawPointer) {
-      if (_isStylus(e.kind)) _lastStylusActivity = _now;
+      if (_isStylus(e.kind)) _markPen(e);
       _drawPointer = null;
       if (cancelled) {
         c.pointerCancel();
@@ -291,8 +349,16 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     final t = _touches.remove(e.pointer);
     if (t == null) return;
     if (_touches.isEmpty) {
-      final quick = _now - _gestureStartedAt < 320;
-      if (!cancelled && quick && !_multiTouchMoved && c.settings.twoFingerUndo && !widget.readOnly) {
+      final now = _now;
+      final quick = now - _gestureStartedAt < 320;
+      final penDuring = _lastStylusContact >= _gestureStartedAt;
+      if (!cancelled &&
+          quick &&
+          _tapEligible &&
+          !penDuring &&
+          !_multiTouchMoved &&
+          c.settings.twoFingerUndo &&
+          !widget.readOnly) {
         if (_maxTouchesInGesture == 2) {
           c.undo();
           _toast('실행 취소');
@@ -302,29 +368,41 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
         }
       } else if (_maxTouchesInGesture == 1 && _panTrail.length >= 2 && widget.interactive) {
         final a = _panTrail.first, b = _panTrail.last;
-        final dt = (b.$1 - a.$1).clamp(1, 1000);
-        _velocity = (b.$2 - a.$2) / dt.toDouble() * 16; // px per frame
-        if (_velocity.distance > 2) _ticker.start();
+        if (now - b.$1 < 60) {
+          final dt = math.max(1, b.$1 - a.$1);
+          _velocity = (b.$2 - a.$2) / dt.toDouble(); // px per ms
+          if (_velocity.distance > 0.15) {
+            _lastFlingTick = Duration.zero;
+            _ticker.start();
+          }
+        }
       }
     } else {
       _beginGesture();
     }
   }
 
-  void _onFling(Duration _) {
-    _velocity = _velocity * 0.94;
-    if (_velocity.distance < 0.4) {
+  void _onFling(Duration elapsed) {
+    final dtMs = (elapsed - _lastFlingTick).inMicroseconds / 1000.0;
+    _lastFlingTick = elapsed;
+    if (dtMs <= 0) return;
+    _velocity = _velocity * math.exp(-dtMs / 325);
+    if (_velocity.distance < 0.02) {
       _ticker.stop();
       return;
     }
     setState(() {
-      _offset += _velocity;
+      _offset += _velocity * dtMs;
       _clamp();
     });
   }
 
   void _onHover(PointerHoverEvent e) {
-    if (_isStylus(e.kind)) _lastStylusActivity = _now;
+    if (_isStylus(e.kind)) {
+      _lastHover = _now;
+      _penGlobal = e.position;
+      _stylusSeen = true;
+    }
   }
 
   void _onSignal(PointerSignalEvent e) {
@@ -418,14 +496,15 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
                           ),
                         ),
                         if (widget.underlay != null)
-                          Positioned(left: 0, top: 0, width: kPageWidth, child: widget.underlay!),
+                          Positioned(
+                              left: 0, top: 0, width: kPageWidth, child: RepaintBoundary(child: widget.underlay!)),
                         Positioned.fill(
                           child: RepaintBoundary(
                             child: CustomPaint(painter: CommittedInkPainter(c)),
                           ),
                         ),
                         Positioned.fill(
-                          child: CustomPaint(painter: ActiveInkPainter(c)),
+                          child: RepaintBoundary(child: CustomPaint(painter: ActiveInkPainter(c))),
                         ),
                       ],
                     ),

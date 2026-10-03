@@ -23,8 +23,21 @@ class FileStorage implements Storage {
 
   File _file(String path) => File('${_root.path}/$path');
 
-  @override
-  Future<String?> read(String path) async {
+  // Writes to the same path are serialized; each uses its own temp file.
+  final Map<String, Future<void>> _queue = {};
+  int _tmpCounter = 0;
+
+  Future<void> _enqueue(String path, Future<void> Function() job) {
+    final prev = _queue[path] ?? Future<void>.value();
+    final next = prev.catchError((Object _) {}).then((_) => job());
+    _queue[path] = next;
+    next.whenComplete(() {
+      if (identical(_queue[path], next)) _queue.remove(path);
+    }).catchError((Object _) {});
+    return next;
+  }
+
+  Future<String?> _read(String path) async {
     try {
       final f = _file(path);
       if (!await f.exists()) return null;
@@ -35,21 +48,36 @@ class FileStorage implements Storage {
   }
 
   @override
-  Future<void> write(String path, String data) async {
-    final f = _file(path);
-    await f.parent.create(recursive: true);
-    final tmp = File('${f.path}.tmp');
-    await tmp.writeAsString(data, flush: true);
-    await tmp.rename(f.path);
+  Future<String?> read(String path) async {
+    final pending = _queue[path];
+    if (pending != null) {
+      try {
+        await pending;
+      } catch (_) {}
+    }
+    return _read(path);
   }
 
   @override
-  Future<void> delete(String path) async {
-    try {
-      final f = _file(path);
-      if (await f.exists()) await f.delete();
-    } catch (_) {}
-  }
+  Future<void> write(String path, String data) => _enqueue(path, () async {
+        try {
+          final f = _file(path);
+          await f.parent.create(recursive: true);
+          final tmp = File('${f.path}.${_tmpCounter++}.tmp');
+          await tmp.writeAsString(data, flush: true);
+          await tmp.rename(f.path);
+        } catch (e) {
+          // never let a failed save crash the app
+        }
+      });
+
+  @override
+  Future<void> delete(String path) => _enqueue(path, () async {
+        try {
+          final f = _file(path);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      });
 
   @override
   Future<void> deleteDir(String dir) async {

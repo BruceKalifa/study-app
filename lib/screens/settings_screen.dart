@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
@@ -180,6 +181,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onSelectionChanged: (v) => app.updateInk((x) => x.eraserMode = v.first),
             ),
           ]),
+          const SizedBox(height: 16),
+          const _PenCheck(),
         ]),
 
         // ---------------- live
@@ -371,6 +374,69 @@ class _Tip extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Text(text, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w500))),
       ]),
+    );
+  }
+}
+
+/// Touch the box with the S Pen (with and without the side button) to see what the app receives.
+class _PenCheck extends StatefulWidget {
+  const _PenCheck();
+
+  @override
+  State<_PenCheck> createState() => _PenCheckState();
+}
+
+class _PenCheckState extends State<_PenCheck> {
+  String _info = 'S펜으로 여기를 눌러 보세요 · 옆 버튼을 누른 채로도 눌러 보세요';
+  bool? _eraser;
+
+  void _show(PointerEvent e) {
+    final stylus = e.kind == PointerDeviceKind.stylus || e.kind == PointerDeviceKind.invertedStylus;
+    final eraser = e.kind == PointerDeviceKind.invertedStylus ||
+        (stylus && (e.buttons & (kPrimaryStylusButton | kSecondaryStylusButton)) != 0);
+    final kind = switch (e.kind) {
+      PointerDeviceKind.stylus => 'S펜',
+      PointerDeviceKind.invertedStylus => 'S펜(지우개 끝)',
+      PointerDeviceKind.touch => '손가락',
+      PointerDeviceKind.mouse => '마우스',
+      _ => '${e.kind.name}',
+    };
+    final p = e.pressureMax > e.pressureMin ? (e.pressure - e.pressureMin) / (e.pressureMax - e.pressureMin) : e.pressure;
+    setState(() {
+      _eraser = stylus ? eraser : null;
+      _info = '$kind · 버튼 값 ${e.buttons} · 필압 ${(p * 100).round()}% · 접촉 크기 ${e.radiusMajor.toStringAsFixed(1)}';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final e = _eraser;
+    return Listener(
+      onPointerDown: _show,
+      onPointerMove: _show,
+      child: Container(
+        height: 96,
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: e == true ? AppColors.accentSoft : AppColors.paper,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: e == true ? AppColors.accent : AppColors.line),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          Row(children: [
+            Icon(e == true ? Icons.auto_fix_normal_rounded : Icons.edit_rounded,
+                color: e == true ? AppColors.accent : AppColors.ink, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              e == null ? 'S펜 점검' : (e ? '지우개로 인식됨 ✓' : '펜으로 인식됨'),
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(_info, style: const TextStyle(fontSize: 13, color: AppColors.inkSoft)),
+        ]),
+      ),
     );
   }
 }

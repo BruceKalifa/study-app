@@ -75,6 +75,7 @@ class AppState extends ChangeNotifier {
   String _pp(String f) => 'profiles/${profile.id}/$f';
 
   Future<void> _loadProfileData() async {
+    _drafts.clear();
     settings = AppSettings();
     ink = InkSettings();
     attempts = [];
@@ -110,6 +111,9 @@ class AppState extends ChangeNotifier {
   void _rebuildBank() {
     bank = customProblems.isEmpty ? _baseBank : _baseBank.withExtra(customProblems);
   }
+
+  /// Called when the app comes back to the foreground.
+  void onResumed() => _live?.reconnect();
 
   void _configureLive() {
     if (!enableLive) return;
@@ -342,8 +346,13 @@ class AppState extends ChangeNotifier {
 
   String _draftKey(String problemId) => _pp('drafts/${problemId.replaceAll(RegExp(r'[^A-Za-z0-9_\-~]'), '_')}.json');
 
+  // drafts are cached in memory so moving back and forth never reads a stale file
+  final Map<String, InkDocument?> _drafts = {};
+
   Future<InkDocument?> loadDraft(String problemId) async {
-    final raw = await storage.read(_draftKey(problemId));
+    final key = _draftKey(problemId);
+    if (_drafts.containsKey(key)) return _drafts[key];
+    final raw = await storage.read(key);
     if (raw == null) return null;
     try {
       return InkDocument.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -353,14 +362,21 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> saveDraft(String problemId, InkDocument doc) async {
+    final key = _draftKey(problemId);
     if (doc.isEmpty) {
-      await storage.delete(_draftKey(problemId));
+      _drafts[key] = null;
+      await storage.delete(key);
     } else {
-      await storage.write(_draftKey(problemId), jsonEncode(doc.toJson()));
+      _drafts[key] = doc;
+      await storage.write(key, jsonEncode(doc.toJson()));
     }
   }
 
-  Future<void> deleteDraft(String problemId) => storage.delete(_draftKey(problemId));
+  Future<void> deleteDraft(String problemId) {
+    final key = _draftKey(problemId);
+    _drafts[key] = null;
+    return storage.delete(key);
+  }
 
   /// Replace all records with [list] (oldest first) and rebuild per-problem state.
   /// Used for demos/screenshots and data import.

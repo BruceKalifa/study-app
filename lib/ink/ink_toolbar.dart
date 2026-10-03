@@ -23,7 +23,7 @@ class InkToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([controller, controller.activeTick]),
+      listenable: controller,
       builder: (context, _) {
         final c = controller;
         final s = c.settings;

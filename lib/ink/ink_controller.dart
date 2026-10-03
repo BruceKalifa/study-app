@@ -133,7 +133,11 @@ class InkController extends ChangeNotifier {
   set tool(InkTool t) {
     if (_tool == t) return;
     _tool = t;
-    if (t != InkTool.lasso) clearSelection(notify: false);
+    if (t != InkTool.lasso) {
+      clearSelection(notify: false);
+      activeTick.value++;
+      committed.value++;
+    }
     notifyListeners();
   }
 
@@ -258,6 +262,7 @@ class InkController extends ChangeNotifier {
         _dragStart = pos;
         _gestureTool = InkTool.lasso;
         activeTick.value++;
+        committed.value++;
         return;
       }
       clearSelection();
@@ -337,6 +342,7 @@ class InkController extends ChangeNotifier {
         _lastErasePos = null;
         activeTick.value++;
         if (_eraseSnapshotTaken) _commitChanged();
+        _eraseSnapshotTaken = false;
         break;
       case InkTool.lasso:
         _finishLasso();
@@ -357,6 +363,7 @@ class InkController extends ChangeNotifier {
     selectionOffset = Offset.zero;
     activeTick.value++;
     if (_eraseSnapshotTaken) _commitChanged();
+    _eraseSnapshotTaken = false;
   }
 
   /// Switch tool mid-gesture (S Pen button pressed/released while touching).
@@ -528,11 +535,32 @@ class InkController extends ChangeNotifier {
         out.add(s);
         continue;
       }
-      changed = true;
       final rr = r + s.width * 0.3;
+      // densify so long segments (fast strokes, straightened lines) can be cut in the middle
+      final dense = <InkPoint>[];
+      final step = math.max(1.0, rr / 2);
+      for (var i = 0; i < s.points.length; i++) {
+        final b = s.points[i];
+        if (i > 0) {
+          final a = s.points[i - 1];
+          final d = (b.offset - a.offset).distance;
+          final n = (d / step).floor();
+          for (var k = 1; k < n; k++) {
+            final f = k / n;
+            dense.add(InkPoint(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.p + (b.p - a.p) * f,
+                a.t + ((b.t - a.t) * f).round()));
+          }
+        }
+        dense.add(b);
+      }
+      if (!dense.any((pt) => (pt.offset - p).distance <= rr)) {
+        out.add(s);
+        continue;
+      }
+      changed = true;
       final pieces = <List<InkPoint>>[];
       var cur = <InkPoint>[];
-      for (final pt in s.points) {
+      for (final pt in dense) {
         if ((pt.offset - p).distance <= rr) {
           if (cur.isNotEmpty) pieces.add(cur);
           cur = <InkPoint>[];

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/problem.dart';
@@ -81,7 +82,12 @@ class LiveSync implements InkSyncSink {
     if (!_enabled) return;
     status.value = LiveStatus.connecting;
     try {
-      final ch = WebSocketChannel.connect(Uri.parse(_url));
+      // protocol-level pings detect half-open sockets after sleep / Wi-Fi changes
+      final WebSocketChannel ch = IOWebSocketChannel.connect(
+        Uri.parse(_url),
+        pingInterval: const Duration(seconds: 10),
+        connectTimeout: const Duration(seconds: 8),
+      );
       _ch = ch;
       ch.ready.then((_) {
         if (_ch != ch) return;
@@ -112,6 +118,14 @@ class LiveSync implements InkSyncSink {
     } catch (e) {
       _scheduleRetry();
     }
+  }
+
+  /// Force a fresh connection (app resumed, network changed).
+  void reconnect() {
+    if (!_enabled) return;
+    _close();
+    _retryDelay = 2;
+    _connect();
   }
 
   void _onData(dynamic data) {

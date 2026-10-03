@@ -93,6 +93,10 @@ class Handwriting {
       '÷': '/', '—': '-', '–': '-', '_': '-',
       ',': '.',
     };
+    // √ and π are not in the en-US model: they come back as V / v / r and TT / n / T
+    s = s.replaceAllMapped(RegExp(r'(^|[\d)])[Vv√](?=[\d(])'), (m) => '${m[1]}√');
+    s = s.replaceAll(RegExp(r'TT|∏|Π'), 'π');
+    s = s.replaceAllMapped(RegExp(r'(\d)n$'), (m) => '${m[1]}π');
     // only remap when the string is mostly digits (avoid ruining text answers like "sqrt")
     final digitCount = s.runes.where((r) => r >= 48 && r <= 57).length;
     if (digitCount >= (s.length / 2).floor() || s.length <= 2) {

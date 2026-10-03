@@ -43,8 +43,10 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) {
+    if (s == AppLifecycleState.paused || s == AppLifecycleState.hidden) {
       widget.state.saveNow();
+    } else if (s == AppLifecycleState.resumed) {
+      widget.state.onResumed();
     }
   }
 
