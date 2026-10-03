@@ -82,10 +82,13 @@ void main() {
         home: SingleChildScrollView(
           child: Column(children: [
             for (final (id, tex) in chunk)
-              Math.tex(tex, onErrorFallback: (e) {
-                failures.add('$id: $tex → ${e.message}');
-                return const SizedBox();
-              }),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Math.tex(tex, onErrorFallback: (e) {
+                  failures.add('$id: $tex → ${e.message}');
+                  return const SizedBox();
+                }),
+              ),
           ]),
         ),
       ));

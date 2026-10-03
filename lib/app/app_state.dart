@@ -313,7 +313,7 @@ class AppState extends ChangeNotifier {
     st.apply(ok: correct, at: a.at, answer: answer, attemptId: id);
     states[baseId] = st;
     if (hasInk) {
-      await storage.write(_pp('ink/$id.json'), jsonEncode(inkDoc.toJson()));
+      await storage.write(_pp('ink/$id.json'), jsonEncode(inkDoc!.toJson()));
     }
     _changed();
     final l = _live;

@@ -9,7 +9,6 @@ import '../ink/ink_canvas.dart';
 import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
 import '../services/handwriting.dart';
-import 'common.dart';
 import 'math_text.dart';
 
 /// Result shown after grading.

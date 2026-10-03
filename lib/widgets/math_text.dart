@@ -72,18 +72,24 @@ class MathText extends StatelessWidget {
         spans.add(TextSpan(text: text));
         continue;
       }
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 1.5),
-          child: Math.tex(
-            text,
-            mathStyle: MathStyle.text,
-            textStyle: base.copyWith(fontSize: (base.fontSize ?? 16) * mathScale),
-            onErrorFallback: (err) => Text(text, style: base.copyWith(fontStyle: FontStyle.italic)),
+      final formula = Math.tex(
+        text,
+        mathStyle: MathStyle.text,
+        textStyle: base.copyWith(fontSize: (base.fontSize ?? 16) * mathScale),
+        onErrorFallback: (err) => Text(text, style: base.copyWith(fontStyle: FontStyle.italic)),
+      );
+      // Break long formulas at relations/operators so they wrap like text;
+      // any single piece that is still too wide is scaled down instead of overflowing.
+      final pieces = formula.texBreak().parts;
+      for (var i = 0; i < pieces.length; i++) {
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: EdgeInsets.only(left: i == 0 ? 1.5 : 0, right: i == pieces.length - 1 ? 1.5 : 0),
+            child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: pieces[i]),
           ),
-        ),
-      ));
+        ));
+      }
     }
     return Text.rich(
       TextSpan(children: spans, style: base),
