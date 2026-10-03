@@ -54,7 +54,6 @@ class _SolveScreenState extends State<SolveScreen> {
   final Map<int, int> _elapsed = {};
   int? _choice;
   DateTime _since = DateTime.now();
-  Timer? _clock;
   Timer? _draftTimer;
   InkController? _ink;
   final GlobalKey<InkCanvasState> _canvasKey = GlobalKey<InkCanvasState>();
@@ -68,9 +67,6 @@ class _SolveScreenState extends State<SolveScreen> {
   void initState() {
     super.initState();
     _problems = List<Problem>.of(widget.problems);
-    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
@@ -88,7 +84,6 @@ class _SolveScreenState extends State<SolveScreen> {
   void dispose() {
     _pauseTimer();
     _saveDraftNow();
-    _clock?.cancel();
     _draftTimer?.cancel();
     _msgSub?.cancel();
     _app.live?.leavePage();
@@ -393,7 +388,7 @@ class _SolveScreenState extends State<SolveScreen> {
         Expanded(child: _progressDots(color)),
         const SizedBox(width: 12),
         if (app.settings.showTimer)
-          Pill(fmtClock(_elapsedOf(_index)), icon: Icons.timer_outlined, color: AppColors.inkSoft),
+          _ElapsedPill(elapsed: () => _elapsedOf(_index)),
         const SizedBox(width: 6),
         _liveBadge(app),
         IconButton(
@@ -464,4 +459,35 @@ class _SolveScreenState extends State<SolveScreen> {
       },
     );
   }
+}
+
+/// Ticks once a second on its own so the page (math, ink) is not rebuilt by the clock.
+class _ElapsedPill extends StatefulWidget {
+  const _ElapsedPill({required this.elapsed});
+  final int Function() elapsed;
+
+  @override
+  State<_ElapsedPill> createState() => _ElapsedPillState();
+}
+
+class _ElapsedPillState extends State<_ElapsedPill> {
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      Pill(fmtClock(widget.elapsed()), icon: Icons.timer_outlined, color: AppColors.inkSoft);
 }
