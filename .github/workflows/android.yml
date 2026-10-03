@@ -32,6 +32,9 @@ jobs:
       - name: Flutter version
         run: mkdir -p ci-out && flutter --version | tee ci-out/flutter-version.txt
 
+      - name: Validate problem bank
+        run: python3 tools/validate_problems.py | tail -15
+
       - name: Fetch fonts (Pretendard, OFL)
         run: bash tools/fetch_fonts.sh
 

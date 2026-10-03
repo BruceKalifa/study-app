@@ -389,6 +389,8 @@ def check_text(s: str, where: str, errs: list, warns: list, allow_placeholders=F
     if not isinstance(s, str):
         errs.append(f"{where}: not a string")
         return
+    if re.search(r'[\x00-\x09\x0b-\x1f]', s):
+        errs.append(f"{where}: control character (JSON escape like \\f instead of \\\\f?)")
     if s.count("$") % 2:
         errs.append(f"{where}: unbalanced $ ({s.count('$')} signs)")
     if "\\begin" in s:
