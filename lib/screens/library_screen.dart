@@ -8,6 +8,7 @@ import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import 'dashboard_screen.dart' show subjectIcon;
+import 'exam_setup.dart';
 import 'solve_screen.dart';
 
 enum _Filter { all, unsolved, wrong, bookmarked }
@@ -161,6 +162,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
       appBar: AppBar(
         title: const Text(''),
         actions: [
+          TextButton.icon(
+            onPressed: () => showExamSetup(context, subjectId: _subject),
+            icon: const Icon(Icons.timer_outlined),
+            label: const Text('모의고사'),
+          ),
           TextButton.icon(
             onPressed: () => LibraryScreen.openQuickVariant(context, subjectId: _subject),
             icon: const Icon(Icons.auto_awesome_rounded),

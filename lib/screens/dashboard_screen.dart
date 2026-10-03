@@ -4,6 +4,7 @@ import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
 import '../widgets/common.dart';
+import 'exam_setup.dart';
 import 'library_screen.dart';
 import 'solve_screen.dart';
 
@@ -243,6 +244,13 @@ class _TodayCard extends StatelessWidget {
                 onPressed: () => LibraryScreen.openQuickVariant(context),
                 icon: const Icon(Icons.auto_awesome_rounded),
                 label: const Text('변형문제 10개'),
+              ),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white, side: BorderSide(color: Colors.white.withValues(alpha: 0.3))),
+                onPressed: () => showExamSetup(context),
+                icon: const Icon(Icons.timer_outlined),
+                label: const Text('모의고사'),
               ),
             ]),
           ]),

@@ -16,21 +16,31 @@ import '../widgets/problem_card.dart';
 import 'result_screen.dart';
 
 class SolveScreen extends StatefulWidget {
-  const SolveScreen({super.key, required this.title, required this.problems, this.mode = 'practice'});
+  const SolveScreen({
+    super.key,
+    required this.title,
+    required this.problems,
+    this.mode = 'practice',
+    this.timeLimitMs,
+  });
 
   final String title;
   final List<Problem> problems;
+
+  /// practice | review | variant | today | exam (answers hidden until the end)
   final String mode;
+  final int? timeLimitMs;
 
   static Future<void> open(BuildContext context,
-      {required String title, required List<Problem> problems, String mode = 'practice'}) {
+      {required String title, required List<Problem> problems, String mode = 'practice', int? timeLimitMs}) {
     if (problems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('풀 문제가 없어요')));
       return Future.value();
     }
     return Navigator.of(context).push(PageRouteBuilder<void>(
       transitionDuration: const Duration(milliseconds: 320),
-      pageBuilder: (_, __, ___) => SolveScreen(title: title, problems: problems, mode: mode),
+      pageBuilder: (_, __, ___) =>
+          SolveScreen(title: title, problems: problems, mode: mode, timeLimitMs: timeLimitMs),
       transitionsBuilder: (_, a, __, child) => FadeTransition(
         opacity: CurvedAnimation(parent: a, curve: Curves.easeOut),
         child: SlideTransition(
@@ -60,6 +70,12 @@ class _SolveScreenState extends State<SolveScreen> {
   StreamSubscription<LiveMessage>? _msgSub;
   late AppState _app;
   bool _started = false;
+
+  // exam mode
+  final Map<int, String> _examAnswers = {};
+  final DateTime _examStart = DateTime.now();
+  bool _finishing = false;
+  bool get _exam => widget.mode == 'exam';
 
   Problem get _p => _problems[_index];
 
@@ -168,8 +184,30 @@ class _SolveScreenState extends State<SolveScreen> {
     }
   }
 
-  void _finish() {
+  Future<void> _finish() async {
+    if (_finishing) return;
     _pauseTimer();
+    if (_exam) {
+      _finishing = true;
+      _saveDraftNow();
+      for (var i = 0; i < _problems.length; i++) {
+        final ans = _examAnswers[i];
+        if (ans == null) continue;
+        final p = _problems[i];
+        final g = gradeAnswer(p, ans);
+        _graded[i] = g;
+        final doc = i == _index ? _ink?.toDocument() : await _app.loadDraft(p.id);
+        await _app.record(p,
+            answer: ans,
+            expected: g.expectedDisplay,
+            correct: g.correct,
+            timeMs: _elapsed[i] ?? 0,
+            mode: 'exam',
+            inkDoc: doc);
+        await _app.deleteDraft(p.id);
+      }
+      if (!mounted) return;
+    }
     final results = <SessionItem>[
       for (var i = 0; i < _problems.length; i++)
         SessionItem(problem: _problems[i], graded: _graded[i], timeMs: _elapsed[i] ?? 0),
@@ -181,6 +219,15 @@ class _SolveScreenState extends State<SolveScreen> {
 
   // ------------------------------------------------------------ grading
   Future<void> _submit(String answer) async {
+    if (_exam) {
+      setState(() => _examAnswers[_index] = answer);
+      if (_index < _problems.length - 1) {
+        _next();
+      } else {
+        _confirmFinish();
+      }
+      return;
+    }
     final p = _p;
     final i = _index;
     final time = _elapsedOf(i);
@@ -204,6 +251,22 @@ class _SolveScreenState extends State<SolveScreen> {
         if (mounted && _index == i) _next();
       });
     }
+  }
+
+  Future<void> _confirmFinish() async {
+    final missing = _problems.length - _examAnswers.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('시험을 마칠까요?'),
+        content: Text(missing > 0 ? '아직 답하지 않은 문제가 $missing개 있어요. 마치면 바로 채점돼요.' : '모든 문제에 답했어요. 채점할까요?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('계속 풀기')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('채점하기')),
+        ],
+      ),
+    );
+    if (ok == true) _finish();
   }
 
   void _addVariant() {
@@ -284,12 +347,13 @@ class _SolveScreenState extends State<SolveScreen> {
       key: ValueKey('panel-${p.id}-$_index'),
       problem: p,
       color: color,
-      graded: graded,
+      graded: _exam ? null : graded,
+      examAnswer: _exam ? _examAnswers[_index] : null,
       handwritingEnabled: app.settings.handwritingAnswer,
       onSubmit: _submit,
       onChoiceChanged: (c) => setState(() => _choice = c),
       onNext: _next,
-      onVariant: (p.hasTemplate || p.isVariant) ? _addVariant : null,
+      onVariant: !_exam && (p.hasTemplate || p.isVariant) ? _addVariant : null,
       onRetry: _retry,
       isLast: _index == _problems.length - 1,
     );
@@ -305,8 +369,10 @@ class _SolveScreenState extends State<SolveScreen> {
                   problem: p,
                   number: _index + 1,
                   color: color,
-                  selectedChoice: graded == null ? _choice : int.tryParse(graded.given),
-                  revealAnswer: graded != null,
+                  selectedChoice: graded == null
+                      ? (_choice ?? (_exam ? int.tryParse(_examAnswers[_index] ?? '') : null))
+                      : int.tryParse(graded.given),
+                  revealAnswer: graded != null && !_exam,
                 ),
               ),
             ),
@@ -387,13 +453,32 @@ class _SolveScreenState extends State<SolveScreen> {
         const SizedBox(width: 16),
         Expanded(child: _progressDots(color)),
         const SizedBox(width: 12),
-        if (app.settings.showTimer)
+        if (_exam && widget.timeLimitMs != null)
+          _Countdown(
+            endsAt: _examStart.add(Duration(milliseconds: widget.timeLimitMs!)),
+            onTimeout: () {
+              if (mounted && !_finishing) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('시간이 끝났어요. 채점할게요.')));
+                _finish();
+              }
+            },
+          )
+        else if (app.settings.showTimer)
           _ElapsedPill(elapsed: () => _elapsedOf(_index)),
+        if (_exam) ...[
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 42), backgroundColor: AppColors.accent),
+            onPressed: _confirmFinish,
+            icon: const Icon(Icons.flag_rounded, size: 18),
+            label: Text('시험 종료 (${_examAnswers.length}/${_problems.length})'),
+          ),
+        ],
         const SizedBox(width: 6),
         _liveBadge(app),
         IconButton(
           tooltip: '힌트',
-          onPressed: _showHint,
+          onPressed: _exam ? null : _showHint,
           icon: const Icon(Icons.lightbulb_outline_rounded),
         ),
         IconButton(
@@ -430,9 +515,11 @@ class _SolveScreenState extends State<SolveScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 3),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: _graded[i] == null
-                    ? (i == _index ? color : AppColors.lineStrong)
-                    : (_graded[i]!.correct ? AppColors.correct : AppColors.wrong),
+                color: _exam
+                    ? (i == _index ? color : (_examAnswers.containsKey(i) ? AppColors.ink : AppColors.lineStrong))
+                    : _graded[i] == null
+                        ? (i == _index ? color : AppColors.lineStrong)
+                        : (_graded[i]!.correct ? AppColors.correct : AppColors.wrong),
               ),
             ),
           ),
@@ -490,4 +577,45 @@ class _ElapsedPillState extends State<_ElapsedPill> {
   @override
   Widget build(BuildContext context) =>
       Pill(fmtClock(widget.elapsed()), icon: Icons.timer_outlined, color: AppColors.inkSoft);
+}
+
+class _Countdown extends StatefulWidget {
+  const _Countdown({required this.endsAt, required this.onTimeout});
+  final DateTime endsAt;
+  final VoidCallback onTimeout;
+
+  @override
+  State<_Countdown> createState() => _CountdownState();
+}
+
+class _CountdownState extends State<_Countdown> {
+  Timer? _t;
+  bool _fired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+      if (!_fired && DateTime.now().isAfter(widget.endsAt)) {
+        _fired = true;
+        widget.onTimeout();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = widget.endsAt.difference(DateTime.now()).inMilliseconds;
+    final urgent = left < 60000;
+    return Pill('남은 시간 ${fmtClock(left < 0 ? 0 : left)}',
+        icon: Icons.hourglass_bottom_rounded, color: urgent ? AppColors.wrong : AppColors.ink);
+  }
 }

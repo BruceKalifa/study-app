@@ -222,6 +222,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('exam mode hides answers and grades everything at the end', (tester) async {
+    _tabletSize(tester);
+    final s = await tester.runAsync(_state);
+    final app = s!;
+    final ps = app.bank.all.where((p) => p.isChoice).take(3).toList();
+    await tester.pumpWidget(_app(app,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () =>
+                    SolveScreen.open(context, title: '시험', problems: ps, mode: 'exam', timeLimitMs: 600000),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    for (final p in ps) {
+      await tester.tap(find.byKey(Key('choice-${p.answer}')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('submit')));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('정답이에요!'), findsNothing);
+    }
+    expect(app.attempts, isEmpty);
+    await tester.tap(find.text('채점하기').last);
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(app.attempts.length, 3);
+    expect(app.attempts.every((a) => a.correct && a.mode == 'exam'), isTrue);
+    expect(find.textContaining('결과'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   test('wrong answers schedule spaced review and graduate after 3 correct reviews', () async {
     final app = AppState(storage: MemoryStorage(), baseBank: ProblemBank(const <Subject>[]), enableLive: false);
     await app.init();

@@ -42,7 +42,11 @@ class AnswerPanel extends StatefulWidget {
     this.onVariant,
     this.onRetry,
     this.isLast = false,
+    this.examAnswer,
   });
+
+  /// Exam mode: the answer already handed in for this problem (shown, can be changed).
+  final String? examAnswer;
 
   final Problem problem;
   final Color color;
@@ -192,6 +196,23 @@ class _AnswerPanelState extends State<AnswerPanel> {
               onChanged: (k) => setState(() => _keypad = k),
             ),
         ]),
+        if (widget.examAnswer != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(color: AppColors.blueSoft, borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              const Icon(Icons.inbox_rounded, size: 18, color: AppColors.blue),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '제출한 답: ${p.isChoice ? circled(int.tryParse(widget.examAnswer!) ?? 0) : widget.examAnswer!} · 다시 고르면 바뀌어요',
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.ink),
+                ),
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 12),
         Expanded(child: p.isChoice ? _choiceInput() : _shortInput()),
         const SizedBox(height: 12),
