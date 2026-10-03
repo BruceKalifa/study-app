@@ -59,7 +59,7 @@ jobs:
 
       - name: Screenshots (for design review)
         continue-on-error: true
-        run: SHOTS=1 flutter test test/screenshots_test.dart 2>&1 | tail -60 > ci-out/shots.txt; ls ci-out/shots || true
+        run: SHOTS=1 flutter test test/screenshots_test.dart > ci-out/shots.txt 2>&1; ls ci-out/shots || true
 
       - name: Stable signing key (so updates install over the old app)
         run: mkdir -p ~/.android && cp tools/keys/debug.keystore ~/.android/debug.keystore

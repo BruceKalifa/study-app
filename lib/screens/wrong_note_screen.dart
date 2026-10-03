@@ -168,7 +168,8 @@ class _WrongCard extends StatelessWidget {
                   _kv('기록', '${state.attempts}번 풀이 · ${state.wrong}번 틀림', AppColors.inkSoft),
                 ]),
               ),
-              if (state.lastWrongAttemptId != null)
+              if (state.lastWrongAttemptId != null &&
+                  app.attempts.any((a) => a.id == state.lastWrongAttemptId && a.hasInk))
                 SizedBox(width: 170, child: InkThumbnail(attemptId: state.lastWrongAttemptId!, height: 96)),
             ]),
             if (state.note.isNotEmpty) ...[

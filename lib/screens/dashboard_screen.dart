@@ -147,7 +147,7 @@ class DashboardScreen extends StatelessWidget {
                 wide,
                 flex: 1,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  SectionHeader('최근 기록', trailing: TextButton(onPressed: () => onNavigate(4), child: const Text('더 보기'))),
+                  SectionHeader('최근 기록', subtitle: '방금 푼 문제부터', trailing: TextButton(onPressed: () => onNavigate(4), child: const Text('더 보기'))),
                   Card(
                     child: app.attempts.isEmpty
                         ? const Padding(

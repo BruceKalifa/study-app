@@ -65,7 +65,7 @@ class AppTheme {
         titleMedium: t.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.2),
         titleSmall: t.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         bodyLarge: t.bodyLarge?.copyWith(height: 1.55),
-        bodyMedium: t.bodyMedium?.copyWith(height: 1.5, color: AppColors.inkSoft),
+        bodyMedium: t.bodyMedium?.copyWith(height: 1.5, color: AppColors.ink),
         labelLarge: t.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
       appBarTheme: const AppBarTheme(
@@ -183,10 +183,8 @@ class Gap extends StatelessWidget {
 
 Color subjectColor(int argb) => Color(argb);
 
-String circled(int n) {
-  const c = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
-  return (n >= 1 && n <= 9) ? c[n - 1] : '$n';
-}
+/// Display label for a multiple-choice answer.
+String circled(int n) => n <= 0 ? '-' : '$n번';
 
 String fmtDuration(int ms) {
   final s = (ms / 1000).round();

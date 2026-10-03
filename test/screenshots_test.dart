@@ -135,6 +135,8 @@ void main() {
     for (var i = 0; i < tabs.length; i++) {
       await tester.tap(find.text(tabs[i]).last);
       await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
       if (tabs[i] == '연습장') {
         final c = tester.getCenter(find.byType(HomeShell));
         await _write(tester, c + const Offset(-200, 50), _axisX());
@@ -163,7 +165,11 @@ void main() {
           ),
         )));
     await tester.tap(find.text('go'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 100));
+    debugPrint('SolveScreen found: ${find.byType(SolveScreen).evaluate().length}; '
+        'exception: ${tester.takeException()}');
     final c = tester.getCenter(find.byType(SolveScreen));
     await _write(tester, c + const Offset(-380, 160), _axisX());
     await _write(tester, c + const Offset(-380, 160), _axisY());

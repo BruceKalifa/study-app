@@ -37,12 +37,14 @@ class StatsScreen extends StatelessWidget {
           const SizedBox(height: 4),
           const Text('문제를 풀 때마다 자동으로 쌓이고 업데이트돼요.', style: TextStyle(color: AppColors.inkSoft, fontSize: 15)),
           const SizedBox(height: 20),
-          Row(children: [
-            for (var i = 0; i < tiles.length; i++) ...[
-              if (i > 0) const SizedBox(width: 14),
-              Expanded(child: tiles[i]),
-            ],
-          ]),
+          IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (var i = 0; i < tiles.length; i++) ...[
+                if (i > 0) const SizedBox(width: 14),
+                Expanded(child: tiles[i]),
+              ],
+            ]),
+          ),
           const SizedBox(height: 24),
           _twoCol(
             wide,

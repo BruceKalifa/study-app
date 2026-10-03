@@ -254,15 +254,23 @@ class AccuracyBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(height),
-      child: SizedBox(
+      child: Container(
         height: height,
-        child: Stack(children: [
-          Positioned.fill(child: ColoredBox(color: color.withValues(alpha: 0.13))),
-          FractionallySizedBox(
-            widthFactor: value.clamp(0.0, 1.0),
-            child: ColoredBox(color: color),
+        width: double.infinity,
+        color: color.withValues(alpha: 0.14),
+        alignment: Alignment.centerLeft,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: value.clamp(0.0, 1.0)),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeOutCubic,
+          builder: (context, v, _) => FractionallySizedBox(
+            widthFactor: v,
+            heightFactor: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(height)),
+            ),
           ),
-        ]),
+        ),
       ),
     );
   }

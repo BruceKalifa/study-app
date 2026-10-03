@@ -47,6 +47,7 @@ class InkToolbar extends StatelessWidget {
               ),
               _ToolButton(
                 icon: Icons.format_color_fill_rounded,
+                glyph: _Glyph.highlighter,
                 tooltip: '형광펜',
                 active: c.tool == InkTool.highlighter,
                 color: Color(s.highlighterColor).withValues(alpha: 1),
@@ -54,6 +55,7 @@ class InkToolbar extends StatelessWidget {
               ),
               _ToolButton(
                 icon: Icons.auto_fix_normal_rounded,
+                glyph: _Glyph.eraser,
                 tooltip: '지우개 (S펜 버튼을 누른 채 써도 지워져요)',
                 active: c.tool == InkTool.eraser,
                 onTap: () => c.tool = InkTool.eraser,
@@ -269,6 +271,53 @@ class InkToolbar extends StatelessWidget {
   }
 }
 
+enum _Glyph { highlighter, eraser }
+
+class _GlyphPainter extends CustomPainter {
+  _GlyphPainter(this.glyph, this.color);
+  final _Glyph glyph;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.085
+      ..strokeJoin = StrokeJoin.round;
+    final fill = Paint()..color = color;
+    canvas.save();
+    canvas.translate(w / 2, size.height / 2);
+    canvas.rotate(-0.785);
+    if (glyph == _Glyph.eraser) {
+      final body = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: w * 0.42, height: w * 0.86),
+          Radius.circular(w * 0.08));
+      canvas.drawRRect(body, stroke);
+      canvas.drawRRect(
+          RRect.fromRectAndCorners(Rect.fromLTRB(-w * 0.21, w * 0.12, w * 0.21, w * 0.43),
+              bottomLeft: Radius.circular(w * 0.08), bottomRight: Radius.circular(w * 0.08)),
+          fill);
+    } else {
+      // marker body + chisel tip
+      final body = RRect.fromRectAndRadius(Rect.fromLTRB(-w * 0.17, -w * 0.44, w * 0.17, w * 0.12),
+          Radius.circular(w * 0.06));
+      canvas.drawRRect(body, stroke);
+      final tip = Path()
+        ..moveTo(-w * 0.17, w * 0.12)
+        ..lineTo(w * 0.17, w * 0.12)
+        ..lineTo(w * 0.08, w * 0.34)
+        ..lineTo(-w * 0.08, w * 0.26)
+        ..close();
+      canvas.drawPath(tip, fill);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlyphPainter old) => old.color != color || old.glyph != glyph;
+}
+
 class _ToolButton extends StatelessWidget {
   const _ToolButton({
     required this.icon,
@@ -277,7 +326,9 @@ class _ToolButton extends StatelessWidget {
     this.active = false,
     this.enabled = true,
     this.color,
+    this.glyph,
   });
+  final _Glyph? glyph;
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
@@ -305,13 +356,19 @@ class _ToolButton extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Icon(icon,
-                    size: 22,
-                    color: !enabled
-                        ? AppColors.lineStrong
-                        : active
-                            ? Colors.white
-                            : AppColors.ink),
+                if (glyph != null)
+                  CustomPaint(
+                    size: const Size(22, 22),
+                    painter: _GlyphPainter(glyph!, active ? Colors.white : AppColors.ink),
+                  )
+                else
+                  Icon(icon,
+                      size: 22,
+                      color: !enabled
+                          ? AppColors.lineStrong
+                          : active
+                              ? Colors.white
+                              : AppColors.ink),
                 if (color != null)
                   Positioned(
                     bottom: 5,
