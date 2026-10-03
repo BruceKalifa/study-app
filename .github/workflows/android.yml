@@ -30,7 +30,7 @@ jobs:
           cache: true
 
       - name: Flutter version
-        run: flutter --version
+        run: mkdir -p ci-out && flutter --version | tee ci-out/flutter-version.txt
 
       - name: Fetch fonts (Pretendard, OFL)
         run: bash tools/fetch_fonts.sh
@@ -45,11 +45,11 @@ jobs:
 
       - name: Resolved package versions
         run: |
-          flutter pub deps --style=compact | head -80 || true
-          mkdir -p ci-out && cp pubspec.lock ci-out/
+          flutter pub deps --style=compact > ci-out/deps.txt 2>&1 || true
+          cp pubspec.lock ci-out/
 
       - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee ci-out/analyze.txt
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee ci-out/analyze.txt; exit ${PIPESTATUS[0]}
 
       - name: Unit tests
         run: flutter test 2>&1 | tee ci-out/test.txt; exit ${PIPESTATUS[0]}
@@ -58,17 +58,20 @@ jobs:
         run: mkdir -p ~/.android && cp tools/keys/debug.keystore ~/.android/debug.keystore
 
       - name: Build APK
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: flutter build apk --release --target-platform android-arm64 --build-number=${{ github.run_number }} 2>&1 | tee ci-out/build.txt; exit ${PIPESTATUS[0]}
 
       - name: Collect APK
         run: cp build/app/outputs/flutter-apk/app-release.apk ci-out/pulinote.apk
 
-      - uses: actions/upload-artifact@v4
+      - name: Push logs to ci-logs branch
         if: always()
-        with:
-          name: ci-out
-          path: ci-out/
-          if-no-files-found: ignore
+        run: |
+          mkdir -p /tmp/logs && cp ci-out/*.txt ci-out/pubspec.lock /tmp/logs/ 2>/dev/null || true
+          echo "${{ job.status }} ${GITHUB_SHA::7} run ${{ github.run_number }}" > /tmp/logs/status.txt
+          cd /tmp/logs && git init -q && git checkout -q -b ci-logs
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "ci logs ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-logs
 
       - name: Publish "latest" release
         env:

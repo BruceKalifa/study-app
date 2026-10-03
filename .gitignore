@@ -18,3 +18,4 @@ assets/fonts/*.otf
 server/node_modules/
 server/data/
 ci-out/
+__pycache__/

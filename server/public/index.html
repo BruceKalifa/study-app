@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>풀이노트 · 선생님</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232B55D6'/%3E%3Cpath d='M9 21c3-7 6-10 8-10s2 4 0 6-5 1-2-3 6-4 8-3' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M9 21c3-7 6-10 8-10s2 4 0 6-5 1-2-3 6-4 8-3" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>
+      </span>
+      <span class="brand-name">풀이노트 · 선생님</span>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="화면 전환">
+      <button class="tab is-active" role="tab" aria-selected="true" data-tab="live" id="tab-live">실시간</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="records" id="tab-records">기록</button>
+    </nav>
+
+    <div class="topbar-right">
+      <span class="conn" id="conn" data-state="connecting" title="서버 연결 상태">
+        <span class="conn-dot" aria-hidden="true"></span><span class="conn-text">연결 중</span>
+      </span>
+      <span class="online-count" id="onlineCount" title="지금 접속한 학생 / 전체 학생">접속 0명</span>
+      <button class="btn btn-primary" id="broadcastBtn" type="button">
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 9.5 16 4l-3.2 12.5-3.6-4.3L3 9.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m9.2 12.2 3.6-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>전체에게 메시지</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-live" class="view" role="tabpanel" aria-labelledby="tab-live">
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="emptyLive" hidden>
+        <div class="empty-sheet" aria-hidden="true">
+          <svg viewBox="0 0 220 120" width="220" height="120"><path d="M20 90c20-50 40-70 60-70s14 30-4 40-30 0-10-20 40-24 60-16 30 30 40 50" fill="none" stroke="#B9C3D3" stroke-width="3" stroke-linecap="round"/></svg>
+        </div>
+        <h2>아직 접속한 학생이 없어요</h2>
+        <p>학생 태블릿의 풀이노트 앱 → 설정에서 아래 서버 주소를 입력하면, 학생이 쓰는 필기가 여기에 바로 나타나요.</p>
+        <ul class="addr-list" id="addrList"></ul>
+        <p class="hint">태블릿과 이 컴퓨터가 같은 Wi-Fi에 연결되어 있어야 해요.</p>
+      </div>
+    </section>
+
+    <section id="view-records" class="view" role="tabpanel" aria-labelledby="tab-records" hidden>
+      <div class="records-head">
+        <h1>학생별 기록</h1>
+        <p class="records-sub" id="recordsSub">제출할 때마다 자동으로 갱신돼요.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="records" id="recordsTable">
+          <thead>
+            <tr>
+              <th data-sort="name" class="col-name">학생</th>
+              <th data-sort="total" class="num">푼 문제</th>
+              <th data-sort="acc" class="col-acc">정답률</th>
+              <th data-sort="streak" class="num">연속 정답</th>
+              <th data-sort="today" class="num">오늘</th>
+              <th class="col-weak">약한 단원</th>
+              <th data-sort="last" class="col-last">마지막 제출</th>
+              <th class="col-toggle"><span class="sr-only">펼치기</span></th>
+            </tr>
+          </thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+      </div>
+      <div class="empty empty-records" id="emptyRecords" hidden>
+        <h2>아직 기록이 없어요</h2>
+        <p>학생이 문제를 제출하면 푼 문제 수, 정답률, 약한 단원이 여기에 쌓여요.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- 학생 한 명 크게 보기 -->
+  <div class="focus" id="focus" hidden>
+    <div class="focus-backdrop" data-close></div>
+    <div class="focus-panel" role="dialog" aria-modal="true" aria-labelledby="focusName">
+      <header class="focus-head">
+        <div class="focus-who">
+          <span class="dot" id="focusDot"></span>
+          <h2 id="focusName">학생</h2>
+          <span class="focus-device" id="focusDevice"></span>
+        </div>
+        <div class="focus-actions">
+          <button class="btn btn-ghost" id="followBtn" type="button" aria-pressed="true" title="학생이 쓰는 위치를 자동으로 따라가요">최신 필기 따라가기</button>
+          <button class="icon-btn" type="button" data-close aria-label="닫기">
+            <svg viewBox="0 0 20 20" width="18" height="18"><path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="focus-body">
+        <aside class="focus-side">
+          <div class="problem">
+            <div class="problem-meta" id="focusMeta"></div>
+            <h3 class="problem-title" id="focusTitle"></h3>
+            <div class="problem-stem" id="focusStem"></div>
+            <ul class="problem-box" id="focusBox" hidden></ul>
+            <ol class="problem-choices" id="focusChoices"></ol>
+          </div>
+          <div class="focus-answer" id="focusAnswer"></div>
+          <form class="msg-box" id="msgForm" autocomplete="off">
+            <label for="msgInput" class="msg-label">메시지 보내기</label>
+            <div class="msg-quick" id="msgQuick">
+              <button type="button" class="chip">잘했어요!</button>
+              <button type="button" class="chip">풀이 과정을 조금 더 써 볼까요?</button>
+              <button type="button" class="chip">단위를 다시 확인해 보세요</button>
+            </div>
+            <div class="msg-row">
+              <input id="msgInput" type="text" maxlength="500" placeholder="학생 화면에 알림으로 표시돼요">
+              <button class="btn btn-primary" type="submit">보내기</button>
+            </div>
+          </form>
+        </aside>
+        <div class="focus-canvas-wrap">
+          <div class="sheet sheet-large" id="focusSheet">
+            <canvas id="focusCanvas"></canvas>
+            <div class="scrollbar" aria-hidden="true"><div class="scrollbar-thumb" id="focusThumb"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 전체 메시지 -->
+  <dialog class="dialog" id="broadcastDialog">
+    <form method="dialog" id="broadcastForm">
+      <h2>전체에게 메시지</h2>
+      <p class="dialog-sub" id="broadcastSub">지금 접속한 모든 학생 화면에 알림으로 표시돼요.</p>
+      <textarea id="broadcastText" rows="3" maxlength="500" placeholder="예: 5분 뒤에 같이 풀이 확인할게요"></textarea>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" value="cancel" type="button" id="broadcastCancel">취소</button>
+        <button class="btn btn-primary" value="send" type="submit">모두에게 보내기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+  <template id="tileTpl">
+    <article class="tile" tabindex="0">
+      <header class="tile-head">
+        <span class="dot"></span>
+        <span class="tile-name"></span>
+        <span class="tile-device"></span>
+      </header>
+      <div class="tile-problem"></div>
+      <div class="sheet">
+        <canvas></canvas>
+        <span class="sheet-idle">아직 필기가 없어요</span>
+      </div>
+      <footer class="tile-foot">
+        <span class="badge"></span>
+        <span class="tile-time"></span>
+      </footer>
+    </article>
+  </template>
+
+  <script defer src="app.js"></script>
+</body>
+</html>

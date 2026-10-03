@@ -1,0 +1,18 @@
+{
+  "name": "pulinote-live-server",
+  "version": "1.0.0",
+  "description": "풀이노트 실시간 필기 공유 서버 + 선생님 대시보드",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "sim": "node tools/sim-student.js ws://localhost:8080/ws",
+    "test": "node tools/test-live.js ws://localhost:8080/ws"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
