@@ -487,7 +487,7 @@ class _AnswerPanelState extends State<AnswerPanel> {
                   if (!g.correct)
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
-                      child: Text('오답노트에 담았어요 · 내일 복습으로 다시 나와요',
+                      child: Text('오답노트에 담았어요',
                           style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
                     ),
                 ]),

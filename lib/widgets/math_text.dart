@@ -74,8 +74,10 @@ class MathText extends StatelessWidget {
       }
       final formula = Math.tex(
         text,
-        mathStyle: MathStyle.text,
-        textStyle: base.copyWith(fontSize: (base.fontSize ?? 16) * mathScale),
+        // display-size fractions read better on a tablet; compact previews keep text size
+        mathStyle: maxLines == null ? MathStyle.display : MathStyle.text,
+        // only size + colour: weight/family from the surrounding text would switch KaTeX to upright glyphs
+        textStyle: TextStyle(fontSize: (base.fontSize ?? 16) * mathScale, color: base.color),
         onErrorFallback: (err) => Text(text, style: base.copyWith(fontStyle: FontStyle.italic)),
       );
       // Break long formulas at relations/operators so they wrap like text;

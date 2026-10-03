@@ -55,7 +55,7 @@ Widget _wrap(AppState s, Widget home) => RepaintBoundary(
       key: _boundary,
       child: AppScope(
         state: s,
-        child: MaterialApp(debugShowCheckedModeBanner: false, theme: AppTheme.light(), home: home),
+        child: MaterialApp(key: UniqueKey(), debugShowCheckedModeBanner: false, theme: AppTheme.light(), home: home),
       ),
     );
 

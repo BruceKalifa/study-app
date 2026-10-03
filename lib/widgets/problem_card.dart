@@ -29,7 +29,7 @@ class ProblemSheet extends StatelessWidget {
     return DefaultTextStyle(
       style: const TextStyle(fontFamily: AppTheme.font, fontSize: 25, height: 1.65, color: AppColors.ink),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(56, 48, 56, 24),
+        padding: const EdgeInsets.fromLTRB(56, 118, 56, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
