@@ -349,6 +349,7 @@ class _SolveScreenState extends State<SolveScreen> {
       color: color,
       graded: _exam ? null : graded,
       examAnswer: _exam ? _examAnswers[_index] : null,
+      submitLabel: _exam ? '답 제출' : '채점하기',
       handwritingEnabled: app.settings.handwritingAnswer,
       onSubmit: _submit,
       onChoiceChanged: (c) => setState(() => _choice = c),

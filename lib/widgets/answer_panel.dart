@@ -43,7 +43,10 @@ class AnswerPanel extends StatefulWidget {
     this.onRetry,
     this.isLast = false,
     this.examAnswer,
+    this.submitLabel = '채점하기',
   });
+
+  final String submitLabel;
 
   /// Exam mode: the answer already handed in for this problem (shown, can be changed).
   final String? examAnswer;
@@ -220,7 +223,7 @@ class _AnswerPanelState extends State<AnswerPanel> {
           key: const Key('submit'),
           onPressed: _canSubmit ? _submit : null,
           icon: const Icon(Icons.check_rounded),
-          label: const Text('채점하기'),
+          label: Text(widget.submitLabel),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(58),
             backgroundColor: widget.color,
