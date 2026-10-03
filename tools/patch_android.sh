@@ -26,3 +26,28 @@ fi
 echo "---- patched manifest ----"
 cat "$M"
 grep -n "minSdk" android/app/build.gradle* || true
+
+# Low-latency stylus: ask Android for unbuffered (un-batched) pen events → more points, less lag.
+MA=$(find android/app/src/main -name MainActivity.kt | head -1)
+if [ -n "$MA" ]; then
+  PKG=$(grep -m1 '^package ' "$MA")
+  cat > "$MA" <<KT
+$PKG
+
+import android.view.MotionEvent
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity() {
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            val tool = ev.getToolType(0)
+            if (tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER) {
+                window.decorView.requestUnbufferedDispatch(ev)
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+}
+KT
+  echo "---- MainActivity ----"; cat "$MA"
+fi

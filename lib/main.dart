@@ -1,16 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter/services.dart';
 
-void main() => runApp(const BootApp());
+import 'app/app_state.dart';
+import 'app/storage.dart';
+import 'app/theme.dart';
+import 'core/problem_bank.dart';
+import 'screens/home_shell.dart';
+import 'services/handwriting.dart';
 
-class BootApp extends StatelessWidget {
-  const BootApp({super.key});
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  final bank = await ProblemBank.load(rootBundle);
+  final storage = await FileStorage.create();
+  final state = AppState(storage: storage, baseBank: bank);
+  await state.init();
+  // download the handwriting model in the background (first launch only)
+  Handwriting.instance.prepare();
+  runApp(PulinoteApp(state: state));
+}
+
+class PulinoteApp extends StatefulWidget {
+  const PulinoteApp({super.key, required this.state});
+  final AppState state;
+
+  @override
+  State<PulinoteApp> createState() => _PulinoteAppState();
+}
+
+class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) {
+      widget.state.saveNow();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(fontFamily: 'Pretendard'),
-      home: Scaffold(
-        body: Center(child: Math.tex(r'\frac{1}{2}at^2', textStyle: const TextStyle(fontSize: 32))),
+    return AppScope(
+      state: widget.state,
+      child: MaterialApp(
+        title: '풀이노트',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        home: const HomeShell(),
       ),
     );
   }
