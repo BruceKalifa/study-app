@@ -362,6 +362,19 @@ class AppState extends ChangeNotifier {
 
   Future<void> deleteDraft(String problemId) => storage.delete(_draftKey(problemId));
 
+  /// Replace all records with [list] (oldest first) and rebuild per-problem state.
+  /// Used for demos/screenshots and data import.
+  void seedAttempts(List<Attempt> list) {
+    attempts = List<Attempt>.of(list)..sort((a, b) => a.at.compareTo(b.at));
+    states = {};
+    for (final a in attempts) {
+      final st = states[a.baseId] ?? ProblemState(a.baseId);
+      st.apply(ok: a.correct, at: a.at, answer: a.answer, attemptId: a.id);
+      states[a.baseId] = st;
+    }
+    _changed();
+  }
+
   Future<String?> readProfileFile(String name) => storage.read(_pp(name));
   Future<void> writeProfileFile(String name, String data) => storage.write(_pp(name), data);
 

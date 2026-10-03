@@ -57,6 +57,10 @@ jobs:
       - name: Unit tests
         run: flutter test 2>&1 | tee ci-out/test.txt; exit ${PIPESTATUS[0]}
 
+      - name: Screenshots (for design review)
+        continue-on-error: true
+        run: SHOTS=1 flutter test test/screenshots_test.dart 2>&1 | tail -60 > ci-out/shots.txt; ls ci-out/shots || true
+
       - name: Stable signing key (so updates install over the old app)
         run: mkdir -p ~/.android && cp tools/keys/debug.keystore ~/.android/debug.keystore
 
@@ -70,6 +74,7 @@ jobs:
         if: always()
         run: |
           mkdir -p /tmp/logs && cp ci-out/*.txt ci-out/pubspec.lock /tmp/logs/ 2>/dev/null || true
+          cp -r ci-out/shots /tmp/logs/ 2>/dev/null || true
           echo "${{ job.status }} ${GITHUB_SHA::7} run ${{ github.run_number }}" > /tmp/logs/status.txt
           cd /tmp/logs && git init -q && git checkout -q -b ci-logs
           git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
