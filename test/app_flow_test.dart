@@ -197,6 +197,7 @@ void main() {
     expect(tester.widget<FilledButton>(find.byKey(const Key('submit'))).onPressed, isNull);
     // a finger tap on the 답 box under the problem opens the keypad
     await tester.tap(find.text('여기에 답을 쓰세요'));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byKey(const Key('keypad-ok')), findsOneWidget);
     await tester.tap(find.byKey(const Key('key-9')));
@@ -205,6 +206,7 @@ void main() {
     await tester.tap(find.byKey(const Key('key-9')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('keypad-ok')));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byKey(const Key('recognized-answer')), findsOneWidget);
     await tester.tap(find.byKey(const Key('submit')));
@@ -214,6 +216,7 @@ void main() {
     expect(find.text(wrong ? '정답이에요!' : '오답 · 정답 ${expectedDisplay(short)}'), findsOneWidget);
     // 해설 sheet opens
     await tester.tap(find.byKey(const Key('solution')));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('해설'), findsWidgets);
     await tester.tapAt(const Offset(20, 20));
@@ -296,6 +299,7 @@ void main() {
     expect(app.attempts, isEmpty);
     expect(find.text('시험 종료 3/3'), findsOneWidget);
     await tester.tap(find.byKey(const Key('exam-finish')));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('exam-finish-ok')));
     await tester.pump(const Duration(milliseconds: 600));

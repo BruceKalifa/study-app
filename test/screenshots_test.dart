@@ -14,7 +14,6 @@ import 'package:study_app/app/app_state.dart';
 import 'package:study_app/app/records.dart';
 import 'package:study_app/app/storage.dart';
 import 'package:study_app/app/theme.dart';
-import 'package:study_app/core/problem.dart';
 import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/ink/ink_model.dart';
@@ -187,6 +186,7 @@ void main() {
     await _write(tester, c + const Offset(300, 60), _axisY());
     await _write(tester, c + const Offset(470, -40), _parabola());
     await _write(tester, c + const Offset(300, 230), _wave());
+    await _write(tester, c + const Offset(560, 120), _circle(26));
     await _rest(tester);
     await _shot(tester, '09_solve_full');
 
@@ -214,6 +214,7 @@ void main() {
     await _rest(tester);
     await _shot(tester, '13_solve_short_written');
     await tester.tapAt(box + const Offset(120, 30));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 500));
     for (final k in short.answer.split('')) {
       final key = find.byKey(Key('key-$k'));
@@ -222,6 +223,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     await _shot(tester, '14_solve_keypad');
     await tester.tap(find.byKey(const Key('keypad-ok')));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const Key('submit')));
     await _shot(tester, '15_solve_short_graded');

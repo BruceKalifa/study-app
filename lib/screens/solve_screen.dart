@@ -553,7 +553,9 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       answerText: graded?.given ?? answer,
       answerNote: _answerNote(app),
       answerBoxEmpty: _boxEmpty,
-      columnWidth: landscape ? 600 : 872,
+      // the page always spans the screen width; keep print the same size on screen as in portrait
+      zoom: (950 / mq.size.width).clamp(0.45, 1.0),
+      columnFraction: landscape ? 0.58 : 1.0,
       serif: app.settings.examFont,
     );
 
@@ -720,7 +722,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       chip = Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Text(
-          has ? '${circled(int.tryParse(answer ?? '') ?? 0)} 선택' : '선지를 눌러 고르세요',
+          has ? '${circled(int.tryParse(answer) ?? 0)} 선택' : '선지를 눌러 고르세요',
           style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800, color: has ? AppColors.ink : AppColors.inkMuted),
         ),
       );
@@ -735,7 +737,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             Text(has ? '답  ' : '답칸에 쓰면 자동 인식',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
             if (has)
-              Text(answerDisplay(p, answer ?? ''), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              Text(answerDisplay(p, answer), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
             const SizedBox(width: 6),
             const Icon(Icons.edit_rounded, size: 17, color: AppColors.inkMuted),
           ]),

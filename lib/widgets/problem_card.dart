@@ -53,7 +53,8 @@ class ProblemSheet extends StatelessWidget {
     this.answerText,
     this.answerNote,
     this.answerBoxEmpty = true,
-    this.columnWidth = 872,
+    this.zoom = 1,
+    this.columnFraction = 1,
     this.serif = true,
   });
 
@@ -76,8 +77,12 @@ class ProblemSheet extends StatelessWidget {
   final String? answerNote;
   final bool answerBoxEmpty;
 
-  /// Width of the problem column (narrower in landscape so the right side is free for solving).
-  final double columnWidth;
+  /// Print size relative to the page (< 1 in landscape, where the page is shown much wider,
+  /// so the text keeps the same size on screen as in portrait).
+  final double zoom;
+
+  /// Share of the line the problem column takes (narrower in landscape: the right side is for solving).
+  final double columnFraction;
   final bool serif;
 
   static const double _indent = 58;
@@ -88,10 +93,28 @@ class ProblemSheet extends StatelessWidget {
     final face = serif ? AppTheme.serif : AppTheme.font;
     final correctChoice = int.tryParse(p.answer);
     const sans = AppTheme.font;
+    final k = zoom.clamp(0.4, 1.0);
+    final contentWidth = 1000 / k;
+    final columnWidth = (contentWidth - 128) * columnFraction.clamp(0.3, 1.0);
+    // laid out wider and scaled down to the page width; [keys.root] stays in page coordinates
+    return SizedBox(
+      key: keys.root,
+      width: 1000,
+      child: FittedBox(
+        fit: BoxFit.fitWidth,
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: contentWidth,
+          child: _content(context, p, face, sans, correctChoice, columnWidth),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, Problem p, String face, String sans, int? correctChoice, double columnWidth) {
     return DefaultTextStyle(
       style: TextStyle(fontFamily: face, fontSize: 25, height: 1.75, color: AppColors.ink),
       child: Padding(
-        key: keys.root,
         padding: const EdgeInsets.fromLTRB(64, 104, 64, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,14 +124,14 @@ class ProblemSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('${p.subjectName} 영역',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontFamily: sans, fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.4)),
                 const SizedBox(width: 14),
                 Flexible(
                   child: Text(
                     [p.unit, if (p.topic.isNotEmpty) p.topic].join('  ·  '),
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontFamily: sans, fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.inkMuted, height: 1.3),
                   ),
                 ),
@@ -452,30 +475,27 @@ class _AnswerBox extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        SizedBox(
-          height: 34,
-          child: Row(children: [
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          runSpacing: 2,
+          children: [
             if (text != null && text!.isNotEmpty) ...[
               Icon(Icons.auto_awesome_rounded, size: 20, color: color),
-              const SizedBox(width: 6),
-              Text('인식된 답  ',
-                  style: TextStyle(fontFamily: sans, fontSize: 17, fontWeight: FontWeight.w700, color: color)),
+              Text('인식된 답', style: TextStyle(fontFamily: sans, fontSize: 17, fontWeight: FontWeight.w700, color: color)),
               Text(u.isEmpty ? text! : '${text!} $u',
                   key: const Key('recognized-answer'),
-                  style: const TextStyle(fontFamily: sans, fontSize: 22, fontWeight: FontWeight.w800, height: 1.2)),
-              const SizedBox(width: 12),
+                  style: const TextStyle(fontFamily: sans, fontSize: 22, fontWeight: FontWeight.w800, height: 1.3)),
               if (reveal == null)
-                const Text('다르면 답칸을 손가락으로 톡',
+                const Text('  다르면 답칸을 손가락으로 톡',
                     style: TextStyle(fontFamily: sans, fontSize: 14.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
             ] else if (note != null)
               Text(note!,
                   style: const TextStyle(fontFamily: sans, fontSize: 16, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
-            if (reveal != null) ...[
-              const SizedBox(width: 14),
-              Text('정답  ${u.isEmpty ? reveal! : '${reveal!} $u'}',
+            if (reveal != null)
+              Text('   정답  ${u.isEmpty ? reveal! : '${reveal!} $u'}',
                   style: const TextStyle(fontFamily: sans, fontSize: 19, fontWeight: FontWeight.w800, color: Color(0xFFE0353B))),
-            ],
-          ]),
+          ],
         ),
       ],
     );
