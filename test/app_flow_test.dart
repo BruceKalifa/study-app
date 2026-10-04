@@ -586,7 +586,7 @@ void main() {
     await tester.runAsync(() => app.record(p, answer: 'x', expected: p.answer, correct: false, timeMs: 1000, mode: 'practice'));
     await tester.pumpWidget(_app(app));
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('오답노트').last);
+    await tester.tap(find.text('오답노트').first); // the rail tab (the home card has the same label)
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('wn-subject-phy1')), findsOneWidget);
