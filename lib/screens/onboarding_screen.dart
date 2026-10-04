@@ -122,9 +122,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.topLeft,
+                      children: [...previous, if (current != null) current],
+                    ),
                     child: KeyedSubtree(
                       key: ValueKey(_step),
-                      child: SingleChildScrollView(child: _body(app)),
+                      child: SingleChildScrollView(child: SizedBox(width: double.infinity, child: _body(app))),
                     ),
                   ),
                 ),

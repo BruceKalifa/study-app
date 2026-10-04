@@ -234,7 +234,11 @@ class ProblemSheet extends StatelessWidget {
                         ]),
                       ),
                       Expanded(
-                        child: MathText('${p.stem}  [${problemPoints(p)}점]',
+                        // a stem that ends with a table gets its 배점 on the next line
+                        child: MathText(
+                            RegExp(r'\n\s*\|[^\n]*$').hasMatch(p.stem)
+                                ? '${p.stem}\n[${problemPoints(p)}점]'
+                                : '${p.stem}  [${problemPoints(p)}점]',
                             style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w400)),
                       ),
                     ],

@@ -569,6 +569,7 @@ class _WeekBars extends CustomPainter {
       tp.text = TextSpan(
           text: labels[i],
           style: TextStyle(
+              fontFamily: AppTheme.font,
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
               color: i == study.length - 1 ? AppColors.ink : AppColors.inkMuted));
@@ -597,7 +598,7 @@ class _GradeChart extends CustomPainter {
     double y(num g) => top + h * (g - 1) / 8;
     for (var g = 1; g <= 9; g++) {
       canvas.drawLine(Offset(left, y(g)), Offset(left + w, y(g)), grid);
-      tp.text = TextSpan(text: '$g', style: const TextStyle(fontSize: 11.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700));
+      tp.text = TextSpan(text: '$g', style: const TextStyle(fontFamily: AppTheme.font, fontSize: 11.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700));
       tp.layout();
       tp.paint(canvas, Offset(left - 10 - tp.width, y(g) - tp.height / 2));
     }
@@ -606,7 +607,7 @@ class _GradeChart extends CustomPainter {
     for (var i = 0; i < n; i++) {
       tp.text = TextSpan(
           text: list[i].name.length > 8 ? list[i].name.substring(0, 8) : list[i].name,
-          style: const TextStyle(fontSize: 11.5, color: AppColors.inkSoft, fontWeight: FontWeight.w700));
+          style: const TextStyle(fontFamily: AppTheme.font, fontSize: 11.5, color: AppColors.inkSoft, fontWeight: FontWeight.w700));
       tp.layout();
       tp.paint(canvas, Offset((x(i) - tp.width / 2).clamp(0, size.width - tp.width), size.height - bottom + 6));
     }
