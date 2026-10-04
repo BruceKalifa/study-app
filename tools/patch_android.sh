@@ -18,6 +18,19 @@ for G in android/app/build.gradle.kts android/app/build.gradle; do
   sed -i -E 's/minSdk(Version)? *=? *flutter\.minSdkVersion/minSdk = 24/' "$G"
 done
 
+# Release: no R8 minify/shrink. R8 strips WorkManager's Room database (a dependency of ML Kit)
+# and the app dies right at launch (androidx.work.impl.WorkDatabase could not be created).
+for G in android/app/build.gradle.kts android/app/build.gradle; do
+  [ -f "$G" ] || continue
+  if [[ "$G" == *.kts ]]; then
+    sed -i -E 's/^([[:space:]]*)signingConfig = signingConfigs\.getByName\("debug"\)/&\n\1isMinifyEnabled = false\n\1isShrinkResources = false/' "$G"
+  else
+    sed -i -E 's/^([[:space:]]*)signingConfig signingConfigs\.debug/&\n\1minifyEnabled false\n\1shrinkResources false/' "$G"
+  fi
+  grep -Eq 'isMinifyEnabled = false|minifyEnabled false' "$G" || { echo "ERROR: could not disable minify in $G"; cat "$G"; exit 1; }
+  echo "---- $G ----"; cat "$G"
+done
+
 # Launcher icons
 if [ -d tools/icons/res ]; then
   cp -r tools/icons/res/* android/app/src/main/res/
