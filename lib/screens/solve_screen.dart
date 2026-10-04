@@ -95,6 +95,9 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   bool get _exam => widget.mode == 'exam';
 
   Problem get _p => _problems[_index];
+
+  /// Enough paper to fill a portrait tablet (and then some) before auto-extend kicks in.
+  static const double _minPageHeight = 2200;
   bool get _locked => !_exam && _graded.containsKey(_index);
 
   @override
@@ -195,6 +198,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     }
     _recogTimer?.cancel();
     final ink = InkController(settings: _app.ink);
+    ink.pageHeight = _minPageHeight;
     ink.committed.addListener(_onInkChanged);
     setState(() {
       _index = i;
@@ -208,6 +212,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final draft = await _app.loadDraft(p.id);
     if (!mounted || _ink != ink) return;
     if (draft != null && ink.isEmpty) ink.load(draft); // never wipe strokes written while loading
+    if (ink.pageHeight < _minPageHeight) ink.pageHeight = _minPageHeight;
     final live = _app.live;
     if (live != null) {
       ink.sink = live;
@@ -548,7 +553,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       color: color,
       keys: _sheet,
       selectedChoice: p.isChoice ? int.tryParse(graded?.given ?? answer ?? '') : null,
-      revealAnswer: graded != null,
+      revealAnswer: graded != null && !graded.correct,
       mark: graded?.correct,
       answerText: graded?.given ?? answer,
       answerNote: _answerNote(app),
@@ -968,9 +973,11 @@ class _NavButton extends StatelessWidget {
         child: Container(
           height: 64,
           padding: EdgeInsets.only(left: trailing ? 22 : 10, right: trailing ? 10 : 22),
-          decoration: const BoxDecoration(
-            borderRadius: BorderRadius.all(Radius.circular(32)),
-            boxShadow: [BoxShadow(color: Color(0x1A1B2A4A), blurRadius: 20, offset: Offset(0, 8))],
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.all(Radius.circular(32)),
+            boxShadow: enabled
+                ? const [BoxShadow(color: Color(0x1A1B2A4A), blurRadius: 20, offset: Offset(0, 8))]
+                : null,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: trailing ? [tx, ic] : [ic, tx]),
         ),

@@ -164,14 +164,14 @@ class ProblemSheet extends StatelessWidget {
                               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, height: 1.55)),
                           if (mark != null)
                             Positioned(
-                              left: -14,
-                              top: -12,
+                              left: -13,
+                              top: -10,
                               child: TweenAnimationBuilder<double>(
                                 tween: Tween(begin: 0, end: 1),
                                 duration: const Duration(milliseconds: 420),
                                 curve: Curves.easeOutCubic,
                                 builder: (context, t, _) => CustomPaint(
-                                  size: const Size(80, 72),
+                                  size: const Size(66, 62),
                                   painter: _MarkPainter(correct: mark!, progress: t),
                                 ),
                               ),
