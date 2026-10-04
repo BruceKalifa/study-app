@@ -728,7 +728,18 @@ class _AuthImageState extends State<AuthImage> {
       future: _f,
       builder: (context, snap) {
         final b = snap.data;
-        if (b != null) return Image.memory(b, width: widget.width, fit: BoxFit.contain, gaplessPlayback: true);
+        if (b != null) {
+          return Image.memory(
+            b,
+            width: widget.width,
+            fit: BoxFit.contain,
+            gaplessPlayback: true,
+            // keep a box while the picture decodes
+            frameBuilder: (context, child, frame, sync) => frame == null && !sync
+                ? const SizedBox(width: 160, height: 110, child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)))
+                : child,
+          );
+        }
         if (snap.hasError) {
           return Padding(
             padding: const EdgeInsets.all(16),
