@@ -51,9 +51,8 @@ class ProblemBrief extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('<보 기>', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
             const SizedBox(height: 4),
-            for (var i = 0; i < p.boxItems.length; i++)
-              MathText('${const ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ'][i % 6]}. ${p.boxItems[i]}',
-                  style: TextStyle(fontSize: fs - 1, color: AppColors.inkSoft, height: 1.6)),
+            for (final b in p.boxItems)
+              MathText(b, style: TextStyle(fontSize: fs - 1, color: AppColors.inkSoft, height: 1.6)),
           ]),
         ),
       ],
@@ -63,11 +62,23 @@ class ProblemBrief extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(
-                width: 30,
-                child: Text('①②③④⑤⑥⑦⑧'[i < 8 ? i : 7],
+              Container(
+                width: 22,
+                height: 22,
+                margin: const EdgeInsets.only(right: 10, top: 2),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: showAnswer && right == i + 1
+                          ? AppColors.correct
+                          : (given == i + 1 ? AppColors.wrong : AppColors.inkMuted),
+                      width: 1.4),
+                ),
+                child: Text('${i + 1}',
                     style: TextStyle(
-                        fontSize: fs,
+                        fontSize: 12.5,
+                        height: 1,
                         fontWeight: FontWeight.w800,
                         color: showAnswer && right == i + 1
                             ? AppColors.correct

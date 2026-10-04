@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
@@ -163,7 +164,7 @@ Future<void> _waitNet(WidgetTester tester, [int rounds = 4]) async {
 Future<void> _teacherShots(WidgetTester tester, String server) async {
   HttpOverrides.global = _RealHttp();
   final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
-  final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+  final png = (await tester.runAsync(_samplePagePng))!;
   final bank = (await tester.runAsync(() => ProblemBank.load(rootBundle)))!;
   final setup = await tester.runAsync(() async {
     final (tToken, tMe) = await AccountApi(server).signup(role: 'teacher', loginId: 'shot$stamp', password: 'teach-pass', name: '우네');
@@ -296,6 +297,47 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
   }
   await tester.pumpWidget(_wrap(sApp, AskTeacherScreen(problem: bank.byId('phy1-mech-005'), snapshot: null)));
   await _shot(tester, '49_ask_teacher');
+  // let requests started inside the fake clock (badge refresh) finish or time out
+  await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));
+  await tester.pumpWidget(const SizedBox());
+  await tester.pump(const Duration(seconds: 90));
+}
+
+/// A page-like picture (problem lines + handwriting) to attach to questions in the screenshots.
+Future<Uint8List> _samplePagePng() async {
+  final rec = ui.PictureRecorder();
+  final c = Canvas(rec);
+  const w = 900.0, h = 520.0;
+  c.drawRect(const Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFFFFFDF8));
+  final grey = Paint()..color = const Color(0xFFD5CDBF);
+  for (var i = 0; i < 4; i++) {
+    c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(40, 40.0 + i * 26, i == 3 ? 380 : 560, 12), const Radius.circular(6)), grey);
+  }
+  final ink = Paint()
+    ..color = const Color(0xFF1B2A4A)
+    ..strokeWidth = 3.2
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+  final path = Path()..moveTo(80, 420);
+  for (var x = 0.0; x <= 300; x += 6) {
+    path.lineTo(80 + x, 420 - (x * x) / 260);
+  }
+  c.drawPath(path, ink);
+  c.drawLine(const Offset(70, 430), const Offset(420, 430), ink);
+  c.drawLine(const Offset(80, 440), const Offset(80, 200), ink);
+  final red = Paint()
+    ..color = const Color(0xFFE5484D)
+    ..strokeWidth = 3.4
+    ..style = PaintingStyle.stroke;
+  c.drawCircle(const Offset(640, 300), 70, red);
+  final wave = Path()..moveTo(520, 420);
+  for (var x = 0.0; x <= 300; x += 5) {
+    wave.lineTo(520 + x, 420 + 22 * math.sin(x / 18));
+  }
+  c.drawPath(wave, ink);
+  final img = await rec.endRecording().toImage(w.toInt(), h.toInt());
+  final data = await img.toByteData(format: ui.ImageByteFormat.png);
+  return data!.buffer.asUint8List();
 }
 
 void main() {

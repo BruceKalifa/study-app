@@ -65,6 +65,13 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
     if (!quiet) setState(() => _loading = true);
     try {
       final list = await api.questions(status: _status, studentId: widget.studentId);
+      if (app.isTeacher) {
+        // 선생님: 답을 기다리는 질문을 먼저
+        list.sort((a, b) {
+          final o = (a.status == 'open' ? 0 : 1) - (b.status == 'open' ? 0 : 1);
+          return o != 0 ? o : b.updatedAt.compareTo(a.updatedAt);
+        });
+      }
       if (!mounted) return;
       setState(() {
         _list = list;
