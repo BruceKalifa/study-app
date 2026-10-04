@@ -264,6 +264,16 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await _waitNet(tester);
+    debugPrint('DEBUG thread: AuthImage=${find.byType(AuthImage).evaluate().length} '
+        'bubbles=${find.byWidgetPredicate((w) => w.runtimeType.toString() == '_Bubble').evaluate().length} '
+        'spinners=${find.byType(CircularProgressIndicator).evaluate().length}');
+    final dq = await tester.runAsync(() async {
+      final api = tApp.api!;
+      final list = await api.questions();
+      final full = await api.question(list.first.id);
+      return '${full.messages.map((m) => m.image).toList()} hasImage=${list.first.hasImage}';
+    });
+    debugPrint('DEBUG api: $dq');
     await _shot(tester, '45_teacher_thread');
     await tester.pageBack();
     await tester.pump();
