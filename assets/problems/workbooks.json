@@ -1,0 +1,250 @@
+{
+  "workbooks": [
+    {
+      "id": "wb-phy1-concept",
+      "title": "물리학Ⅰ 개념 완성",
+      "course": "phy1",
+      "level": "기본",
+      "desc": "교과 개념을 유형별로 한 바퀴 — 기본 난이도 문항 위주",
+      "problems": [
+        "phy1-mech-001",
+        "phy1-mech-002",
+        "phy1-mech-003",
+        "phy1-mech-004",
+        "phy1-mech-009",
+        "phy1-em-001",
+        "phy1-em-004",
+        "phy1-em-008",
+        "phy1-wave-001",
+        "phy1-wave-004",
+        "phy1-wave-006",
+        "phy1-wave-007"
+      ]
+    },
+    {
+      "id": "wb-phy1-real1",
+      "title": "물리학Ⅰ 실전 N제 1",
+      "course": "phy1",
+      "level": "실전",
+      "desc": "수능 3점 수준의 계산·<보기> 문항",
+      "problems": [
+        "phy1-mech-005",
+        "phy1-mech-006",
+        "phy1-mech-007",
+        "phy1-mech-008",
+        "phy1-mech-010",
+        "phy1-em-002",
+        "phy1-em-003",
+        "phy1-em-005",
+        "phy1-em-006",
+        "phy1-wave-002",
+        "phy1-wave-003",
+        "phy1-wave-005"
+      ]
+    },
+    {
+      "id": "wb-phy2-deep",
+      "title": "물리학Ⅱ 심화 문제",
+      "course": "phy2",
+      "level": "심화",
+      "desc": "원운동·전자기·파동의 고난도 문항",
+      "problems": [
+        "phy2-mech-002",
+        "phy2-mech-003",
+        "phy2-mech-005",
+        "phy2-mech-007",
+        "phy2-elec-003",
+        "phy2-elec-005",
+        "phy2-elec-007",
+        "phy2-elec-008",
+        "phy2-wave-001",
+        "phy2-wave-002",
+        "phy2-wave-003",
+        "phy2-wave-004"
+      ]
+    },
+    {
+      "id": "wb-earth1-concept",
+      "title": "지구과학Ⅰ 핵심 유형",
+      "course": "earth1",
+      "level": "기본",
+      "desc": "고체 지구부터 우주까지 빈출 개념 확인",
+      "problems": [
+        "earth1-solid-001",
+        "earth1-solid-002",
+        "earth1-solid-003",
+        "earth1-solid-008",
+        "earth1-solid-009",
+        "earth1-solid-010",
+        "earth1-atm-001",
+        "earth1-atm-003",
+        "earth1-atm-006",
+        "earth1-atm-010",
+        "earth1-space-003",
+        "earth1-space-008"
+      ]
+    },
+    {
+      "id": "wb-earth1-mock1",
+      "title": "지구과학Ⅰ 미니 모의고사 1회",
+      "course": "earth1",
+      "level": "모의고사",
+      "desc": "단원별 5문항씩, 실제 시험처럼 시간을 재고 풀어 보세요",
+      "problems": [
+        "earth1-solid-004",
+        "earth1-solid-005",
+        "earth1-solid-006",
+        "earth1-solid-007",
+        "earth1-solid-001",
+        "earth1-atm-002",
+        "earth1-atm-004",
+        "earth1-atm-005",
+        "earth1-atm-007",
+        "earth1-atm-008",
+        "earth1-space-009",
+        "earth1-space-001",
+        "earth1-space-002",
+        "earth1-space-004",
+        "earth1-space-005"
+      ]
+    },
+    {
+      "id": "wb-math-common",
+      "title": "고1 공통수학 기초",
+      "course": "math",
+      "level": "기본",
+      "desc": "다항식·방정식·부등식 기본기 다지기",
+      "problems": [
+        "math-poly-001",
+        "math-poly-002",
+        "math-poly-003",
+        "math-poly-004",
+        "math-poly-005",
+        "math-poly-006"
+      ]
+    },
+    {
+      "id": "wb-math-real1",
+      "title": "수학Ⅰ·Ⅱ 실전 N제 1",
+      "course": "math",
+      "level": "실전",
+      "desc": "지수·로그, 삼각함수, 수열, 미적분 실전 문항",
+      "problems": [
+        "math-exp-001",
+        "math-exp-005",
+        "math-trig-003",
+        "math-trig-006",
+        "math-seq-002",
+        "math-seq-004",
+        "math-seq-005",
+        "math-seq-006",
+        "math-calc-003",
+        "math-calc-004",
+        "math-calc-006",
+        "math-calc-007"
+      ]
+    },
+    {
+      "id": "wb-integ-concept",
+      "title": "통합과학 개념 다지기",
+      "course": "integ",
+      "level": "기본",
+      "desc": "고1 통합과학 핵심 개념 확인 문제",
+      "problems": [
+        "integ-matter-001",
+        "integ-matter-002",
+        "integ-matter-003",
+        "integ-system-001",
+        "integ-system-002",
+        "integ-system-003",
+        "integ-change-001",
+        "integ-change-002",
+        "integ-change-003",
+        "integ-energy-001",
+        "integ-energy-002",
+        "integ-energy-003"
+      ]
+    },
+    {
+      "id": "wb-kor-read",
+      "title": "국어 독서 지문 훈련",
+      "course": "kor-read",
+      "level": "실전",
+      "desc": "인문·사회·과학기술 지문 3개 — 내용 일치, 추론, <보기> 적용",
+      "problems": [
+        "kor-read-hum-001",
+        "kor-read-hum-002",
+        "kor-read-hum-003",
+        "kor-read-soc-001",
+        "kor-read-soc-002",
+        "kor-read-soc-003",
+        "kor-read-sci-001",
+        "kor-read-sci-002",
+        "kor-read-sci-003"
+      ]
+    },
+    {
+      "id": "wb-eng-focus",
+      "title": "영어 빈칸·주제 집중",
+      "course": "eng",
+      "level": "실전",
+      "desc": "대의 파악(주제·요지·제목·함축)과 빈칸 추론 집중 훈련",
+      "problems": [
+        "eng-read-001",
+        "eng-read-002",
+        "eng-read-004",
+        "eng-read-005",
+        "eng-short-002"
+      ]
+    },
+    {
+      "id": "wb-soc-data",
+      "title": "통합사회 자료 해석",
+      "course": "soc-int",
+      "level": "실전",
+      "desc": "표 자료를 읽고 계산·해석하는 문항 모음",
+      "problems": [
+        "soc-int-nat-001",
+        "soc-int-econ-001",
+        "soc-int-econ-002",
+        "soc-int-econ-003",
+        "soc-int-just-001",
+        "soc-int-fut-001"
+      ]
+    },
+    {
+      "id": "wb-mid-math2",
+      "title": "중2 수학 내신 대비",
+      "course": "mid-math2",
+      "level": "기본",
+      "desc": "유리수와 순환소수부터 일차함수까지 내신 필수 유형",
+      "problems": [
+        "mid-math2-rat-001",
+        "mid-math2-rat-002",
+        "mid-math2-expr-001",
+        "mid-math2-expr-002",
+        "mid-math2-expr-003",
+        "mid-math2-sys-001",
+        "mid-math2-sys-002",
+        "mid-math2-lin-001",
+        "mid-math2-lin-002",
+        "mid-math2-lin-003"
+      ]
+    },
+    {
+      "id": "wb-mid-sci",
+      "title": "중등 과학 내신 핵심",
+      "course": "mid-sci",
+      "level": "기본",
+      "desc": "전기, 운동과 에너지, 화학 반응, 날씨, 유전 핵심 문항",
+      "problems": [
+        "mid-sci-elec-001",
+        "mid-sci-elec-002",
+        "mid-sci-mot-001",
+        "mid-sci-chem-001",
+        "mid-sci-atm-001",
+        "mid-sci-gen-001"
+      ]
+    }
+  ]
+}

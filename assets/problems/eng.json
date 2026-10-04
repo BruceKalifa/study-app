@@ -1,0 +1,266 @@
+{
+  "subject": "영어",
+  "subjectId": "eng",
+  "color": "#2F86C9",
+  "group": "eng",
+  "level": "high",
+  "grades": [
+    "고1",
+    "고2",
+    "고3",
+    "N수"
+  ],
+  "track": "수능",
+  "units": [
+    "대의 파악",
+    "세부 정보",
+    "빈칸 추론",
+    "간접 쓰기",
+    "어법·어휘"
+  ],
+  "passages": [
+    {
+      "id": "eng-p01",
+      "title": "Rereading and Real Learning",
+      "body": "Many students prepare for exams by rereading their notes until the material feels familiar. The problem is that familiarity is a poor guide to learning. When we reread a page, the words flow easily, and this ease creates the impression that we have mastered the content. Yet recognizing information when it is in front of us is very different from producing it when it is not. Research on memory suggests that the act of pulling information out of our heads, even when it is slow and full of errors, strengthens it far more than passively reviewing it. A student who closes the book and tries to explain a concept from memory may feel frustrated and uncertain, but that very struggle signals that the brain is rebuilding the connection. In other words, __　　　　　　　　　　　　__. Learners who understand this stop judging their study sessions by how comfortable they feel and start valuing the effort of recall."
+    },
+    {
+      "id": "eng-p02",
+      "title": "Trees and the Urban Heat Island",
+      "body": "Cities are often several degrees warmer than the surrounding countryside, a phenomenon known as the urban heat island. Concrete and asphalt absorb sunlight during the day and ①__release__ it slowly at night, so streets stay hot long after sunset. One of the simplest ways to reduce this effect is to plant more trees. A single large tree shades a wide area, and through its leaves it gives off water vapor, ②__which__ cools the surrounding air much as sweat cools our skin. Neighborhoods with plenty of trees can be several degrees cooler on summer afternoons than ③__that__ without them. This difference matters most to people who cannot afford air conditioning, for whom a hot night can be ④__dangerous__. Unfortunately, trees are often the first things to be cut down when roads are widened, and young trees planted to replace them take decades ⑤__to provide__ the same shade. For this reason, city planners argue that protecting existing trees should be treated as seriously as building new parks."
+    },
+    {
+      "id": "eng-p03",
+      "title": "The Axolotl",
+      "body": "The axolotl is a salamander that comes from a small network of lakes and canals near Mexico City. Unlike many salamanders, which lose their gills and move onto land as adults, the axolotl usually keeps its juvenile features throughout its life. It stays in the water, breathing mainly through feathery gills on either side of its head, and it can reproduce without ever going through a full transformation. What has made the axolotl famous among scientists, however, is its remarkable ability to regrow lost body parts. If it loses a leg, it can grow back a complete, working limb, including bones, muscles, and nerves, often without leaving a scar. Researchers study this ability in the hope that it may one day help repair damaged human tissues. Sadly, the wild population has fallen sharply because of water pollution and the spread of the city, and the animal is now critically endangered in its natural home."
+    }
+  ],
+  "problems": [
+    {
+      "id": "eng-read-001",
+      "unit": "빈칸 추론",
+      "topic": "빈칸 추론",
+      "difficulty": 4,
+      "type": "choice",
+      "passageId": "eng-p01",
+      "stem": "다음 글의 빈칸에 들어갈 말로 가장 적절한 것은?",
+      "choices": [
+        "the speed of reading is the best measure of how well we understand",
+        "reviewing notes repeatedly is the safest way to avoid forgetting",
+        "the difficulty that makes learning feel slow is often what makes it last",
+        "mistakes made during study should be avoided at all costs",
+        "learning is most effective when it feels smooth and familiar"
+      ],
+      "answer": "3",
+      "solution": "글의 흐름: 다시 읽기는 익숙함만 줄 뿐 학습의 좋은 지표가 아니다 → 기억에서 정보를 꺼내는 행위는 느리고 오류가 많아도 기억을 훨씬 강화한다 → 그 '애씀(struggle)'이 바로 뇌가 연결을 다시 만드는 신호이다.\n빈칸은 In other words로 이를 정리하므로 '학습을 느리게 느껴지게 하는 어려움이 흔히 학습을 오래 지속되게 한다'(③)가 알맞다.\n②, ⑤는 글이 비판하는 내용이고, ①, ④는 글과 반대된다.",
+      "hint": "In other words 앞 문장의 'that very struggle'이 무엇을 의미하는지 생각한다.",
+      "tags": [
+        "빈칸",
+        "학습법"
+      ]
+    },
+    {
+      "id": "eng-read-002",
+      "unit": "대의 파악",
+      "topic": "제목",
+      "difficulty": 3,
+      "type": "choice",
+      "passageId": "eng-p01",
+      "stem": "다음 글의 제목으로 가장 적절한 것은?",
+      "choices": [
+        "How to Take Notes That Are Easy to Review",
+        "Familiar Words: The Key to Fast Reading",
+        "The Hidden Dangers of Studying in Groups",
+        "Why Memory Declines as We Grow Older",
+        "Struggling to Recall: The Hidden Engine of Lasting Learning"
+      ],
+      "answer": "5",
+      "solution": "글은 다시 읽기가 주는 익숙함이 학습의 착각을 일으키며, 기억에서 애써 꺼내는 과정이 오래가는 학습을 만든다고 주장한다. 따라서 '기억해 내려는 애씀: 오래가는 학습의 숨은 동력'(⑤)이 제목으로 가장 적절하다.\n①, ②는 다시 읽기·익숙함을 긍정하는 방향이고, ③, ④는 글에서 다루지 않은 내용이다.",
+      "hint": "필자가 '긍정적으로' 평가하는 학습 방식이 무엇인지 찾는다.",
+      "tags": [
+        "제목",
+        "학습법"
+      ]
+    },
+    {
+      "id": "eng-read-003",
+      "unit": "어법·어휘",
+      "topic": "어법",
+      "difficulty": 3,
+      "type": "choice",
+      "passageId": "eng-p02",
+      "stem": "다음 글의 밑줄 친 부분 중, 어법상 틀린 것은?",
+      "choices": [
+        "①",
+        "②",
+        "③",
+        "④",
+        "⑤"
+      ],
+      "answer": "3",
+      "solution": "③ 비교 대상은 앞의 복수 명사 Neighborhoods이므로, 이를 대신하는 대명사는 복수형 those가 되어야 한다. (that → those)\n① absorb와 and로 병렬 연결된 동사 release는 적절하다.\n② 앞의 water vapor를 선행사로 하는 계속적 용법의 관계대명사 which는 적절하다.\n④ be동사 can be의 보어 자리이므로 형용사 dangerous가 적절하다.\n⑤ 'take+시간+to부정사(~하는 데 시간이 걸리다)' 구문이므로 to provide가 적절하다.",
+      "hint": "비교 대상과 대명사의 수 일치를 확인한다.",
+      "tags": [
+        "어법",
+        "대명사 수 일치"
+      ]
+    },
+    {
+      "id": "eng-read-004",
+      "unit": "대의 파악",
+      "topic": "요지",
+      "difficulty": 2,
+      "type": "choice",
+      "passageId": "eng-p02",
+      "stem": "다음 글의 요지로 가장 적절한 것은?",
+      "choices": [
+        "도로를 넓힐 때는 반드시 새 공원을 함께 조성해야 한다.",
+        "냉방 기기 보급을 늘리는 것이 도시 열섬의 가장 효과적인 해결책이다.",
+        "어린 나무를 많이 심는 것만으로 도시의 기온을 빠르게 낮출 수 있다.",
+        "도시의 기존 나무를 보호하는 것은 도시 열섬을 완화하는 데 중요하다.",
+        "콘크리트와 아스팔트를 자연 소재로 모두 바꾸어야 한다."
+      ],
+      "answer": "4",
+      "solution": "도시 열섬을 줄이는 간단한 방법은 나무를 심는 것이며, 어린 나무가 같은 그늘을 만들기까지는 수십 년이 걸리므로 기존 나무를 보호하는 일을 새 공원 조성만큼 중요하게 다루어야 한다는 것이 글의 요지이다(④).\n③은 어린 나무가 같은 그늘을 만드는 데 수십 년이 걸린다는 내용과 어긋나고, ①, ②, ⑤는 글에서 주장하지 않은 내용이다.",
+      "hint": "마지막 문장(For this reason, ...)에 필자의 주장이 드러나 있다.",
+      "tags": [
+        "요지",
+        "환경"
+      ]
+    },
+    {
+      "id": "eng-read-005",
+      "unit": "대의 파악",
+      "topic": "주제",
+      "difficulty": 2,
+      "type": "choice",
+      "passageId": "eng-p03",
+      "stem": "다음 글의 주제로 가장 적절한 것은?",
+      "choices": [
+        "reasons why salamanders leave the water as adults",
+        "the unique features of the axolotl and threats to its survival",
+        "methods of breeding axolotls in laboratories",
+        "the history of the lakes and canals near Mexico City",
+        "how human tissues recover from injuries without scars"
+      ],
+      "answer": "2",
+      "solution": "axolotl이 평생 어린 시기의 특징을 유지하고, 잃어버린 신체 부위를 재생하는 놀라운 능력이 있으며, 수질 오염과 도시 확장으로 멸종 위기에 처했다는 내용이다. 따라서 'axolotl의 독특한 특징과 생존에 대한 위협'(②)이 주제로 가장 적절하다.",
+      "hint": "글 전체에 걸쳐 반복되는 대상과, 마지막 문장의 내용까지 함께 담은 선택지를 고른다.",
+      "tags": [
+        "주제",
+        "동물"
+      ]
+    },
+    {
+      "id": "eng-read-006",
+      "unit": "세부 정보",
+      "topic": "내용 일치",
+      "difficulty": 2,
+      "type": "choice",
+      "passageId": "eng-p03",
+      "stem": "axolotl에 관한 다음 글의 내용과 일치하지 않는 것은?",
+      "choices": [
+        "멕시코시티 근처의 호수와 수로가 원산지이다.",
+        "대개 일생 동안 어린 시기의 특징을 유지한다.",
+        "완전한 변태를 거치지 않고도 번식할 수 있다.",
+        "잃어버린 다리를 다시 자라게 할 수 있지만 반드시 흉터가 남는다.",
+        "수질 오염과 도시 확장으로 야생 개체 수가 크게 줄었다."
+      ],
+      "answer": "4",
+      "solution": "④ 본문에서 다리를 잃으면 뼈, 근육, 신경까지 갖춘 다리를 다시 자라게 할 수 있으며 'often without leaving a scar(흔히 흉터를 남기지 않고)'라고 하였으므로 일치하지 않는다.\n① comes from ... near Mexico City, ② keeps its juvenile features throughout its life, ③ reproduce without ever going through a full transformation, ⑤ fallen sharply because of water pollution and the spread of the city와 일치한다.",
+      "hint": "scar가 언급된 문장을 정확히 해석한다.",
+      "tags": [
+        "내용 일치",
+        "동물"
+      ]
+    },
+    {
+      "id": "eng-short-001",
+      "unit": "어법·어휘",
+      "topic": "어휘",
+      "difficulty": 3,
+      "type": "choice",
+      "stem": "다음 글의 밑줄 친 부분 중, 문맥상 낱말의 쓰임이 적절하지 않은 것은?\n\nOnline reviews have become a powerful force in shaping what we buy. Because a product with thousands of positive ratings seems ①__safer__ than one with only a few, shoppers tend to follow the crowd. However, this habit can be ②__misleading__. Early reviews strongly influence later ones: once a few enthusiastic ratings appear, new buyers expect to be satisfied and become ③__reluctant__ to give the product high marks themselves. As a result, a high average rating may reflect the luck of a good start rather than ④__superior__ quality. Wise shoppers, therefore, look beyond the number of stars and read the reasons behind both the praise and the ⑤__complaints__.",
+      "choices": [
+        "①",
+        "②",
+        "③",
+        "④",
+        "⑤"
+      ],
+      "answer": "3",
+      "solution": "초기의 열광적인 평점을 본 새 구매자는 만족할 것이라 기대하고 스스로도 높은 점수를 주려는 경향이 생긴다는 흐름이다. 따라서 ③ reluctant(꺼리는)는 eager(열망하는)나 likely(~할 가능성이 큰) 등으로 바꾸어야 한다.\n① 평점이 많은 상품이 더 안전해 보임, ② 그 습관이 오해를 낳을 수 있음, ④ 우수한 품질, ⑤ 칭찬과 불만 모두의 이유는 모두 문맥에 맞다.",
+      "hint": "As a result 문장(높은 평점 = 좋은 출발의 운)과 자연스럽게 이어지려면 새 구매자는 어떻게 행동해야 하는가?",
+      "tags": [
+        "어휘",
+        "문맥"
+      ]
+    },
+    {
+      "id": "eng-short-002",
+      "unit": "대의 파악",
+      "topic": "함축 의미",
+      "difficulty": 4,
+      "type": "choice",
+      "stem": "밑줄 친 __hitting the target but missing the point__가 다음 글에서 의미하는 바로 가장 적절한 것은?\n\nMany organizations reward employees for what can be easily counted: the number of calls answered, emails sent, or hours spent at the desk. These numbers are attractive because they are simple to compare. But when people know they are judged by a number, they begin to work for the number rather than for the goal behind it. A customer service agent who must answer as many calls as possible may rush callers off the phone before their problems are solved. In this way, the organization ends up __hitting the target but missing the point__. Good managers remember that a measurement is only a tool for checking progress toward a purpose, not the purpose itself.",
+      "choices": [
+        "achieving the measured goal while failing at the real purpose",
+        "setting goals that are too difficult for employees to reach",
+        "losing customers because of a lack of reliable data",
+        "comparing employees fairly by using simple numbers",
+        "ignoring numbers in favor of personal judgment"
+      ],
+      "answer": "1",
+      "solution": "숫자로 평가받는 직원은 숫자 자체를 위해 일하게 되어, 통화 수라는 목표치는 달성하지만 고객의 문제 해결이라는 본래 목적은 놓치게 된다. 따라서 '측정된 목표는 달성하지만 진짜 목적에는 실패하는 것'(①)이 가장 적절하다.",
+      "hint": "target은 '측정되는 숫자', point는 '그 숫자 뒤의 본래 목적'에 해당한다.",
+      "tags": [
+        "함축 의미"
+      ]
+    },
+    {
+      "id": "eng-short-003",
+      "unit": "간접 쓰기",
+      "topic": "무관한 문장",
+      "difficulty": 2,
+      "type": "choice",
+      "stem": "다음 글에서 전체 흐름과 관계 없는 문장은?\n\nSleep plays a key role in how the brain stores new memories. ① During deep sleep, the brain replays patterns of activity from the day, strengthening the connections that represent what was learned. ② This is why students who sleep well after studying tend to remember more than those who stay up all night. ③ Even a short nap after learning a new skill can improve performance on a later test. ④ Many people drink coffee in the morning because its smell helps them feel more awake. ⑤ Rather than cutting sleep to find more study time, then, learners may benefit from protecting it as part of the learning process itself.",
+      "choices": [
+        "①",
+        "②",
+        "③",
+        "④",
+        "⑤"
+      ],
+      "answer": "4",
+      "solution": "글은 수면이 새로운 기억을 저장하는 데 핵심적인 역할을 한다는 내용이다. ④는 아침에 커피를 마시는 이유에 관한 것으로 수면과 기억 저장이라는 글의 흐름과 관계가 없다.",
+      "hint": "첫 문장의 주제(수면과 기억)에서 벗어난 문장을 찾는다.",
+      "tags": [
+        "무관한 문장",
+        "수면"
+      ]
+    },
+    {
+      "id": "eng-short-001-t1",
+      "twinOf": "eng-short-001",
+      "unit": "어법·어휘",
+      "topic": "어휘",
+      "difficulty": 3,
+      "type": "choice",
+      "stem": "다음 글의 밑줄 친 부분 중, 문맥상 낱말의 쓰임이 적절하지 않은 것은?\n\nMany people believe that multitasking helps them get more done. In reality, the brain does not perform two demanding tasks at once; it ①__switches__ rapidly between them. Each switch has a small cost, as attention needs time to ②__adjust__ to the new task. These costs add up, so people who multitask often finish their work more ③__slowly__ and make more errors than those who focus on one thing at a time. What is more, frequent multitaskers tend to ④__overestimate__ their own ability to handle several tasks. The ⑤__harmful__ solution is simple: turn off notifications and give one task your full attention before moving on.",
+      "choices": [
+        "①",
+        "②",
+        "③",
+        "④",
+        "⑤"
+      ],
+      "answer": "5",
+      "solution": "마지막 문장은 멀티태스킹의 문제를 해결하는 방법(알림을 끄고 한 가지 일에 집중하기)을 제시하므로, ⑤ harmful(해로운)은 effective(효과적인)나 best(최선의) 등으로 바꾸어야 한다.\n① 빠르게 전환함, ② 새 과제에 적응함, ③ 더 느리게 끝냄, ④ 자신의 능력을 과대평가함은 모두 문맥에 맞다.",
+      "hint": "마지막 문장이 문제점인지, 해결책인지 판단한다.",
+      "tags": [
+        "어휘",
+        "문맥"
+      ]
+    }
+  ]
+}

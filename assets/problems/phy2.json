@@ -2,6 +2,18 @@
   "subject": "물리학Ⅱ",
   "subjectId": "phy2",
   "color": "#7A4FD6",
+  "group": "sci",
+  "level": "high",
+  "grades": [
+    "고3",
+    "N수"
+  ],
+  "track": "수능",
+  "units": [
+    "힘과 운동",
+    "전기와 자기",
+    "파동과 물질의 성질"
+  ],
   "problems": [
     {
       "id": "phy2-mech-001",

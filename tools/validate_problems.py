@@ -13,7 +13,12 @@ Usage:
       primary := number | name | name '(' args ')' | '(' expr ')'
   Functions: sqrt abs sin cos tan (degrees) log (base 10) ln exp min(a,b)
   max(a,b) round(x,n) floor ceil.  Constants: pi e.
-* Checks schema + LaTeX rules of every file listed in assets/problems/_index.json.
+* Checks schema + LaTeX rules of every file listed in assets/problems/_index.json:
+  course metadata (group/level/grades/track/units), passages and passageId links,
+  twin families (twinOf -> an existing non-twin problem), body markup
+  (**bold** / __underline__ pairs and | table | rows outside $...$).
+* Checks assets/problems/workbooks.json (not listed in _index.json): unique ids,
+  known course, allowed level, existing non-twin problem ids.
 * For every template, generates variants and checks answers / choiceExprs.
 
 Exit status is non-zero when any error is found.  Standard library only.
@@ -410,6 +415,67 @@ def check_text(s: str, where: str, errs: list, warns: list, allow_placeholders=F
             errs.append(f"{where}: unbalanced braces in ${seg}$")
     if not allow_placeholders and "[[" in s:
         errs.append(f"{where}: [[...]] placeholder outside a template")
+    check_markup(s, where, errs, warns)
+
+
+# ---------------------------------------------------------------------------
+# Body markup (**bold**, __underline__, | tables |) — see docs/problem-schema.md
+
+TABLE_SEP_RE = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$")
+
+
+def mask_math(s: str) -> str:
+    """Replace the inside of every $...$ segment by 'x' (newlines kept) so markup
+    characters used inside LaTeX (|x|, a_{n}, ...) are not mistaken for markup."""
+    parts = s.split("$")
+    for i in range(1, len(parts), 2):
+        parts[i] = re.sub(r"[^\n]", "x", parts[i])
+    return "$".join(parts)
+
+
+def table_cells(line: str) -> int:
+    t = line.strip()
+    if t.startswith("|"):
+        t = t[1:]
+    if t.endswith("|"):
+        t = t[:-1]
+    return len(t.split("|"))
+
+
+def check_markup(s: str, where: str, errs: list, warns: list):
+    m = mask_math(s)
+    if m.count("**") % 2:
+        errs.append(f"{where}: unbalanced ** (bold) markers")
+    if m.count("__") % 2:
+        errs.append(f"{where}: unbalanced __ (underline) markers")
+    if re.search(r"_{3,}", m):
+        warns.append(f"{where}: run of 3+ '_' outside math collides with __underline__ markup "
+                     f"(write a blank as __<spaces>__)")
+    # tables: consecutive lines starting with '|'
+    block: list = []
+    for line in m.split("\n") + [""]:
+        if line.lstrip().startswith("|"):
+            block.append(line)
+            continue
+        if block:
+            check_table(block, where, errs, warns)
+            block = []
+
+
+def check_table(rows: list, where: str, errs: list, warns: list):
+    if len(rows) < 2:
+        warns.append(f"{where}: one-line table {rows[0].strip()!r}")
+        return
+    counts = [table_cells(r) for r in rows]
+    if len(set(counts)) != 1:
+        errs.append(f"{where}: table rows have different cell counts {counts}: {rows[0].strip()!r}")
+    for i, r in enumerate(rows):
+        if i != 1 and TABLE_SEP_RE.match(r.strip()):
+            warns.append(f"{where}: table separator row |---| at row {i + 1} (expected only as row 2)")
+        if not r.strip().endswith("|"):
+            warns.append(f"{where}: table row {i + 1} does not end with '|'")
+    if len(rows) == 2 and TABLE_SEP_RE.match(rows[1].strip()):
+        warns.append(f"{where}: table has a header but no data rows")
 
 
 def check_placeholders(s: str, where: str, names: set, errs: list, allow_v=False):
@@ -635,6 +701,100 @@ def validate_template(p: dict, where: str, errs: list, warns: list, stats: dict,
 # Problem / file checks
 
 REQUIRED = ("id", "unit", "topic", "difficulty", "type", "stem", "answer", "solution")
+KNOWN_PROBLEM_KEYS = set(REQUIRED) | {
+    "choices", "boxItems", "answerUnit", "tolerance", "hint", "tags", "template",
+    "passageId", "twinOf",
+}
+
+# course metadata
+GROUPS = ("kor", "math", "eng", "soc", "sci")
+LEVELS = ("mid", "high")
+GRADES = ("중1", "중2", "중3", "고1", "고2", "고3", "N수")
+TRACKS = ("수능", "내신", "공통")
+SUBJECT_ID_RE = re.compile(r"^[a-z0-9-]+$")
+
+# workbooks.json
+WORKBOOK_FILE = "workbooks.json"
+WB_LEVELS = ("기본", "실전", "심화", "모의고사")
+WB_ID_RE = re.compile(r"^[a-z0-9-]+$")
+
+
+def validate_course_meta(fname: str, data: dict, errs: list, warns: list):
+    sid = data.get("subjectId")
+    if not isinstance(sid, str) or not SUBJECT_ID_RE.match(sid):
+        errs.append(f"{fname}: subjectId must be lowercase letters/digits/'-', got {sid!r}")
+    if not isinstance(data.get("subject"), str) or not data.get("subject", "").strip():
+        errs.append(f"{fname}: subject must be a non-empty string")
+    g = data.get("group")
+    if g not in GROUPS:
+        errs.append(f"{fname}: group must be one of {'/'.join(GROUPS)}, got {g!r}")
+    lv = data.get("level")
+    if lv not in LEVELS:
+        errs.append(f"{fname}: level must be one of {'/'.join(LEVELS)}, got {lv!r}")
+    gr = data.get("grades")
+    if not isinstance(gr, list) or not gr:
+        errs.append(f"{fname}: grades must be a non-empty list")
+    else:
+        bad = [x for x in gr if x not in GRADES]
+        if bad:
+            errs.append(f"{fname}: unknown grade(s) {bad} (allowed: {' '.join(GRADES)})")
+        if len(set(gr)) != len(gr):
+            errs.append(f"{fname}: duplicate grades {gr}")
+        if lv == "mid" and any(not str(x).startswith("중") for x in gr):
+            warns.append(f"{fname}: level 'mid' but grades {gr} include non-중 grades")
+        if lv == "high" and any(str(x).startswith("중") for x in gr):
+            warns.append(f"{fname}: level 'high' but grades {gr} include 중 grades")
+    if "track" in data and data["track"] not in TRACKS:
+        errs.append(f"{fname}: track must be one of {'/'.join(TRACKS)}, got {data['track']!r}")
+    units = data.get("units")
+    if units is not None:
+        if (not isinstance(units, list) or not units
+                or not all(isinstance(u, str) and u.strip() for u in units)):
+            errs.append(f"{fname}: units must be a non-empty list of non-empty strings")
+        elif len(set(units)) != len(units):
+            errs.append(f"{fname}: duplicate units {units}")
+
+
+def validate_passages(fname: str, data: dict, seen_passages: dict, errs: list, warns: list):
+    """Returns the set of passage ids defined in this file."""
+    ids = set()
+    ps = data.get("passages")
+    if ps is None:
+        return ids
+    if not isinstance(ps, list):
+        errs.append(f"{fname}: passages must be a list")
+        return ids
+    for i, ps_ in enumerate(ps):
+        where = f"{fname}:passages[{i}]"
+        if not isinstance(ps_, dict):
+            errs.append(f"{where}: must be an object")
+            continue
+        pid = ps_.get("id")
+        if not isinstance(pid, str) or not pid.strip():
+            errs.append(f"{where}: missing id")
+            continue
+        where = f"{fname}:{pid}"
+        if pid in seen_passages:
+            errs.append(f"{where}: duplicate passage id (also in {seen_passages[pid]})")
+        seen_passages[pid] = fname
+        ids.add(pid)
+        body = ps_.get("body")
+        if not isinstance(body, str) or not body.strip():
+            errs.append(f"{where}: passage body must be a non-empty string")
+        else:
+            check_text(body, f"{where}.body", errs, warns)
+        for k in ("title", "source"):
+            if k in ps_:
+                if not isinstance(ps_[k], str) or not ps_[k].strip():
+                    errs.append(f"{where}: '{k}' must be a non-empty string")
+                else:
+                    check_text(ps_[k], f"{where}.{k}", errs, warns)
+        if "title" not in ps_:
+            warns.append(f"{where}: passage has no title")
+        unknown = set(ps_) - {"id", "title", "body", "source"}
+        if unknown:
+            warns.append(f"{where}: unknown passage field(s) {sorted(unknown)}")
+    return ids
 
 
 def validate_problem(p: dict, where: str, errs, warns, stats, rng):
@@ -685,17 +845,28 @@ def validate_problem(p: dict, where: str, errs, warns, stats, rng):
         else:
             for i, b in enumerate(bi):
                 check_text(b, f"{where}.boxItems[{i}]", errs, warns)
-                if not re.match(r"^[ㄱ-ㅎ]\. ", b):
+                # a single item is a free-form <보기> passage (국어·영어·사회 style)
+                if len(bi) > 1 and not re.match(r"^[ㄱ-ㅎ]\. ", b):
                     warns.append(f"{where}.boxItems[{i}]: expected to start with 'ㄱ. ' style label")
     if "tags" in p and not (isinstance(p["tags"], list) and all(isinstance(x, str) for x in p["tags"])):
         errs.append(f"{where}: tags must be a string list")
+    for k in ("passageId", "twinOf", "answerUnit"):
+        if k in p and (not isinstance(p[k], str) or not p[k].strip()):
+            errs.append(f"{where}: '{k}' must be a non-empty string")
+    if p.get("twinOf") == p["id"]:
+        errs.append(f"{where}: twinOf points to itself")
+    unknown = set(p) - KNOWN_PROBLEM_KEYS
+    if unknown:
+        warns.append(f"{where}: unknown field(s) {sorted(unknown)}")
     if "hint" not in p:
         stats["no_hint"] += 1
     if "template" in p:
         validate_template(p, where, errs, warns, stats, rng)
 
 
-def validate_file(fname: str, seen_ids: dict, errs, warns, rng):
+def validate_file(fname: str, ctx: dict, errs, warns, rng):
+    """ctx: {'ids': id->file, 'probs': id->problem, 'passages': passage id->file}"""
+    seen_ids = ctx["ids"]
     path = os.path.join(PROB_DIR, fname)
     stats = {"variants": 0, "collision_rates": [], "samples": {}, "no_hint": 0}
     try:
@@ -704,20 +875,132 @@ def validate_file(fname: str, seen_ids: dict, errs, warns, rng):
     except (OSError, json.JSONDecodeError) as ex:
         errs.append(f"{fname}: cannot load: {ex}")
         return None, stats
-    for k in ("subject", "subjectId", "color", "problems"):
+    if not isinstance(data, dict):
+        errs.append(f"{fname}: top level must be an object")
+        return None, stats
+    for k in ("subject", "subjectId", "color", "group", "level", "grades", "problems"):
         if k not in data:
             errs.append(f"{fname}: missing top-level '{k}'")
     if not re.match(r"^#[0-9A-Fa-f]{6}$", str(data.get("color", ""))):
         errs.append(f"{fname}: color must be #RRGGBB")
+    validate_course_meta(fname, data, errs, warns)
+    passage_ids = validate_passages(fname, data, ctx["passages"], errs, warns)
     probs = data.get("problems") or []
+    if not isinstance(probs, list) or not probs:
+        errs.append(f"{fname}: problems must be a non-empty list")
+        probs = probs if isinstance(probs, list) else []
+    used_passages = set()
     for i, p in enumerate(probs):
+        if not isinstance(p, dict):
+            errs.append(f"{fname}:#{i}: problem must be an object")
+            continue
         pid = p.get("id", f"#{i}")
         where = f"{fname}:{pid}"
         if pid in seen_ids:
             errs.append(f"{where}: duplicate id (also in {seen_ids[pid]})")
         seen_ids[pid] = fname
+        ctx["probs"][pid] = p
         validate_problem(p, where, errs, warns, stats, rng)
+        ref = p.get("passageId")
+        if isinstance(ref, str):
+            if ref not in passage_ids:
+                errs.append(f"{where}: passageId {ref!r} is not a passage of {fname}")
+            used_passages.add(ref)
+    for unused in sorted(passage_ids - used_passages):
+        warns.append(f"{fname}:{unused}: passage is not used by any problem")
+    units = data.get("units")
+    if isinstance(units, list):
+        used_units = []
+        for p in probs:
+            u = p.get("unit") if isinstance(p, dict) else None
+            if isinstance(u, str) and u not in used_units:
+                used_units.append(u)
+        missing = [u for u in used_units if u not in units]
+        if missing:
+            warns.append(f"{fname}: problem unit(s) {missing} not listed in 'units' (sorted last)")
+        empty = [u for u in units if u not in used_units]
+        if empty:
+            warns.append(f"{fname}: unit(s) {empty} in 'units' have no problems")
     return data, stats
+
+
+def validate_twins(ctx: dict, errs, warns):
+    probs, files = ctx["probs"], ctx["ids"]
+    for pid, p in probs.items():
+        orig_id = p.get("twinOf")
+        if not isinstance(orig_id, str) or orig_id == pid:
+            continue
+        where = f"{files[pid]}:{pid}"
+        orig = probs.get(orig_id)
+        if orig is None:
+            errs.append(f"{where}: twinOf {orig_id!r} does not exist")
+            continue
+        if "twinOf" in orig:
+            errs.append(f"{where}: twinOf {orig_id!r} is itself a twin (point to the original)")
+        if files[orig_id] != files[pid]:
+            warns.append(f"{where}: twin lives in {files[pid]} but its original is in {files[orig_id]}")
+        for k in ("unit", "topic"):
+            if p.get(k) != orig.get(k):
+                warns.append(f"{where}: twin {k} {p.get(k)!r} differs from original {orig.get(k)!r}")
+
+
+def validate_workbooks(ctx: dict, courses: dict, errs, warns):
+    """courses: subjectId -> file name.  Returns the parsed workbook list (or None)."""
+    path = os.path.join(PROB_DIR, WORKBOOK_FILE)
+    if not os.path.exists(path):
+        warns.append(f"{WORKBOOK_FILE}: not found (no workbooks)")
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as ex:
+        errs.append(f"{WORKBOOK_FILE}: cannot load: {ex}")
+        return None
+    wbs = data.get("workbooks") if isinstance(data, dict) else None
+    if not isinstance(wbs, list) or not wbs:
+        errs.append(f"{WORKBOOK_FILE}: 'workbooks' must be a non-empty list")
+        return None
+    seen = set()
+    probs, files = ctx["probs"], ctx["ids"]
+    for i, wb in enumerate(wbs):
+        if not isinstance(wb, dict):
+            errs.append(f"{WORKBOOK_FILE}[{i}]: must be an object")
+            continue
+        wid = wb.get("id")
+        where = f"{WORKBOOK_FILE}:{wid if isinstance(wid, str) else f'#{i}'}"
+        if not isinstance(wid, str) or not WB_ID_RE.match(wid):
+            errs.append(f"{where}: id must be lowercase letters/digits/'-'")
+        elif wid in seen:
+            errs.append(f"{where}: duplicate workbook id")
+        seen.add(wid)
+        if not isinstance(wb.get("title"), str) or not wb["title"].strip():
+            errs.append(f"{where}: title must be a non-empty string")
+        course = wb.get("course")
+        if course not in courses:
+            errs.append(f"{where}: course {course!r} is not a subjectId of any listed file")
+        if wb.get("level") not in WB_LEVELS:
+            errs.append(f"{where}: level must be one of {'/'.join(WB_LEVELS)}, got {wb.get('level')!r}")
+        if "desc" in wb and not isinstance(wb["desc"], str):
+            errs.append(f"{where}: desc must be a string")
+        unknown = set(wb) - {"id", "title", "course", "level", "desc", "problems"}
+        if unknown:
+            warns.append(f"{where}: unknown field(s) {sorted(unknown)}")
+        plist = wb.get("problems")
+        if not isinstance(plist, list) or not plist:
+            errs.append(f"{where}: problems must be a non-empty list of problem ids")
+            continue
+        if len(set(plist)) != len(plist):
+            dups = sorted({x for x in plist if plist.count(x) > 1})
+            errs.append(f"{where}: duplicate problem ids {dups}")
+        for pid in plist:
+            if pid not in probs:
+                errs.append(f"{where}: problem {pid!r} does not exist")
+                continue
+            if "twinOf" in probs[pid]:
+                errs.append(f"{where}: problem {pid!r} is a twin (twins are not listed in workbooks)")
+            if course in courses and files[pid] != courses[course]:
+                warns.append(f"{where}: problem {pid!r} belongs to {files[pid]}, not course {course!r}")
+    return wbs
 
 
 def summarize(fname, data, stats, n_err, n_warn):
@@ -735,8 +1018,13 @@ def summarize(fname, data, stats, n_err, n_warn):
         units[p.get("unit", "?")] = units.get(p.get("unit", "?"), 0) + 1
     rates = stats["collision_rates"]
     coll = f"{max(rates):.0%} max / {sum(rates) / len(rates):.0%} avg" if rates else "-"
-    print(f"== {fname}  [{data.get('subject')} / {data.get('subjectId')}]")
-    print(f"   problems {n}: choice {n_choice} (보기형 {n_box}), short {n - n_choice}; "
+    n_twin = sum(1 for p in probs if "twinOf" in p)
+    n_psg = len(data.get("passages") or [])
+    grades = ",".join(data.get("grades") or [])
+    print(f"== {fname}  [{data.get('subject')} / {data.get('subjectId')}]  "
+          f"{data.get('group')}·{data.get('level')}·{grades}·{data.get('track', '-')}")
+    print(f"   problems {n} (originals {n - n_twin}, twins {n_twin}), passages {n_psg}")
+    print(f"   choice {n_choice} (보기형 {n_box}), short {n - n_choice}; "
           f"templates {n_tpl} ({(n_tpl / n if n else 0):.0%}), variants checked {stats['variants']}")
     print("   difficulty " + "  ".join(f"{d}:{c}" for d, c in diff.items())
           + f"   no-hint {stats['no_hint']}")
@@ -772,17 +1060,31 @@ def main():
         print("ERROR: _index.json lists no files")
         sys.exit(1)
 
+    if WORKBOOK_FILE in files:
+        errs.append(f"_index.json: {WORKBOOK_FILE} is not a course file and must not be listed")
+        files = [f for f in files if f != WORKBOOK_FILE]
+    if len(set(files)) != len(files):
+        errs.append(f"_index.json: duplicate file names {files}")
+
     rng = random.Random(args.seed)
-    seen = {}
-    total = {"problems": 0, "templates": 0}
+    ctx = {"ids": {}, "probs": {}, "passages": {}}
+    courses = {}  # subjectId -> file
+    total = {"problems": 0, "templates": 0, "twins": 0, "passages": 0}
     for fname in files:
         e0, w0 = len(errs), len(warns)
-        data, stats = validate_file(fname, seen, errs, warns, rng)
+        data, stats = validate_file(fname, ctx, errs, warns, rng)
         if data is None:
             continue
+        sid = data.get("subjectId")
+        if sid in courses:
+            errs.append(f"{fname}: subjectId {sid!r} already used by {courses[sid]}")
+        else:
+            courses[sid] = fname
         summarize(fname, data, stats, len(errs) - e0, len(warns) - w0)
         total["problems"] += len(data.get("problems", []))
         total["templates"] += sum(1 for p in data.get("problems", []) if "template" in p)
+        total["twins"] += sum(1 for p in data.get("problems", []) if "twinOf" in p)
+        total["passages"] += len(data.get("passages") or [])
         if args.samples:
             for pid, samples in stats["samples"].items():
                 if args.only and not pid.startswith(args.only):
@@ -795,6 +1097,16 @@ def main():
                     if "choices" in s:
                         print(f"      choices (first = correct): {s['choices']}")
                     print(f"      answer: {s['answer']}")
+
+    validate_twins(ctx, errs, warns)
+    e0 = len(errs)
+    wbs = validate_workbooks(ctx, courses, errs, warns)
+    if wbs is not None:
+        print(f"== {WORKBOOK_FILE}: {len(wbs)} workbooks, errors {len(errs) - e0}")
+        for wb in wbs:
+            if isinstance(wb, dict):
+                print(f"   {wb.get('id')}  [{wb.get('course')} / {wb.get('level')}]  "
+                      f"{wb.get('title')}  ({len(wb.get('problems') or [])})")
     print()
     if warns:
         print(f"WARNINGS ({len(warns)}):")
@@ -806,8 +1118,9 @@ def main():
         print(f"ERRORS ({len(errs)}):")
         for e in errs:
             print("  -", e)
-    print(f"TOTAL: {len(files)} files, {total['problems']} problems, {total['templates']} templates, "
-          f"{len(errs)} errors, {len(warns)} warnings")
+    print(f"TOTAL: {len(files)} files, {total['problems']} problems ({total['twins']} twins), "
+          f"{total['passages']} passages, {total['templates']} templates, "
+          f"{len(wbs) if wbs else 0} workbooks, {len(errs)} errors, {len(warns)} warnings")
     sys.exit(1 if errs else 0)
 
 

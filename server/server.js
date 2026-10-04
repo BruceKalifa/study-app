@@ -12,7 +12,10 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
+const { ContentStore } = require('./content-store');
+const { createContentApi } = require('./content-api');
 
 // ───────────────────────── 설정 ─────────────────────────
 const PORT = Number(process.env.PORT) || 8080;
@@ -20,6 +23,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
 const RECORDS_FILE = path.join(DATA_DIR, 'records.json');
+// 문제 콘텐츠(과목별 JSON + workbooks.json). 비어 있으면 SEED_DIR(기본: 앱의 assets/problems)에서 복사
+const CONTENT_DIR = process.env.CONTENT_DIR ? path.resolve(process.env.CONTENT_DIR) : path.join(__dirname, 'content');
+const SEED_DIR = process.env.SEED_DIR ? path.resolve(process.env.SEED_DIR) : path.join(__dirname, '..', 'assets', 'problems');
 
 const MAX_MESSAGE_BYTES = 2 * 1024 * 1024; // 메시지 1개 최대 2MB
 const MAX_STROKES_PER_PAGE = 5000; // 페이지당 최근 5000획만 유지
@@ -455,6 +461,29 @@ function sendSnapshot(ws) {
   send(ws, { type: 'snapshot', students: list, serverTime: Date.now() });
 }
 
+// ───────────────────────── 문제 콘텐츠 + 관리자 키 ─────────────────────────
+/** ADMIN_KEY 환경변수 → data/admin-key.txt → 새로 만든 6자리 숫자(파일에 저장해 다음에도 같은 키) */
+function loadAdminKey() {
+  const env = (process.env.ADMIN_KEY || '').trim();
+  if (env) return { key: env, source: 'env' };
+  const file = path.join(DATA_DIR, 'admin-key.txt');
+  try {
+    const k = fs.readFileSync(file, 'utf8').trim();
+    if (/^\S{4,}$/.test(k)) return { key: k, source: 'file', file };
+  } catch (_) { /* 처음 */ }
+  const key = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(file, key + '\n', { mode: 0o600 });
+  } catch (e) {
+    console.warn('관리자 키를 파일에 저장하지 못했습니다(이번 실행에서만 유효):', e.message);
+  }
+  return { key, source: 'new', file };
+}
+const ADMIN = loadAdminKey();
+const contentStore = new ContentStore({ dir: CONTENT_DIR, seedDir: SEED_DIR }).init();
+const contentApi = createContentApi({ store: contentStore, adminKey: ADMIN.key });
+
 // ───────────────────────── HTTP (정적 파일) ─────────────────────────
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -481,10 +510,19 @@ function lanAddresses() {
 
 const server = http.createServer((req, res) => {
   let urlPath;
+  let reqUrl;
   try {
-    urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    reqUrl = new URL(req.url, 'http://x');
+    urlPath = decodeURIComponent(reqUrl.pathname);
   } catch (_) {
     res.writeHead(400).end('Bad Request');
+    return;
+  }
+
+  // 문제 콘텐츠 API (앱 다운로드용 /api/content/…, 출제 웹용 /api/admin/…)
+  if (contentApi.handle(req, res, reqUrl)) return;
+  if (urlPath === '/admin') {
+    res.writeHead(301, { Location: '/admin/' + (reqUrl.search || '') }).end();
     return;
   }
 
@@ -495,6 +533,7 @@ const server = http.createServer((req, res) => {
       port: PORT,
       wsUrls: ips.map((ip) => `ws://${ip}:${PORT}/ws`),
       teacherUrls: ips.map((ip) => `http://${ip}:${PORT}/`),
+      adminUrls: ips.map((ip) => `http://${ip}:${PORT}/admin`), // 추가: 출제 도구 주소
       students: students.size,
       online: Array.from(students.values()).filter((s) => s.online).length,
     });
@@ -624,10 +663,17 @@ server.listen(PORT, HOST, () => {
   }
   for (const ip of ips) {
     console.log(` 선생님 화면 주소:   http://${ip}:${PORT}/`);
+    console.log(` 문제 출제 도구:     http://${ip}:${PORT}/admin`);
     console.log(` 학생 앱 서버 주소:  ws://${ip}:${PORT}/ws`);
   }
-  console.log(` (이 컴퓨터에서는 http://localhost:${PORT}/ 로도 열 수 있습니다)`);
+  console.log(` (이 컴퓨터에서는 http://localhost:${PORT}/ , http://localhost:${PORT}/admin 로도 열 수 있습니다)`);
   console.log(` 기록 파일: ${RECORDS_FILE}`);
+  console.log(` 문제 폴더: ${CONTENT_DIR}`);
+  console.log(line);
+  console.log(` ★ 출제 도구 관리자 키:  ${ADMIN.key}`);
+  if (ADMIN.source === 'env') console.log('   (ADMIN_KEY 환경변수로 정한 키입니다)');
+  else console.log(`   (처음 한 번 만들어 ${ADMIN.file} 에 저장했습니다. 바꾸려면 이 파일을 지우거나 ADMIN_KEY 환경변수를 쓰세요)`);
+  console.log('   이 키를 아는 사람은 문제를 고치거나 지울 수 있으니 학생에게 알려 주지 마세요.');
   console.log(`${line}\n 끄려면 Ctrl + C\n`);
 });
 
