@@ -36,7 +36,7 @@ jobs:
       - name: Stable signing key
         run: mkdir -p ~/.android && cp tools/keys/debug.keystore ~/.android/debug.keystore
       - name: Build x64 release APK (same code/R8 as the tablet build)
-        run: flutter build apk --release --target-platform android-x64
+        run: flutter build apk --release --no-shrink --target-platform android-x64
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

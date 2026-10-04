@@ -65,7 +65,7 @@ jobs:
         run: mkdir -p ~/.android && cp tools/keys/debug.keystore ~/.android/debug.keystore
 
       - name: Build APK
-        run: flutter build apk --release --target-platform android-arm64 --build-number=${{ github.run_number }} 2>&1 | tee ci-out/build.txt; exit ${PIPESTATUS[0]}
+        run: flutter build apk --release --no-shrink --target-platform android-arm64 --build-number=${{ github.run_number }} 2>&1 | tee ci-out/build.txt; exit ${PIPESTATUS[0]}
 
       - name: Collect APK
         run: cp build/app/outputs/flutter-apk/app-release.apk ci-out/pulinote.apk
