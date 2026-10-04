@@ -7,6 +7,9 @@ import 'dashboard_screen.dart';
 import 'editor_screen.dart';
 import 'history_screen.dart';
 import 'library_screen.dart';
+import 'onboarding_screen.dart';
+import 'planner_screen.dart';
+import 'subscription_screen.dart';
 import 'scratch_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
@@ -32,10 +35,12 @@ class HomeShellState extends State<HomeShell> {
     _Dest(Icons.home_outlined, Icons.home_rounded, '홈'),
     _Dest(Icons.menu_book_outlined, Icons.menu_book_rounded, '문제집'),
     _Dest(Icons.assignment_late_outlined, Icons.assignment_late_rounded, '오답노트'),
+    _Dest(Icons.event_note_outlined, Icons.event_note_rounded, '학습관리'),
     _Dest(Icons.insights_outlined, Icons.insights_rounded, '통계'),
     _Dest(Icons.history_rounded, Icons.history_rounded, '기록'),
     _Dest(Icons.draw_outlined, Icons.draw_rounded, '연습장'),
     _Dest(Icons.edit_note_outlined, Icons.edit_note_rounded, '내 문제'),
+    _Dest(Icons.workspace_premium_outlined, Icons.workspace_premium_rounded, '구독'),
     _Dest(Icons.settings_outlined, Icons.settings_rounded, '설정'),
   ];
 
@@ -50,13 +55,17 @@ class HomeShellState extends State<HomeShell> {
       case 2:
         return const WrongNoteScreen();
       case 3:
-        return const StatsScreen();
+        return const PlannerScreen();
       case 4:
-        return const HistoryScreen();
+        return const StatsScreen();
       case 5:
-        return const ScratchScreen();
+        return const HistoryScreen();
       case 6:
+        return const ScratchScreen();
+      case 7:
         return const EditorScreen();
+      case 8:
+        return const SubscriptionScreen();
       default:
         return const SettingsScreen();
     }
@@ -65,6 +74,7 @@ class HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
+    if (app.needsOnboarding) return const OnboardingScreen();
     final wide = MediaQuery.sizeOf(context).width >= 760;
     final due = app.dueCount;
     final body = AnimatedSwitcher(
@@ -171,7 +181,7 @@ class _Rail extends StatelessWidget {
               ),
             ),
           GestureDetector(
-            onTap: () => onTap(7),
+            onTap: () => onTap(9),
             child: Tooltip(
               message: profileName,
               child: CircleAvatar(

@@ -201,6 +201,12 @@ class Problem {
   final String? variantOf;
   final int? variantSeed;
 
+  /// 지문형: id of the passage this question belongs to.
+  final String? passageId;
+
+  /// Authored twin (쌍둥이 변형) of another problem.
+  final String? twinOf;
+
   /// Created by the user in the app.
   final bool custom;
 
@@ -224,8 +230,15 @@ class Problem {
     this.template,
     this.variantOf,
     this.variantSeed,
+    this.passageId,
+    this.twinOf,
     this.custom = false,
   });
+
+  bool get isTwin => twinOf != null;
+
+  /// The problem whose 오답 record this problem feeds (variant/twin → original).
+  String get familyId => variantOf ?? twinOf ?? id;
 
   bool get isVariant => variantOf != null;
   bool get hasTemplate => template != null;
@@ -277,6 +290,8 @@ class Problem {
       template: tpl == null ? null : ProblemTemplate.fromJson(tpl),
       variantOf: _strOrNull(j['variantOf']),
       variantSeed: _int(j['variantSeed']),
+      passageId: _strOrNull(j['passageId']),
+      twinOf: _strOrNull(j['twinOf']),
       custom: j['custom'] == true,
     );
   }
@@ -304,6 +319,8 @@ class Problem {
     if (t != null) m['template'] = t.toJson();
     if (variantOf != null) m['variantOf'] = variantOf;
     if (variantSeed != null) m['variantSeed'] = variantSeed;
+    if (passageId != null) m['passageId'] = passageId;
+    if (twinOf != null) m['twinOf'] = twinOf;
     if (custom) m['custom'] = true;
     return m;
   }
@@ -355,6 +372,8 @@ class Problem {
       template: clearTemplate ? null : (template ?? this.template),
       variantOf: clearVariant ? null : (variantOf ?? this.variantOf),
       variantSeed: clearVariant ? null : (variantSeed ?? this.variantSeed),
+      passageId: passageId,
+      twinOf: twinOf,
       custom: custom ?? this.custom,
     );
   }
@@ -363,25 +382,101 @@ class Problem {
   String toString() => 'Problem($id)';
 }
 
+/// 지문 (국어·영어 지문형 문항).
+class Passage {
+  final String id;
+  final String title;
+  final String body;
+  final String? source;
+  const Passage({required this.id, this.title = '', required this.body, this.source});
+
+  factory Passage.fromJson(Map<String, dynamic> j) => Passage(
+        id: _str(j['id']),
+        title: _str(j['title']),
+        body: _str(j['body']),
+        source: _strOrNull(j['source']),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'body': body,
+        if (source != null) 'source': source,
+      };
+}
+
+/// 교과군 (국어·수학·영어·사회·과학).
+class SubjectGroup {
+  final String id;
+  final String name;
+  final int color;
+  const SubjectGroup(this.id, this.name, this.color);
+
+  static const all = <SubjectGroup>[
+    SubjectGroup('kor', '국어', 0xFFD9534F),
+    SubjectGroup('math', '수학', 0xFFE0703B),
+    SubjectGroup('eng', '영어', 0xFF2F9E6E),
+    SubjectGroup('soc', '사회', 0xFF8C5BD6),
+    SubjectGroup('sci', '과학', 0xFF2F6BFF),
+  ];
+
+  static SubjectGroup? byId(String id) {
+    for (final g in all) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+}
+
+/// 학년 값 (schema `grades`).
+const List<String> kGrades = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수'];
+
+/// A course (과목): 물리학Ⅰ, 중2 수학, 국어(독서)… — one JSON file.
 class Subject {
   final String id;
   final String name;
 
   /// ARGB, parsed from "#RRGGBB".
   final int color;
+
+  /// Problems shown in lists / 무한 풀기 (authored twins are kept in [twins]).
   final List<Problem> problems;
+  final List<Problem> twins;
+  final List<Passage> passages;
+
+  /// kor | math | eng | soc | sci ('' for 내 문제).
+  final String group;
+
+  /// mid | high
+  final String level;
+  final List<String> grades;
+  final String track;
+  final List<String> unitOrder;
 
   const Subject({
     required this.id,
     required this.name,
     required this.color,
     required this.problems,
+    this.twins = const <Problem>[],
+    this.passages = const <Passage>[],
+    this.group = '',
+    this.level = 'high',
+    this.grades = const <String>[],
+    this.track = '',
+    this.unitOrder = const <String>[],
   });
 
-  /// Units (대단원) in first-appearance order.
+  bool get isMiddle => level == 'mid';
+
+  /// Units (대단원): declared order first, then any others in first-appearance order.
   List<String> get units {
     final seen = <String>{};
     final out = <String>[];
+    final present = {for (final p in problems) p.unit};
+    for (final u in unitOrder) {
+      if (present.contains(u) && seen.add(u)) out.add(u);
+    }
     for (final p in problems) {
       if (seen.add(p.unit)) out.add(p.unit);
     }
@@ -391,16 +486,48 @@ class Subject {
   List<Problem> problemsInUnit(String unit) =>
       problems.where((p) => p.unit == unit).toList();
 
+  Passage? passage(String? id) {
+    if (id == null) return null;
+    for (final p in passages) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  Subject copyWith({List<Problem>? problems, List<Problem>? twins, List<Passage>? passages}) => Subject(
+        id: id,
+        name: name,
+        color: color,
+        problems: problems ?? this.problems,
+        twins: twins ?? this.twins,
+        passages: passages ?? this.passages,
+        group: group,
+        level: level,
+        grades: grades,
+        track: track,
+        unitOrder: unitOrder,
+      );
+
   factory Subject.fromJson(Map<String, dynamic> j) {
     final id = _str(j['subjectId'], _str(j['id']));
     final name = _str(j['subject'], _str(j['name'], id));
     final raw = j['problems'];
     final problems = <Problem>[];
+    final twins = <Problem>[];
     if (raw is List) {
       for (final e in raw) {
         final m = _map(e);
         if (m == null) continue;
-        problems.add(Problem.fromJson(m, subjectId: id, subjectName: name));
+        final p = Problem.fromJson(m, subjectId: id, subjectName: name);
+        (p.isTwin ? twins : problems).add(p);
+      }
+    }
+    final passages = <Passage>[];
+    final rawP = j['passages'];
+    if (rawP is List) {
+      for (final e in rawP) {
+        final m = _map(e);
+        if (m != null) passages.add(Passage.fromJson(m));
       }
     }
     return Subject(
@@ -408,6 +535,13 @@ class Subject {
       name: name,
       color: parseColor(j['color']),
       problems: List<Problem>.unmodifiable(problems),
+      twins: List<Problem>.unmodifiable(twins),
+      passages: List<Passage>.unmodifiable(passages),
+      group: _str(j['group']),
+      level: _str(j['level'], 'high'),
+      grades: _strList(j['grades']),
+      track: _str(j['track']),
+      unitOrder: _strList(j['units']),
     );
   }
 
@@ -415,6 +549,52 @@ class Subject {
         'subject': name,
         'subjectId': id,
         'color': colorToHex(color),
-        'problems': [for (final p in problems) p.toJson()],
+        if (group.isNotEmpty) 'group': group,
+        'level': level,
+        if (grades.isNotEmpty) 'grades': grades,
+        if (track.isNotEmpty) 'track': track,
+        if (unitOrder.isNotEmpty) 'units': unitOrder,
+        if (passages.isNotEmpty) 'passages': [for (final p in passages) p.toJson()],
+        'problems': [for (final p in [...problems, ...twins]) p.toJson()],
       };
+}
+
+/// 문제집 (assets/problems/workbooks.json).
+class Workbook {
+  final String id;
+  final String title;
+  final String course;
+  final String level;
+  final String desc;
+  final List<String> problemIds;
+  const Workbook({
+    required this.id,
+    required this.title,
+    required this.course,
+    this.level = '기본',
+    this.desc = '',
+    this.problemIds = const <String>[],
+  });
+
+  factory Workbook.fromJson(Map<String, dynamic> j) => Workbook(
+        id: _str(j['id']),
+        title: _str(j['title']),
+        course: _str(j['course']),
+        level: _str(j['level'], '기본'),
+        desc: _str(j['desc']),
+        problemIds: _strList(j['problems']),
+      );
+
+  static List<Workbook> listFromJson(Object? decoded) {
+    final m = _map(decoded);
+    final raw = m == null ? decoded : m['workbooks'];
+    final out = <Workbook>[];
+    if (raw is List) {
+      for (final e in raw) {
+        final w = _map(e);
+        if (w != null) out.add(Workbook.fromJson(w));
+      }
+    }
+    return out;
+  }
 }

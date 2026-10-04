@@ -10,7 +10,9 @@ import '../core/problem_bank.dart';
 import '../core/variants.dart';
 import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
+import '../services/content_sync.dart';
 import '../services/live_sync.dart';
+import 'learner.dart';
 import 'records.dart';
 import 'storage.dart';
 import 'theme.dart';
@@ -25,10 +27,14 @@ class Tally {
 class AppState extends ChangeNotifier {
   AppState({required this.storage, required ProblemBank baseBank, this.enableLive = true})
       : _baseBank = baseBank,
+        _contentBank = baseBank,
         bank = baseBank;
 
   final Storage storage;
   final ProblemBank _baseBank;
+
+  /// Bundled content + packs downloaded from the content server.
+  ProblemBank _contentBank;
   final bool enableLive;
   ProblemBank bank;
 
@@ -40,6 +46,16 @@ class AppState extends ChangeNotifier {
   Map<String, ProblemState> states = {};
   List<Problem> customProblems = [];
   bool ready = false;
+
+  // learner / study management
+  Learner learner = Learner();
+  DailySet? _daily;
+  List<StudySession> sessions = [];
+  int? studyStartedAt;
+  List<TodoItem> todos = [];
+  List<ExamScore> scores = [];
+  String syncMessage = '';
+  bool syncing = false;
 
   LiveSync? _live;
   LiveSync? get live => _live;
@@ -65,6 +81,8 @@ class AppState extends ChangeNotifier {
       profiles = [Profile(id: _newId(), name: '학생', color: 0xFF2F6BFF, createdAt: _now)];
     }
     profile = profiles.firstWhere((p) => p.id == currentId, orElse: () => profiles.first);
+    final (packs, wbs) = await ContentSync(storage).loadCached();
+    if (packs.isNotEmpty || wbs != null) _contentBank = _baseBank.withPacks(packs, workbooks: wbs);
     await _loadProfileData();
     ready = true;
     notifyListeners();
@@ -81,6 +99,12 @@ class AppState extends ChangeNotifier {
     attempts = [];
     states = {};
     customProblems = [];
+    learner = Learner();
+    _daily = null;
+    sessions = [];
+    studyStartedAt = null;
+    todos = [];
+    scores = [];
     final raw = await storage.read(_pp('state.json'));
     if (raw != null) {
       try {
@@ -99,6 +123,13 @@ class AppState extends ChangeNotifier {
             Problem.fromJson((p as Map).cast<String, dynamic>(),
                 subjectId: ProblemBank.customSubjectId, subjectName: ProblemBank.customSubjectName)
         ];
+        Map<String, dynamic> m(Object? o) => (o as Map).cast<String, dynamic>();
+        if (j['learner'] is Map) learner = Learner.fromJson(m(j['learner']));
+        if (j['daily'] is Map) _daily = DailySet.fromJson(m(j['daily']));
+        sessions = [for (final x in (j['sessions'] as List? ?? const [])) StudySession.fromJson(m(x))];
+        studyStartedAt = (j['studyStart'] as num?)?.toInt();
+        todos = [for (final x in (j['todos'] as List? ?? const [])) TodoItem.fromJson(m(x))];
+        scores = [for (final x in (j['scores'] as List? ?? const [])) ExamScore.fromJson(m(x))];
       } catch (e) {
         debugPrint('state.json broken: $e');
       }
@@ -109,7 +140,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _rebuildBank() {
-    bank = customProblems.isEmpty ? _baseBank : _baseBank.withExtra(customProblems);
+    bank = customProblems.isEmpty ? _contentBank : _contentBank.withExtra(customProblems);
   }
 
   /// Called when the app comes back to the foreground.
@@ -142,6 +173,12 @@ class AppState extends ChangeNotifier {
       'attempts': [for (final a in attempts) a.toJson()],
       'states': [for (final s in states.values) s.toJson()],
       'custom': [for (final p in customProblems) p.toJson()],
+      'learner': learner.toJson(),
+      if (_daily != null) 'daily': _daily!.toJson(),
+      'sessions': [for (final x in sessions) x.toJson()],
+      'studyStart': studyStartedAt,
+      'todos': [for (final x in todos) x.toJson()],
+      'scores': [for (final x in scores) x.toJson()],
     });
     await storage.write(_pp('state.json'), data);
   }
@@ -209,15 +246,29 @@ class AppState extends ChangeNotifier {
   // ------------------------------------------------------------ problems
   Problem? problem(String id) => bank.byId(id);
 
-  String baseIdOf(Problem p) => p.variantOf ?? p.id;
+  /// Records of variants and authored twins count for their original problem.
+  String baseIdOf(Problem p) => p.familyId;
 
   ProblemState stateOf(String baseId) => states[baseId] ?? ProblemState(baseId);
 
   bool isSolved(String baseId) => (states[baseId]?.attempts ?? 0) > 0;
 
+  bool _attempted(String problemId) => attempts.any((a) => a.problemId == problemId);
+
+  /// Is there any variant (authored twin or template) for this problem's family?
+  bool hasVariant(Problem p) {
+    final b = problem(p.familyId) ?? p;
+    return b.hasTemplate || bank.twinsOf(b.id).isNotEmpty;
+  }
+
+  /// A variant of [base]'s family: an authored twin not tried yet, else a template variant,
+  /// else any twin, else the original itself.
   Problem makeVariant(Problem base) {
-    final b = base.isVariant ? (problem(base.variantOf!) ?? base) : base;
-    if (!b.hasTemplate) return b;
+    final b = problem(base.familyId) ?? base;
+    final twins = bank.twinsOf(b.id).where((t) => t.id != base.id).toList()..shuffle(_rand);
+    final fresh = twins.where((t) => !_attempted(t.id)).toList();
+    if (fresh.isNotEmpty) return fresh.first;
+    if (!b.hasTemplate) return twins.isNotEmpty ? twins.first : b;
     for (var i = 0; i < 6; i++) {
       try {
         return generateVariant(b, _rand.nextInt(1 << 30));
@@ -316,6 +367,8 @@ class AppState extends ChangeNotifier {
     final st = states[baseId] ?? ProblemState(baseId);
     st.apply(ok: correct, at: a.at, answer: answer, attemptId: id);
     states[baseId] = st;
+    final d = _daily;
+    if (d != null && d.day == dayKey(DateTime.now()) && d.problemIds.contains(p.id)) d.done.add(p.id);
     if (hasInk) {
       await storage.write(_pp('ink/$id.json'), jsonEncode(inkDoc!.toJson()));
     }
@@ -469,10 +522,345 @@ class AppState extends ChangeNotifier {
 
   String newCustomId() => 'my-${_newId()}';
 
+
+  // ------------------------------------------------------------ learner: courses & workbooks
+  bool get needsOnboarding => !learner.onboarded;
+
+  /// Courses meant for [grade] (내 문제 excluded).
+  List<Subject> coursesForGrade(String grade) => [
+        for (final s in bank.subjects)
+          if (s.id != ProblemBank.customSubjectId && (s.grades.isEmpty || s.grades.contains(grade))) s
+      ];
+
+  /// The learner's courses (all courses of the grade when none were picked).
+  List<Subject> get myCourses {
+    final picked = [
+      for (final id in learner.courses)
+        if (bank.subject(id) case final s?) s
+    ];
+    return picked.isNotEmpty ? picked : coursesForGrade(learner.grade);
+  }
+
+  Set<String> get myCourseIds => {for (final s in myCourses) s.id};
+
+  List<Workbook> get myWorkbooks {
+    final ids = myCourseIds;
+    final picked = [
+      for (final id in learner.workbooks)
+        if (bank.workbook(id) case final w? when ids.contains(w.course)) w
+    ];
+    return picked.isNotEmpty ? picked : bank.workbooks.where((w) => ids.contains(w.course)).toList();
+  }
+
+  /// (solved, total) for a workbook.
+  (int, int) workbookProgress(Workbook w) {
+    var n = 0;
+    for (final id in w.problemIds) {
+      if (isSolved(id)) n++;
+    }
+    return (n, w.problemIds.length);
+  }
+
+  void completeOnboarding({
+    required String name,
+    required String grade,
+    required String goal,
+    required List<String> courses,
+    required List<String> workbooks,
+  }) {
+    if (name.trim().isNotEmpty && name.trim() != profile.name) {
+      profile.name = name.trim();
+      _saveProfiles();
+    }
+    learner
+      ..grade = grade
+      ..goal = goal
+      ..courses = courses
+      ..workbooks = workbooks
+      ..onboarded = true;
+    if (learner.examDate == 0) {
+      final d = defaultSuneungDate(DateTime.now());
+      learner.examDate = d.millisecondsSinceEpoch;
+      learner.examName = grade.startsWith('중') ? '기말고사' : '수능';
+    }
+    if (learner.trialStartedAt == 0) learner.trialStartedAt = _now;
+    _daily = null; // rebuild today's set for the new courses
+    _configureLive();
+    _changed();
+  }
+
+  void updateLearner(void Function(Learner l) fn) {
+    fn(learner);
+    _changed();
+  }
+
+  // ------------------------------------------------------------ D-day
+  int get dDay {
+    if (learner.examDate == 0) return 0;
+    final t = DateTime.fromMillisecondsSinceEpoch(learner.examDate);
+    final n = DateTime.now();
+    return DateTime(t.year, t.month, t.day).difference(DateTime(n.year, n.month, n.day)).inDays;
+  }
+
+  // ------------------------------------------------------------ subscription (결제 연동 전)
+  static const int trialDays = 7;
+  bool get subscribed => learner.plan.isNotEmpty;
+  int get trialDaysLeft {
+    if (learner.trialStartedAt == 0) return trialDays;
+    final used = (_now - learner.trialStartedAt) ~/ Duration.millisecondsPerDay;
+    return math.max(0, trialDays - used);
+  }
+
+  void subscribe(String plan) {
+    learner
+      ..plan = plan
+      ..subscribedAt = _now;
+    _changed();
+  }
+
+  void cancelSubscription() {
+    learner.plan = '';
+    _changed();
+  }
+
+  // ------------------------------------------------------------ 매일 오답 변형 세트
+  DailySet get dailySet {
+    final key = dayKey(DateTime.now());
+    final d = _daily;
+    if (d != null && d.day == key) return d;
+    final fresh = _buildDaily(key);
+    _daily = fresh;
+    _scheduleSave();
+    return fresh;
+  }
+
+  /// Make tomorrow's set now (e.g. after changing courses).
+  void rebuildDailySet() {
+    _daily = _buildDaily(dayKey(DateTime.now()));
+    _changed();
+  }
+
+  List<Problem> get dailyProblems => [
+        for (final id in dailySet.problemIds)
+          if (problem(id) case final p?) p
+      ];
+
+  DailySet _buildDaily(String day) {
+    final target = math.max(6, settings.dailyGoal);
+    final mine = myCourseIds;
+    bool inMine(Problem p) => mine.isEmpty || mine.contains(p.subjectId);
+    final ids = <String>[];
+    final why = <String, String>{};
+    final usedFamilies = <String>{};
+    void add(Problem p, String reason) {
+      if (ids.contains(p.id)) return;
+      ids.add(p.id);
+      why[p.id] = reason;
+      usedFamilies.add(p.familyId);
+    }
+
+    // 1) 최근 오답 → 쌍둥이 / 템플릿 변형 / 같은 유형 다른 문항
+    final wrongs = states.values.where((s) => s.inWrongNote).toList()..sort((a, b) => b.lastAt.compareTo(a.lastAt));
+    for (final st in wrongs) {
+      if (ids.length >= (target * 0.6).ceil()) break;
+      final base = problem(st.baseId);
+      if (base == null || !inMine(base)) continue;
+      final twins = bank.twinsOf(base.id).where((t) => !_attempted(t.id)).toList()..shuffle(_rand);
+      if (twins.isNotEmpty) {
+        add(twins.first, 'twin');
+      } else if (base.hasTemplate) {
+        add(makeVariant(base), 'variant');
+      } else {
+        final similar = bank.all
+            .where((p) =>
+                p.subjectId == base.subjectId &&
+                p.topic == base.topic &&
+                p.id != base.id &&
+                !usedFamilies.contains(p.id) &&
+                !isSolved(p.id))
+            .toList();
+        if (similar.isNotEmpty) {
+          add(similar[_rand.nextInt(similar.length)], 'similar');
+        } else {
+          add(base, 'review');
+        }
+      }
+    }
+    // 2) 복습할 날이 된 오답
+    final now = _now;
+    for (final st in wrongs.where((s) => s.isDue(now))) {
+      if (ids.length >= (target * 0.75).ceil()) break;
+      if (usedFamilies.contains(st.baseId)) continue;
+      final base = problem(st.baseId);
+      if (base != null && inMine(base)) add(base, 'review');
+    }
+    // 3) 약점 유형의 새 문항
+    for (final (topic, _, _) in weakTopics) {
+      if (ids.length >= (target * 0.9).ceil()) break;
+      final cands = bank.all
+          .where((p) => p.topic == topic && inMine(p) && !isSolved(p.id) && !usedFamilies.contains(p.id))
+          .toList();
+      if (cands.isNotEmpty) add(cands[_rand.nextInt(cands.length)], 'weak');
+    }
+    // 4) 내 과목의 새 문항 (과목을 고르게)
+    final byCourse = <String, List<Problem>>{};
+    for (final p in bank.all) {
+      if (!inMine(p) || isSolved(p.id) || usedFamilies.contains(p.id) || p.passageId != null) continue;
+      byCourse.putIfAbsent(p.subjectId, () => []).add(p);
+    }
+    for (final l in byCourse.values) {
+      l.shuffle(_rand);
+      l.sort((a, b) => a.difficulty.compareTo(b.difficulty));
+    }
+    final queues = byCourse.values.toList()..shuffle(_rand);
+    var i = 0;
+    while (ids.length < target && queues.any((q) => q.isNotEmpty)) {
+      final q = queues[i % queues.length];
+      if (q.isNotEmpty) add(q.removeAt(0), 'new');
+      i++;
+    }
+    return DailySet(day: day, problemIds: ids, reasons: why);
+  }
+
+  /// 오늘의 세트에서 이 문제가 들어간 이유.
+  String dailyReason(String problemId) => dailySet.reasons[problemId] ?? '';
+
+  // ------------------------------------------------------------ 순공 타이머
+  bool get studying => studyStartedAt != null;
+
+  void startStudy() {
+    if (studyStartedAt != null) return;
+    studyStartedAt = _now;
+    _changed();
+  }
+
+  void stopStudy() {
+    final s = studyStartedAt;
+    if (s == null) return;
+    final ms = _now - s;
+    if (ms >= 30 * 1000) sessions = [...sessions, StudySession(s, ms)];
+    studyStartedAt = null;
+    _changed();
+  }
+
+  int studyMsOn(String day) {
+    var ms = 0;
+    for (final x in sessions) {
+      if (dayKey(DateTime.fromMillisecondsSinceEpoch(x.start)) == day) ms += x.ms;
+    }
+    final s = studyStartedAt;
+    if (s != null && dayKey(DateTime.fromMillisecondsSinceEpoch(s)) == day) ms += _now - s;
+    return ms;
+  }
+
+  int get todayStudyMs => studyMsOn(dayKey(DateTime.now()));
+
+  /// Time spent solving problems on [day] (from attempts).
+  int solveMsOn(String day) =>
+      daily[day]?.timeMs ?? 0;
+
+  // ------------------------------------------------------------ 할 일
+  List<TodoItem> get todayTodos {
+    final today = dayKey(DateTime.now());
+    // unfinished items from earlier days carry over
+    return todos.where((t) => t.day == today || (!t.done && t.day.compareTo(today) < 0)).toList();
+  }
+
+  void addTodo(String text) {
+    if (text.trim().isEmpty) return;
+    todos = [...todos, TodoItem(id: _newId(), text: text.trim(), day: dayKey(DateTime.now()))];
+    _changed();
+  }
+
+  void toggleTodo(String id) {
+    for (final t in todos) {
+      if (t.id == id) t.done = !t.done;
+    }
+    _changed();
+  }
+
+  void removeTodo(String id) {
+    todos = todos.where((t) => t.id != id).toList();
+    _changed();
+  }
+
+  // ------------------------------------------------------------ 모의고사 성적
+  List<ExamScore> get scoresByDate => [...scores]..sort((a, b) => a.date.compareTo(b.date));
+
+  void saveScore(ExamScore s) {
+    scores = [for (final x in scores) if (x.id != s.id) x, s];
+    _changed();
+  }
+
+  void removeScore(String id) {
+    scores = scores.where((x) => x.id != id).toList();
+    _changed();
+  }
+
+  String newId() => _newId();
+
+  // ------------------------------------------------------------ content server
+  Future<SyncResult> syncContent() async {
+    if (syncing) return const SyncResult(false, 0, 0, '받는 중이에요');
+    syncing = true;
+    syncMessage = '문항을 받는 중…';
+    notifyListeners();
+    final sync = ContentSync(storage);
+    final r = await sync.sync(settings.serverUrl);
+    if (r.ok) {
+      final (packs, wbs) = await sync.loadCached();
+      _contentBank = _baseBank.withPacks(packs, workbooks: wbs);
+      _rebuildBank();
+    }
+    syncing = false;
+    syncMessage = r.message;
+    _changed(save: false);
+    return r;
+  }
+
+  // ------------------------------------------------------------ 무한 풀기
+  /// Next problem for an endless session (adaptive difficulty).
+  Problem? nextEndless(EndlessFeed f) {
+    final mine = myCourseIds;
+    final pool = bank.all.where((p) {
+      if (f.courseId != null ? p.subjectId != f.courseId : !(mine.isEmpty || mine.contains(p.subjectId))) {
+        return false;
+      }
+      if (f.unit != null && p.unit != f.unit) return false;
+      if (f.topic != null && p.topic != f.topic) return false;
+      return !f.seenFamilies.contains(p.familyId);
+    }).toList();
+    final target = f.level.round().clamp(1, 5);
+    Problem? pick(List<Problem> l) {
+      if (l.isEmpty) return null;
+      l.shuffle(_rand);
+      l.sort((a, b) => (a.difficulty - target).abs().compareTo((b.difficulty - target).abs()));
+      final best = (l.first.difficulty - target).abs();
+      final top = l.where((p) => (p.difficulty - target).abs() == best).toList();
+      return top[_rand.nextInt(top.length)];
+    }
+
+    var p = pick(pool.where((p) => !isSolved(p.id)).toList()) ?? pick(pool);
+    if (p == null) {
+      // everything seen in this session: keep going with variants
+      final again = bank.all.where((x) {
+        if (f.courseId != null && x.subjectId != f.courseId) return false;
+        if (f.unit != null && x.unit != f.unit) return false;
+        if (f.topic != null && x.topic != f.topic) return false;
+        return hasVariant(x);
+      }).toList();
+      if (again.isEmpty) return null;
+      p = makeVariant(again[_rand.nextInt(again.length)]);
+    }
+    f.seenFamilies.add(p.familyId);
+    return p;
+  }
+
   // ------------------------------------------------------------ reset
   Future<void> resetRecords() async {
     attempts = [];
     states = {};
+    _daily = null;
     await storage.deleteDir(_pp('ink'));
     await storage.deleteDir(_pp('drafts'));
     _changed();
@@ -594,4 +982,21 @@ class AppScope extends InheritedNotifier<AppState> {
     final s = context.getInheritedWidgetOfExactType<AppScope>();
     return s!.notifier!;
   }
+}
+
+/// State of one 무한 풀기 session: what to draw from and how hard.
+class EndlessFeed {
+  EndlessFeed({this.courseId, this.unit, this.topic, this.level = 2.5});
+  final String? courseId;
+  final String? unit;
+  final String? topic;
+  double level;
+  final Set<String> seenFamilies = {};
+
+  /// Adapt: right answers push difficulty up, wrong ones down.
+  void report(bool correct) {
+    level = (level + (correct ? 0.5 : -0.7)).clamp(1.0, 5.0);
+  }
+
+  String get title => topic ?? unit ?? '무한 풀기';
 }

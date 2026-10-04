@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,13 +16,17 @@ import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
+import 'package:study_app/services/content_sync.dart';
 
-Future<AppState> _state() async {
+Future<AppState> _state({bool onboard = true}) async {
   final bank = await ProblemBank.load(rootBundle);
   final s = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
   await s.init();
+  if (onboard) s.completeOnboarding(name: '학생', grade: '고2', goal: '수능', courses: const [], workbooks: const []);
   return s;
 }
+
+class _RealHttp extends HttpOverrides {}
 
 Widget _app(AppState s, {Widget? home}) => AppScope(
       state: s,
@@ -62,7 +69,12 @@ void main() {
       }
     }
 
-    for (final p in bank.all) {
+    for (final sub in bank.subjects) {
+      for (final ps in sub.passages) {
+        collect(ps.id, ps.body);
+      }
+    }
+    for (final p in [...bank.all, for (final sub in bank.subjects) ...sub.twins]) {
       collect(p.id, p.stem);
       collect(p.id, p.solution);
       if (p.hint != null) collect(p.id, p.hint!);
@@ -106,8 +118,8 @@ void main() {
     final s = await tester.runAsync(_state);
     await tester.pumpWidget(_app(s!));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('오늘의 학습'), findsOneWidget);
-    for (final tab in ['문제집', '오답노트', '통계', '기록', '연습장', '내 문제', '설정', '홈']) {
+    expect(find.text('오늘의 오답 변형 세트'), findsOneWidget);
+    for (final tab in ['문제집', '오답노트', '학습관리', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
       await tester.tap(find.text(tab).last);
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump(const Duration(milliseconds: 600));
@@ -324,5 +336,243 @@ void main() {
     expect(app.resolvedWrong.length, 1);
     expect(app.totalSolved, 4);
     expect(app.streak, 1);
+  });
+
+  testWidgets('onboarding: name, grade, goal, courses, workbooks → home', (tester) async {
+    _tabletSize(tester);
+    final s = (await tester.runAsync(() => _state(onboard: false)))!;
+    await tester.pumpWidget(_app(s));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('반가워요!'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('onb-name')), '예진');
+    await tester.tap(find.byKey(const Key('grade-중2')));
+    await tester.pump();
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byKey(const Key('onb-next')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    expect(find.byKey(const Key('course-mid-math2')), findsOneWidget);
+    expect(find.byKey(const Key('course-phy1')), findsNothing);
+    await tester.tap(find.byKey(const Key('onb-next')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('wb-wb-mid-math2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('onb-start')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('오늘의 오답 변형 세트'), findsOneWidget);
+    expect(s.learner.grade, '중2');
+    expect(s.learner.goal, '내신');
+    expect(s.profile.name, '예진');
+    expect(s.myCourseIds, {'mid-math2', 'mid-sci'});
+    expect(s.dailySet.problemIds, isNotEmpty);
+    expect(s.dailyProblems.every((p) => s.myCourseIds.contains(p.subjectId)), isTrue);
+    expect(s.trialDaysLeft, AppState.trialDays);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('daily set: a wrong answer comes back as its authored twin; twins count for the original', () async {
+    final app = await _state();
+    final base = app.bank.byId('phy1-mech-009')!; // has two authored twins
+    expect(app.bank.twinsOf(base.id), isNotEmpty);
+    expect(app.bank.all.any((p) => p.isTwin), isFalse, reason: 'twins stay out of lists');
+    await app.record(base, answer: 'x', expected: base.answer, correct: false, timeMs: 1000, mode: 'practice');
+    app.rebuildDailySet();
+    final set = app.dailySet;
+    final twinId = set.problemIds.firstWhere((id) => app.problem(id)?.twinOf == base.id);
+    expect(set.reasons[twinId], 'twin');
+    expect(set.problemIds.length, greaterThanOrEqualTo(6));
+    final twin = app.problem(twinId)!;
+    await app.record(twin, answer: twin.answer, expected: twin.answer, correct: true, timeMs: 1000, mode: 'daily');
+    expect(app.dailySet.done, contains(twinId));
+    expect(app.stateOf(base.id).attempts, 2);
+    expect(app.attempts.last.baseId, base.id);
+    // the next variant of this family is the other twin, not the one just solved
+    expect(app.makeVariant(base).id, isNot(twinId));
+  });
+
+  test('endless feed adapts difficulty and does not repeat a family', () async {
+    final app = await _state();
+    final feed = EndlessFeed(courseId: 'math');
+    final seen = <String>{};
+    for (var i = 0; i < 12; i++) {
+      final p = app.nextEndless(feed)!;
+      expect(p.subjectId, 'math');
+      expect(seen.add(p.familyId), isTrue);
+      feed.report(true);
+    }
+    expect(feed.level, 5);
+    feed.report(false);
+    expect(feed.level, lessThan(5));
+  });
+
+  testWidgets('무한 풀기: next keeps drawing new problems', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.pumpWidget(_app(app,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.endless(context, courseId: 'phy1'),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('1번째'), findsOneWidget);
+    await _penRest(tester);
+    for (var i = 2; i <= 4; i++) {
+      await tester.tap(find.byKey(const Key('next')));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('$i번째'), findsOneWidget);
+    }
+    await tester.tap(find.byKey(const Key('endless-stop')));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('결과'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('지문형 passages and 표 tables render on the exam sheet', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    final kor = app.bank.subject('kor-read')!;
+    final pid = kor.passages.first.id;
+    final linked = kor.problems.where((p) => p.passageId == pid).take(2).toList();
+    final table = app.bank.all.firstWhere((p) => p.stem.contains('\n|'));
+    await tester.pumpWidget(_app(app,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.open(context, title: '지문', problems: [...linked, table]),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('[1~2] 다음 글을 읽고 물음에 답하시오.'), findsOneWidget);
+    await _penRest(tester);
+    await tester.tap(find.byKey(const Key('next')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(const Key('next')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(Table), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('학습관리: to-do, 순공 timer, 모의고사 성적', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.pumpWidget(_app(app));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('학습관리').last);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byKey(const Key('todo-input')), '수학Ⅰ 지수함수 20문제');
+    await tester.tap(find.byKey(const Key('todo-add')));
+    await tester.pump();
+    expect(app.todayTodos.single.text, '수학Ⅰ 지수함수 20문제');
+    expect(find.text('수학Ⅰ 지수함수 20문제'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('planner-study-toggle')));
+    await tester.pump();
+    expect(app.studying, isTrue);
+    await tester.tap(find.byKey(const Key('planner-study-toggle')));
+    await tester.pump();
+    expect(app.studying, isFalse);
+    await tester.ensureVisible(find.byKey(const Key('score-add')));
+    await tester.tap(find.byKey(const Key('score-add')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byKey(const Key('score-name')), '9월 모의평가');
+    await tester.tap(find.byKey(const Key('score-국어-2')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('score-수학-3')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('score-save')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(app.scores.single.grades, {'국어': 2, '수학': 3});
+    expect(tester.takeException(), isNull);
+  });
+
+  test('content server: packs are downloaded, cached and reused offline', () async {
+    expect(ContentSync.httpBase('ws://192.168.0.12:8080/ws'), 'http://192.168.0.12:8080');
+    expect(ContentSync.httpBase('192.168.0.12'), 'http://192.168.0.12:8080');
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final storage = MemoryStorage();
+      final bank = await ProblemBank.load(rootBundle);
+      final app = AppState(storage: storage, baseBank: bank, enableLive: false);
+      await app.init();
+      final pack = {
+        'subject': '테스트 과목',
+        'subjectId': 'test-course',
+        'color': '#123456',
+        'group': 'sci',
+        'level': 'high',
+        'grades': ['고2'],
+        'problems': [
+          {'id': 'tc-1', 'unit': 'U', 'topic': 'T', 'difficulty': 2, 'type': 'short', 'stem': '1+1?', 'answer': '2'},
+          {'id': 'tc-1-t1', 'twinOf': 'tc-1', 'unit': 'U', 'topic': 'T', 'difficulty': 2, 'type': 'short', 'stem': '2+2?', 'answer': '4'},
+        ],
+      };
+      var version = 'v1';
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((req) {
+        final path = req.uri.path;
+        Object? body;
+        if (path == '/api/content/index') {
+          body = {
+            'packs': [
+              {'id': 'test-course', 'version': version}
+            ],
+            'workbooks': {'version': 'w1'}
+          };
+        } else if (path == '/api/content/pack/test-course') {
+          body = pack;
+        } else if (path == '/api/content/workbooks') {
+          body = {
+            'workbooks': [
+              {'id': 'wb-test', 'title': '테스트 문제집', 'course': 'test-course', 'level': '기본', 'problems': ['tc-1']}
+            ]
+          };
+        }
+        req.response.statusCode = body == null ? 404 : 200;
+        req.response.headers.contentType = ContentType.json;
+        req.response.write(body == null ? '{}' : jsonEncode(body));
+        req.response.close();
+      });
+      app.updateSettings((x) => x.serverUrl = '127.0.0.1:${server.port}');
+      final r = await app.syncContent();
+      expect(r.ok, isTrue, reason: r.message);
+      expect(r.updated, 2);
+      expect(app.bank.byId('tc-1'), isNotNull);
+      expect(app.bank.twinsOf('tc-1').single.id, 'tc-1-t1');
+      expect(app.bank.workbook('wb-test'), isNotNull);
+      expect(app.bank.subject('phy1'), isNotNull, reason: 'bundled courses stay');
+      final r2 = await app.syncContent();
+      expect(r2.updated, 0);
+      version = 'v2';
+      expect((await app.syncContent()).updated, 1);
+      await server.close(force: true);
+      // offline: a fresh start uses the cached copy
+      final again = AppState(storage: storage, baseBank: bank, enableLive: false);
+      await again.init();
+      expect(again.bank.byId('tc-1'), isNotNull);
+      expect(again.bank.workbook('wb-test'), isNotNull);
+      final failed = await again.syncContent();
+      expect(failed.ok, isFalse);
+      expect(again.bank.byId('tc-1'), isNotNull);
+    }, _RealHttp());
   });
 }

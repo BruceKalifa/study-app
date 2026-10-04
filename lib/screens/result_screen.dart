@@ -125,7 +125,7 @@ class ResultScreen extends StatelessWidget {
                         Text('${i + 1}번', style: const TextStyle(fontWeight: FontWeight.w800)),
                         const SizedBox(width: 8),
                         Pill(p.topic.isNotEmpty ? p.topic : p.unit, color: color, dense: true),
-                        if (p.isVariant) ...[
+                        if (p.isVariant || p.isTwin) ...[
                           const SizedBox(width: 6),
                           const Pill('변형', color: AppColors.accent, dense: true),
                         ],

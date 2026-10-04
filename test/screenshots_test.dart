@@ -21,6 +21,8 @@ import 'package:study_app/screens/history_screen.dart';
 import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/result_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
+import 'package:study_app/screens/workbook_screen.dart';
+import 'package:study_app/app/learner.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 
 final bool _enabled = Platform.environment['SHOTS'] == '1';
@@ -92,6 +94,17 @@ Future<AppState> _seeded() async {
     }
   }
   s.seedAttempts(list);
+  s.completeOnboarding(name: '선주', grade: '고2', goal: '수능', courses: const [], workbooks: const []);
+  s.addTodo('수학Ⅰ 지수함수 20문제');
+  s.addTodo('영어 단어 Day 12');
+  s.toggleTodo(s.todos.first.id);
+  for (final (i, (name, g)) in [
+    ('3월 학력평가', {'국어': 3, '수학': 4, '영어': 2, '탐구1': 3}),
+    ('6월 모의평가', {'국어': 2, '수학': 3, '영어': 2, '탐구1': 3}),
+    ('9월 모의평가', {'국어': 2, '수학': 2, '영어': 1, '탐구1': 2}),
+  ].indexed) {
+    s.saveScore(ExamScore(id: 'e$i', name: name, date: now - (200 - i * 90) * Duration.millisecondsPerDay, grades: g));
+  }
   return s;
 }
 
@@ -140,8 +153,8 @@ void main() {
     await tester.pumpWidget(_wrap(app, const HomeShell()));
     await _shot(tester, '01_dashboard');
 
-    // 2..7 tabs
-    const tabs = ['문제집', '오답노트', '통계', '기록', '연습장', '내 문제', '설정'];
+    // 2..10 tabs
+    const tabs = ['문제집', '오답노트', '학습관리', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
     for (var i = 0; i < tabs.length; i++) {
       await tester.tap(find.text(tabs[i]).last);
       await tester.pump(const Duration(milliseconds: 500));
@@ -154,8 +167,83 @@ void main() {
         await _write(tester, c + const Offset(-50, -60), _parabola());
         await _write(tester, c + const Offset(150, 140), _wave());
       }
-      await _shot(tester, '0${i + 2}_${['library', 'wrongnote', 'stats', 'history', 'scratch', 'editor', 'settings'][i]}');
+      await _shot(tester,
+          '0${i + 2}_${['library', 'wrongnote', 'planner', 'stats', 'history', 'scratch', 'editor', 'subscription', 'settings'][i]}'
+              .replaceFirst('010_', '10_'));
     }
+
+    // onboarding (fresh learner)
+    final fresh = (await tester.runAsync(() async {
+      final bank = await ProblemBank.load(rootBundle);
+      final f = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+      await f.init();
+      return f;
+    }))!;
+    await tester.pumpWidget(_wrap(fresh, const HomeShell()));
+    await _shot(tester, '20_onboarding_grade');
+    await tester.tap(find.byKey(const Key('grade-고3')));
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byKey(const Key('onb-next')));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    await _shot(tester, '21_onboarding_courses');
+
+    // workbook
+    await tester.pumpWidget(_wrap(app, const WorkbookScreen(workbookId: 'wb-phy1-concept')));
+    await _shot(tester, '22_workbook');
+
+    // 지문형 (국어), 영어, 표 (통합사회), 무한 풀기
+    final kor = app.bank.subject('kor-read')!;
+    final korPs = kor.problems.where((p) => p.passageId == kor.passages.first.id).toList();
+    final eng = app.bank.subject('eng')!;
+    final engPs = eng.problems.where((p) => p.passageId != null).take(2).toList();
+    final soc = app.bank.all.firstWhere((p) => p.stem.contains('\n|'));
+    await tester.pumpWidget(_wrap(
+        app,
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.open(context, title: '국어 독서', problems: [...korPs, ...engPs, soc]),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await _shot(tester, '23_solve_passage_kor');
+    for (var i = 0; i < korPs.length; i++) {
+      await tester.tap(find.byKey(const Key('next')));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    await _shot(tester, '24_solve_passage_eng');
+    for (var i = 0; i < engPs.length; i++) {
+      await tester.tap(find.byKey(const Key('next')));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    await _shot(tester, '25_solve_table_soc');
+    tester.view.physicalSize = const Size(1848, 2960);
+    await tester.pump(const Duration(milliseconds: 300));
+    await _shot(tester, '26_solve_table_portrait');
+    tester.view.physicalSize = const Size(2960, 1848);
+    await tester.pumpWidget(_wrap(
+        app,
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.endless(context, courseId: 'math'),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await _shot(tester, '27_solve_endless');
 
     // 9. solve — choice problem with 보기, handwriting on the page
     final choice = app.bank.all.firstWhere((p) => p.isChoice && p.boxItems.isNotEmpty && p.subjectId == 'phy1');

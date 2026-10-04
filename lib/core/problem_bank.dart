@@ -6,12 +6,14 @@ import 'package:flutter/services.dart' show AssetBundle;
 import 'problem.dart';
 import 'variants.dart';
 
-/// Immutable collection of subjects/problems loaded from assets.
+/// Immutable collection of courses/problems (bundled assets + downloaded packs).
 class ProblemBank {
   final List<Subject> subjects;
+  final List<Workbook> workbooks;
 
-  ProblemBank(List<Subject> subjects)
-      : subjects = List<Subject>.unmodifiable(subjects);
+  ProblemBank(List<Subject> subjects, {List<Workbook> workbooks = const <Workbook>[]})
+      : subjects = List<Subject>.unmodifiable(subjects),
+        workbooks = List<Workbook>.unmodifiable(workbooks);
 
   static const String customSubjectId = 'custom';
   static const String customSubjectName = '내 문제';
@@ -20,6 +22,7 @@ class ProblemBank {
   static final RegExp _variantId = RegExp(r'^(.+)~v(-?\d+)$');
 
   late final Map<String, Problem> _index = _buildIndex();
+  late final Map<String, List<Problem>> _twins = _buildTwins();
   final Map<String, Problem> _variantCache = <String, Problem>{};
 
   Map<String, Problem> _buildIndex() {
@@ -28,57 +31,89 @@ class ProblemBank {
       for (final p in s.problems) {
         m.putIfAbsent(p.id, () => p);
       }
+      for (final p in s.twins) {
+        m.putIfAbsent(p.id, () => p);
+      }
     }
     return m;
   }
 
-  /// Reads `assets/problems/_index.json` (`{"files": [...]}`) and then each
-  /// listed file. Files that fail to load/parse are skipped. Subjects with the
-  /// same id coming from several files are merged.
+  Map<String, List<Problem>> _buildTwins() {
+    final m = <String, List<Problem>>{};
+    for (final s in subjects) {
+      for (final t in s.twins) {
+        m.putIfAbsent(t.twinOf!, () => <Problem>[]).add(t);
+      }
+    }
+    return m;
+  }
+
+  /// Reads `assets/problems/_index.json` (`{"files": [...]}`), each listed course
+  /// file and `workbooks.json`. Files that fail to load/parse are skipped.
   static Future<ProblemBank> load(AssetBundle bundle) async {
     var files = <String>[];
     try {
       final raw = await bundle.loadString('assets/problems/_index.json');
       final decoded = jsonDecode(raw);
       final list = decoded is Map ? decoded['files'] : decoded;
-      files = list is List
-          ? list.map((e) => e.toString()).toList()
-          : <String>[];
+      files = list is List ? list.map((e) => e.toString()).toList() : <String>[];
     } catch (e) {
       debugPrint('ProblemBank: _index.json 읽기 실패: $e');
       return ProblemBank(const <Subject>[]);
     }
-
-    final order = <String>[];
-    final byId = <String, Subject>{};
+    final subjects = <Subject>[];
     for (final f in files) {
       final path = f.startsWith('assets/') ? f : 'assets/problems/$f';
       try {
-        final raw = await bundle.loadString(path);
-        final decoded = jsonDecode(raw);
-        if (decoded is! Map) {
-          throw const FormatException('최상위가 객체가 아닙니다');
-        }
-        final subject = Subject.fromJson(
-            decoded.map((k, v) => MapEntry(k.toString(), v)));
-        final existing = byId[subject.id];
-        if (existing == null) {
-          order.add(subject.id);
-          byId[subject.id] = subject;
-        } else {
-          byId[subject.id] = Subject(
-            id: existing.id,
-            name: existing.name,
-            color: existing.color,
-            problems: List<Problem>.unmodifiable(
-                <Problem>[...existing.problems, ...subject.problems]),
-          );
-        }
+        subjects.add(parseCourse(await bundle.loadString(path)));
       } catch (e) {
         debugPrint('ProblemBank: $path 건너뜀: $e');
       }
     }
-    return ProblemBank(<Subject>[for (final id in order) byId[id]!]);
+    var workbooks = <Workbook>[];
+    try {
+      workbooks = Workbook.listFromJson(jsonDecode(await bundle.loadString('assets/problems/workbooks.json')));
+    } catch (e) {
+      debugPrint('ProblemBank: workbooks.json 없음: $e');
+    }
+    return ProblemBank(_merge(subjects), workbooks: workbooks);
+  }
+
+  static Subject parseCourse(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) throw const FormatException('최상위가 객체가 아닙니다');
+    return Subject.fromJson(decoded.map((k, v) => MapEntry(k.toString(), v)));
+  }
+
+  /// Same-id subjects are merged (later problems appended).
+  static List<Subject> _merge(List<Subject> list) {
+    final order = <String>[];
+    final byId = <String, Subject>{};
+    for (final s in list) {
+      final e = byId[s.id];
+      if (e == null) {
+        order.add(s.id);
+        byId[s.id] = s;
+      } else {
+        byId[s.id] = e.copyWith(
+          problems: List<Problem>.unmodifiable([...e.problems, ...s.problems]),
+          twins: List<Problem>.unmodifiable([...e.twins, ...s.twins]),
+          passages: List<Passage>.unmodifiable([...e.passages, ...s.passages]),
+        );
+      }
+    }
+    return [for (final id in order) byId[id]!];
+  }
+
+  /// Courses downloaded from the content server replace bundled ones with the same id.
+  ProblemBank withPacks(List<Subject> packs, {List<Workbook>? workbooks}) {
+    if (packs.isEmpty && workbooks == null) return this;
+    final byId = {for (final p in packs) p.id: p};
+    final out = <Subject>[
+      for (final s in subjects) byId.remove(s.id) ?? s,
+      ...byId.values,
+    ];
+    return ProblemBank(out, workbooks: workbooks ?? this.workbooks);
   }
 
   /// Looks up a problem by id. Variant ids ("baseId~v123") are resolved by
@@ -110,14 +145,33 @@ class ProblemBank {
     return null;
   }
 
+  /// Authored twins (쌍둥이 변형) of a problem.
+  List<Problem> twinsOf(String id) => _twins[id] ?? const <Problem>[];
+
+  Passage? passageOf(Problem p) => p.passageId == null ? null : subject(p.subjectId)?.passage(p.passageId);
+
+  Workbook? workbook(String id) {
+    for (final w in workbooks) {
+      if (w.id == id) return w;
+    }
+    return null;
+  }
+
+  List<Problem> problemsOf(Workbook w) => [
+        for (final id in w.problemIds)
+          if (byId(id) case final p?) p,
+      ];
+
+  List<Subject> inGroup(String group) => subjects.where((s) => s.group == group).toList();
+
+  /// Problems in lists (twins excluded).
   List<Problem> get all => <Problem>[
         for (final s in subjects) ...s.problems,
       ];
 
   /// Returns a new bank where [extra] problems are appended to their subject
   /// (matched by `subjectId`). Problems whose subject does not exist get a new
-  /// subject: id = their subjectId (or 'custom' when empty), named
-  /// '내 문제' for 'custom' (otherwise their subjectName), color 0xFF5B6475.
+  /// subject '내 문제'.
   ProblemBank withExtra(List<Problem> extra) {
     if (extra.isEmpty) return this;
     final order = <String>[for (final s in subjects) s.id];
@@ -132,26 +186,13 @@ class ProblemBank {
         list = <Problem>[];
         lists[sid] = list;
         order.add(sid);
-        final name = (sid == customSubjectId || p.subjectName.isEmpty)
-            ? customSubjectName
-            : p.subjectName;
-        meta[sid] = Subject(
-          id: sid,
-          name: name,
-          color: customSubjectColor,
-          problems: const <Problem>[],
-        );
+        final name = (sid == customSubjectId || p.subjectName.isEmpty) ? customSubjectName : p.subjectName;
+        meta[sid] = Subject(id: sid, name: name, color: customSubjectColor, problems: const <Problem>[]);
       }
       list.add(p);
     }
     return ProblemBank(<Subject>[
-      for (final id in order)
-        Subject(
-          id: id,
-          name: meta[id]!.name,
-          color: meta[id]!.color,
-          problems: List<Problem>.unmodifiable(lists[id]!),
-        ),
-    ]);
+      for (final id in order) meta[id]!.copyWith(problems: List<Problem>.unmodifiable(lists[id]!)),
+    ], workbooks: workbooks);
   }
 }

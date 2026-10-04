@@ -7,6 +7,7 @@ import '../ink/ink_controller.dart';
 import '../services/handwriting.dart';
 import '../services/live_sync.dart';
 import '../widgets/common.dart';
+import 'onboarding_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -107,6 +108,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ]),
 
         // ---------------- study
+        _Section(title: '학년 · 목표 · 과목', subtitle: '오늘의 세트, 무한 풀기, 문제집이 이 설정을 따라요', children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.school_outlined),
+            title: Text('${app.learner.grade} · ${app.learner.goal} 목표',
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+            subtitle: Text('과목 ${app.myCourses.map((c) => c.name).join(', ')}'),
+            trailing: FilledButton.tonal(
+              key: const Key('edit-learner'),
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute<void>(builder: (_) => const OnboardingScreen(editing: true))),
+              child: const Text('바꾸기'),
+            ),
+          ),
+        ]),
         _Section(title: '학습', children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -240,12 +256,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
 
+        // ---------------- content
+        _Section(
+          title: '문항 받기',
+          subtitle: '선생님 서버(출제 도구)에서 새로 만든 문항과 문제집을 받아요. 위의 서버 주소를 써요.',
+          children: [
+            Row(children: [
+              FilledButton.icon(
+                key: const Key('sync-content'),
+                onPressed: app.syncing
+                    ? null
+                    : () async {
+                        if (_url.text.trim().isNotEmpty && _url.text.trim() != s.serverUrl) {
+                          app.updateSettings((x) => x.serverUrl = _url.text.trim());
+                        }
+                        final r = await app.syncContent();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.message)));
+                        }
+                      },
+                icon: app.syncing
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.cloud_download_rounded),
+                label: const Text('새 문항 받기'),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(app.syncMessage.isEmpty ? '과목 ${app.bank.subjects.length}개 · 문항 ${app.bank.all.length}개' : app.syncMessage,
+                    style: const TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ],
+        ),
+
         // ---------------- data
         _Section(title: '데이터', children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.inventory_2_outlined),
-            title: Text('문제 ${app.bank.all.length}개 · 변형 가능 ${app.bank.all.where((p) => p.hasTemplate).length}개'),
+            title: Text('문제 ${app.bank.all.length}개 · 변형 가능 ${app.bank.all.where(app.hasVariant).length}개'),
             subtitle: Text('${app.profile.name}님의 기록 ${app.totalSolved}개 · 오답노트 ${app.wrongNote.length}개'),
           ),
           Align(

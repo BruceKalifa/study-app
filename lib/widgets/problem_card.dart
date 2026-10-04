@@ -56,7 +56,15 @@ class ProblemSheet extends StatelessWidget {
     this.zoom = 1,
     this.columnFraction = 1,
     this.serif = true,
+    this.passage,
+    this.passageLabel,
   });
+
+  /// 지문형: the passage printed with the question (left column in landscape, on top in portrait).
+  final Passage? passage;
+
+  /// e.g. "[1~3] 다음 글을 읽고 물음에 답하시오."
+  final String? passageLabel;
 
   final Problem problem;
   final int number;
@@ -95,7 +103,9 @@ class ProblemSheet extends StatelessWidget {
     const sans = AppTheme.font;
     final k = zoom.clamp(0.4, 1.0);
     final contentWidth = 1000 / k;
-    final columnWidth = (contentWidth - 128) * columnFraction.clamp(0.3, 1.0);
+    final line = contentWidth - 128;
+    final sideBySide = passage != null && columnFraction < 1;
+    final columnWidth = sideBySide ? line * 0.47 : line * columnFraction.clamp(0.3, 1.0);
     // laid out wider and scaled down to the page width; [keys.root] stays in page coordinates
     return SizedBox(
       key: keys.root,
@@ -105,13 +115,42 @@ class ProblemSheet extends StatelessWidget {
         alignment: Alignment.topLeft,
         child: SizedBox(
           width: contentWidth,
-          child: _content(context, p, face, sans, correctChoice, columnWidth),
+          child: _content(context, p, face, sans, correctChoice, columnWidth, line, sideBySide),
         ),
       ),
     );
   }
 
-  Widget _content(BuildContext context, Problem p, String face, String sans, int? correctChoice, double columnWidth) {
+  Widget _passageBox(Passage ps) {
+    final paras = ps.body.split(RegExp(r'\n\s*\n'));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(passageLabel ?? '다음 글을 읽고 물음에 답하시오.',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.5)),
+      const SizedBox(height: 14),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(26, 22, 26, 14),
+        decoration: BoxDecoration(border: Border.all(color: AppColors.ink, width: 1.2)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final para in paras)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: MathText('\u3000${para.trim()}', style: const TextStyle(fontSize: 23, height: 1.8)),
+            ),
+          if ((ps.source ?? '').isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(ps.source!, style: const TextStyle(fontSize: 17, color: AppColors.inkMuted)),
+            ),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _content(BuildContext context, Problem p, String face, String sans, int? correctChoice, double columnWidth,
+      double line, bool sideBySide) {
+    final ps = passage;
+    final column = _problemColumn(p, correctChoice, columnWidth);
     return DefaultTextStyle(
       style: TextStyle(fontFamily: face, fontSize: 25, height: 1.75, color: AppColors.ink),
       child: Padding(
@@ -137,7 +176,7 @@ class ProblemSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 DifficultyDots(p.difficulty, color: color, size: 8),
-                if (p.isVariant) ...[
+                if (p.isVariant || p.isTwin) ...[
                   const SizedBox(width: 10),
                   const Pill('변형', color: AppColors.accent, icon: Icons.auto_awesome_rounded, dense: true),
                 ],
@@ -148,8 +187,24 @@ class ProblemSheet extends StatelessWidget {
             const SizedBox(height: 3),
             Container(height: 1, color: AppColors.ink),
             const SizedBox(height: 34),
-            // ── the problem column
-            SizedBox(
+            if (ps != null && sideBySide)
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: line * 0.49, child: _passageBox(ps)),
+                SizedBox(width: line * 0.04),
+                column,
+              ])
+            else ...[
+              if (ps != null) ...[_passageBox(ps), const SizedBox(height: 36)],
+              column,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _problemColumn(Problem p, int? correctChoice, double columnWidth) {
+    return SizedBox(
               width: columnWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,11 +276,7 @@ class ProblemSheet extends StatelessWidget {
                   ],
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
+            );
   }
 }
 

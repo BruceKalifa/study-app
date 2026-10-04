@@ -55,7 +55,7 @@ class _ExamSetupState extends State<_ExamSetup> {
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             ChoiceChip(label: const Text('전 과목'), selected: _subject == null, onSelected: (_) => setState(() => _subject = null)),
-            for (final s in app.bank.subjects)
+            for (final s in app.myCourses)
               ChoiceChip(
                 label: Text(s.name),
                 selected: _subject == s.id,
@@ -97,7 +97,7 @@ class _ExamSetupState extends State<_ExamSetup> {
             // spread difficulty: easy → hard like a real paper
             final picked = pool.take(_count).toList()..sort((a, b) => a.difficulty.compareTo(b.difficulty));
             final problems = <Problem>[
-              for (final p in picked) _variants && p.hasTemplate ? app.makeVariant(p) : p,
+              for (final p in picked) _variants && app.hasVariant(p) ? app.makeVariant(p) : p,
             ];
             final name = _subject == null ? '전 과목' : (app.bank.subject(_subject!)?.name ?? '');
             Navigator.pop(context, ('모의고사 · $name ${problems.length}문항', problems, _minutes * 60000));

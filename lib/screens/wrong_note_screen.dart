@@ -65,7 +65,7 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
                 mode: 'review',
                 problems: [
                   for (final s in due)
-                    if (app.problem(s.baseId) case final Problem p) p.hasTemplate ? app.makeVariant(p) : p,
+                    if (app.problem(s.baseId) case final Problem p) app.hasVariant(p) ? app.makeVariant(p) : p,
                 ],
               ),
               icon: const Icon(Icons.replay_rounded),

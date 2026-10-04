@@ -30,7 +30,11 @@ class SolveScreen extends StatefulWidget {
     required this.problems,
     this.mode = 'practice',
     this.timeLimitMs,
+    this.feed,
   });
+
+  /// 무한 풀기: more problems are drawn from this feed as the student goes.
+  final EndlessFeed? feed;
 
   final String title;
   final List<Problem> problems;
@@ -39,8 +43,25 @@ class SolveScreen extends StatefulWidget {
   final String mode;
   final int? timeLimitMs;
 
+  /// 무한 풀기 over the learner's courses (or one course / unit / 유형).
+  static Future<void> endless(BuildContext context, {String? courseId, String? unit, String? topic, String? title}) {
+    final app = AppScope.read(context);
+    final feed = EndlessFeed(courseId: courseId, unit: unit, topic: topic);
+    final first = app.nextEndless(feed);
+    if (first == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('풀 문제가 없어요')));
+      return Future.value();
+    }
+    final name = title ?? topic ?? unit ?? (courseId == null ? '무한 풀기' : app.bank.subject(courseId)?.name ?? '무한 풀기');
+    return open(context, title: '$name · 무한 풀기', problems: [first], mode: 'endless', feed: feed);
+  }
+
   static Future<void> open(BuildContext context,
-      {required String title, required List<Problem> problems, String mode = 'practice', int? timeLimitMs}) {
+      {required String title,
+      required List<Problem> problems,
+      String mode = 'practice',
+      int? timeLimitMs,
+      EndlessFeed? feed}) {
     if (problems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('풀 문제가 없어요')));
       return Future.value();
@@ -48,7 +69,7 @@ class SolveScreen extends StatefulWidget {
     return Navigator.of(context).push(PageRouteBuilder<void>(
       transitionDuration: const Duration(milliseconds: 320),
       pageBuilder: (_, __, ___) =>
-          SolveScreen(title: title, problems: problems, mode: mode, timeLimitMs: timeLimitMs),
+          SolveScreen(title: title, problems: problems, mode: mode, timeLimitMs: timeLimitMs, feed: feed),
       transitionsBuilder: (_, a, __, child) => FadeTransition(
         opacity: CurvedAnimation(parent: a, curve: Curves.easeOut),
         child: SlideTransition(
@@ -245,6 +266,15 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   }
 
   void _next() {
+    final feed = widget.feed;
+    if (_index >= _problems.length - 1 && feed != null) {
+      final more = _app.nextEndless(feed);
+      if (more != null) {
+        setState(() => _problems.add(more));
+        _goTo(_index + 1);
+        return;
+      }
+    }
     if (_index < _problems.length - 1) {
       _goTo(_index + 1);
     } else if (_exam) {
@@ -411,6 +441,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     _elapsed[i] = time;
     final g = gradeAnswer(p, answer);
     HapticFeedback.mediumImpact();
+    widget.feed?.report(g.correct);
     setState(() => _graded[i] = g);
     if (!_retrying.contains(i)) {
       await _app.record(
@@ -547,7 +578,22 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final landscape = mq.size.width > mq.size.height * 1.15;
     final answer = _answers[_index];
 
+    final passage = app.bank.passageOf(p);
+    String? passageLabel;
+    if (passage != null) {
+      var a = _index, b = _index;
+      while (a > 0 && _problems[a - 1].passageId == p.passageId) {
+        a--;
+      }
+      while (b < _problems.length - 1 && _problems[b + 1].passageId == p.passageId) {
+        b++;
+      }
+      passageLabel = a == b ? '다음 글을 읽고 물음에 답하시오.' : '[${a + 1}~${b + 1}] 다음 글을 읽고 물음에 답하시오.';
+    }
+
     final sheet = ProblemSheet(
+      passage: passage,
+      passageLabel: passageLabel,
       problem: p,
       number: _index + 1,
       color: color,
@@ -657,10 +703,10 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         ),
         _NavButton(
           key: const Key('next'),
-          icon: last ? Icons.flag_rounded : Icons.chevron_right_rounded,
-          label: last ? (_exam ? '시험 종료' : '결과 보기') : '다음',
+          icon: last && widget.feed == null ? Icons.flag_rounded : Icons.chevron_right_rounded,
+          label: last && widget.feed == null ? (_exam ? '시험 종료' : '결과 보기') : '다음',
           trailing: true,
-          filled: graded != null || (_exam && last),
+          filled: graded != null || (_exam && last && widget.feed == null),
           color: color,
           onTap: _palmSafe(_next),
         ),
@@ -706,7 +752,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
           icon: const Icon(Icons.menu_book_rounded, size: 19),
           label: const Text('해설'),
         ),
-        if (!_exam && (p.hasTemplate || p.isVariant))
+        if (!_exam && _app.hasVariant(p))
           TextButton.icon(
             onPressed: _palmSafe(_addVariant),
             icon: const Icon(Icons.auto_awesome_rounded, size: 19),
@@ -798,10 +844,17 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         const SizedBox(width: 8),
-        Text('${_index + 1}',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color, letterSpacing: -0.5)),
-        Text(' / ${_problems.length}',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+        if (widget.feed != null) ...[
+          Icon(Icons.all_inclusive_rounded, size: 20, color: color),
+          const SizedBox(width: 6),
+          Text('${_index + 1}번째',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: color, letterSpacing: -0.5)),
+        ] else ...[
+          Text('${_index + 1}',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color, letterSpacing: -0.5)),
+          Text(' / ${_problems.length}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+        ],
         const SizedBox(width: 8),
         if (_exam && widget.timeLimitMs != null)
           _Countdown(
@@ -816,6 +869,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             onPressed: _showHint,
             icon: const Icon(Icons.lightbulb_outline_rounded),
           ),
+        if (widget.feed != null)
+          TextButton(key: const Key('endless-stop'), onPressed: _finish, child: const Text('그만 풀기')),
         IconButton(
           key: const Key('fullscreen-toggle'),
           tooltip: '전체화면 끄기',
@@ -853,7 +908,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
-              Text('${_index + 1} / ${_problems.length} 문제',
+              Text(widget.feed != null ? '${_index + 1}번째 문제 · 맞히면 더 어렵게' : '${_index + 1} / ${_problems.length} 문제',
                   style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
             ]),
           ),
