@@ -294,6 +294,7 @@ void main() {
       if (k < ps.length - 1) {
         await tester.tap(find.byKey(const Key('next')));
         await tester.pump(const Duration(milliseconds: 600));
+        await tester.pump(const Duration(milliseconds: 100));
       }
     }
     expect(app.attempts, isEmpty);

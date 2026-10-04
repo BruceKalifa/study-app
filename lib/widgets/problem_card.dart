@@ -19,8 +19,8 @@ class ExamSheetKeys {
     final root = this.root.currentContext?.findRenderObject();
     final box = k.currentContext?.findRenderObject();
     if (root is! RenderBox || box is! RenderBox || !box.attached || !box.hasSize || !root.attached) return null;
-    final o = box.localToGlobal(Offset.zero, ancestor: root);
-    return o & box.size;
+    // include the print-size scaling between the item and the page
+    return MatrixUtils.transformRect(box.getTransformTo(root), Offset.zero & box.size);
   }
 
   Rect? get answerRect => rectOf(answerBox);
