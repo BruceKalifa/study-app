@@ -725,7 +725,8 @@ void main() {
     expect(find.textContaining('[[col'), findsNothing);
     expect(tester.takeException(), isNull);
 
-    // read-only views (선생님 화면 · 오답 상세) use the same markup
+    // read-only views (선생님 화면 · 오답 상세) use the same markup (fresh navigator: drop the solve route)
+    await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(_app(app,
         home: Scaffold(
             body: SingleChildScrollView(child: ProblemBrief(problem: ps[1], studentAnswer: '5', showSolution: true)))));

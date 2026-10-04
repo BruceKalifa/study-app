@@ -730,6 +730,7 @@ body{margin:0;background:#E9E6DF;font-family:'Noto Serif CJK KR','NanumMyeongjo'
 .stem{font-size:17px;line-height:1.75;margin-top:10px}.box{border:1px solid #1B2A4A;padding:8px 12px;margin:6px 0}
 .dm{text-align:center;margin:6px 0}.ctr{text-align:center}.sol{font-size:15px;line-height:1.7;border-top:1px dashed #aaa;margin-top:24px;padding-top:12px}
 .ans{color:#169C6B;font:700 14px sans-serif;margin-top:12px}
+.cols{display:flex;gap:14px;align-items:flex-start}.tb{border-collapse:collapse;font-size:14px}.tb td{border:1px solid #1B2A4A;padding:2px 10px;text-align:center}
 """
 
 
@@ -740,8 +741,30 @@ def make_preview(bundle, outdir):
 
     def render(src):
         out = []
+        table = []
+
+        def flush_table():
+            if table:
+                rows = [r for r in table if not re.match(r'^\|[-|: ]+\|$', r)]
+                out.append('<table class="tb">' + ''.join(
+                    '<tr>' + ''.join('<td>' + H.escape(c.strip()) + '</td>' for c in r.strip().strip('|').split('|')) + '</tr>'
+                    for r in rows) + '</table>')
+                table.clear()
+
         for line in src.split('\n'):
-            if line == '[[box]]':
+            if line.startswith('|'):
+                table.append(line)
+                continue
+            flush_table()
+            if line.startswith('[[cols'):
+                ws = [int(x) for x in re.findall(r':(\d+)', line)] or [1, 1]
+                out.append(f'<div class="cols"><div style="flex:{ws[0]}">')
+                out.append(f'<!--{ws[1] if len(ws) > 1 else 1}-->')
+            elif line == '[[col]]':
+                out.append('</div><div style="flex:1;display:flex;justify-content:flex-end">')
+            elif line == '[[/cols]]':
+                out.append('</div></div>')
+            elif line == '[[box]]':
                 out.append('<div class="box">')
             elif line == '[[/box]]':
                 out.append('</div>')
@@ -757,6 +780,7 @@ def make_preview(bundle, outdir):
                 t = H.escape(line)
                 t = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', t)
                 out.append('<div>' + t + '</div>')
+        flush_table()
         return ''.join(out)
 
     pages = []
@@ -785,8 +809,11 @@ def make_preview(bundle, outdir):
         page = b.new_page(viewport={'width': 840, 'height': 1000})
         page.goto('file://' + os.path.join(pdir, 'index.html'))
         page.wait_for_timeout(800)
+        only = [x for x in os.environ.get('PREVIEW_ONLY', '').split(',') if x]
         for c in bundle['courses']:
             for p in c['problems']:
+                if only and not any(x in p['id'] for x in only):
+                    continue
                 el = page.query_selector('#' + p['id'])
                 fn = os.path.join(pdir, p['id'] + '.png')
                 el.screenshot(path=fn)
