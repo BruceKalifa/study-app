@@ -53,7 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   List<Workbook> _availableWorkbooks(AppState app) {
     final ids = _effectiveCourses(app);
-    return app.bank.workbooks.where((w) => ids.contains(w.course)).toList();
+    return app.bank.workbooks.where((w) => app.bank.coursesOf(w).any(ids.contains)).toList();
   }
 
   void _finish(AppState app) {

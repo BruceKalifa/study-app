@@ -176,6 +176,14 @@ class ProblemSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 DifficultyDots(p.difficulty, color: color, size: 8),
+                if (p.source != null) ...[
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(p.source!,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontFamily: sans, fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                  ),
+                ],
                 if (p.isVariant || p.isTwin) ...[
                   const SizedBox(width: 10),
                   const Pill('변형', color: AppColors.accent, icon: Icons.auto_awesome_rounded, dense: true),

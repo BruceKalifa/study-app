@@ -162,6 +162,9 @@ class ProblemBank {
           if (byId(id) case final p?) p,
       ];
 
+  /// Courses a workbook draws from (series such as FLOW TYPE mix 수학Ⅰ·Ⅱ·확통).
+  Set<String> coursesOf(Workbook w) => {w.course, for (final p in problemsOf(w)) p.subjectId};
+
   List<Subject> inGroup(String group) => subjects.where((s) => s.group == group).toList();
 
   /// Problems in lists (twins excluded).

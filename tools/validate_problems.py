@@ -382,7 +382,19 @@ ALLOWED_CMDS = set(
 ) | {",", ";", "!", " ", "to", "ln", "cdots", "quad", "neq", "leq", "geq", "lt",
      "gt", "gamma", "phi", "varphi", "epsilon", "tau", "Omega", "rightarrow",
      "Rightarrow", "prime", "%", "{", "}", "|", "angle", "triangle", "perp",
-     "parallel", "propto", "Phi"}
+     "parallel", "propto", "Phi",
+     # used by the owner's 수능 math content
+     "begin", "end", "\\", "&", "mathrm", "iff", "ldots", "in", "notin", "sim", "mid", "bigcirc",
+     "mapsto", "leftrightarrow", "Leftrightarrow", "subset", "subseteq", "max", "min", "cup", "cap",
+     "widehat", "overrightarrow", "dfrac", "displaystyle", "le", "therefore", "because", "cdot",
+     "times", "emptyset", "varnothing", "pm", "mp", "dots", "underline", "boxed", "square",
+     "bullet", "star", "ast", "hline", "binom", "choose", "le", "ge", "leqslant", "geqslant",
+     "Big", "big", "bigg", "Bigg", "right", "left", "lbrace", "rbrace", "langle", "rangle",
+     "lfloor", "rfloor", "lceil", "rceil", "sqrt", "log", "exp", "sec", "csc", "cot", "arctan",
+     "infty", "partial", "nabla", "int", "iint", "oint", "prod", "sum", "lim", "limits"}
+
+# only these LaTeX environments are allowed (flutter_math renders them)
+ALLOWED_ENVS = {"cases", "aligned", "matrix", "pmatrix", "bmatrix"}
 
 
 def math_segments(s: str):
@@ -398,10 +410,13 @@ def check_text(s: str, where: str, errs: list, warns: list, allow_placeholders=F
         errs.append(f"{where}: control character (JSON escape like \\f instead of \\\\f?)")
     if s.count("$") % 2:
         errs.append(f"{where}: unbalanced $ ({s.count('$')} signs)")
-    if "\\begin" in s:
-        errs.append(f"{where}: \\begin is not allowed")
-    if "\\\\" in s:
-        errs.append(f"{where}: '\\\\' (LaTeX line break) is not allowed")
+    for env in re.findall(r"\\begin\{([^}]*)\}", s):
+        if env not in ALLOWED_ENVS:
+            errs.append(f"{where}: \\begin{{{env}}} is not allowed (only {sorted(ALLOWED_ENVS)})")
+    if s.count("\\begin") != s.count("\\end"):
+        errs.append(f"{where}: unbalanced \\begin/\\end")
+    if "\\\\" in s and "\\begin" not in s:
+        errs.append(f"{where}: '\\\\' (LaTeX line break) is only allowed inside an environment such as cases")
     for seg in math_segments(s):
         if HANGUL_RE.search(seg):
             errs.append(f"{where}: Korean text inside $...$: ${seg}$")
@@ -703,7 +718,7 @@ def validate_template(p: dict, where: str, errs: list, warns: list, stats: dict,
 REQUIRED = ("id", "unit", "topic", "difficulty", "type", "stem", "answer", "solution")
 KNOWN_PROBLEM_KEYS = set(REQUIRED) | {
     "choices", "boxItems", "answerUnit", "tolerance", "hint", "tags", "template",
-    "passageId", "twinOf",
+    "passageId", "twinOf", "source", "needsFigure",
 }
 
 # course metadata
@@ -982,7 +997,7 @@ def validate_workbooks(ctx: dict, courses: dict, errs, warns):
             errs.append(f"{where}: level must be one of {'/'.join(WB_LEVELS)}, got {wb.get('level')!r}")
         if "desc" in wb and not isinstance(wb["desc"], str):
             errs.append(f"{where}: desc must be a string")
-        unknown = set(wb) - {"id", "title", "course", "level", "desc", "problems"}
+        unknown = set(wb) - {"id", "title", "course", "level", "desc", "problems", "series"}
         if unknown:
             warns.append(f"{where}: unknown field(s) {sorted(unknown)}")
         plist = wb.get("problems")
@@ -998,7 +1013,7 @@ def validate_workbooks(ctx: dict, courses: dict, errs, warns):
                 continue
             if "twinOf" in probs[pid]:
                 errs.append(f"{where}: problem {pid!r} is a twin (twins are not listed in workbooks)")
-            if course in courses and files[pid] != courses[course]:
+            if course in courses and files[pid] != courses[course] and not wb.get("series"):
                 warns.append(f"{where}: problem {pid!r} belongs to {files[pid]}, not course {course!r}")
     return wbs
 

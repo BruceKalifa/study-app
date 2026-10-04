@@ -24,6 +24,9 @@ class WorkbookCard extends StatelessWidget {
     final app = AppScope.of(context);
     final course = app.bank.subject(workbook.course);
     final color = Color(course?.color ?? 0xFF5B6475);
+    final courseLabel = workbook.series.isEmpty
+        ? (course?.name ?? '')
+        : '${workbook.series} · ${[for (final id in app.bank.coursesOf(workbook)) app.bank.subject(id)?.name ?? id].join('·')}';
     final (done, total) = app.workbookProgress(workbook);
     final lv = workbookLevelColor(workbook.level);
     return Card(
@@ -41,7 +44,7 @@ class WorkbookCard extends StatelessWidget {
                   Pill(workbook.level, color: lv, dense: true),
                   const SizedBox(width: 8),
                   Flexible(
-                    child: Text(course?.name ?? '',
+                    child: Text(courseLabel,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
                   ),

@@ -364,7 +364,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           s
     ];
     final courseIds = {for (final c in courses) c.id};
-    final wbs = app.bank.workbooks.where((w) => courseIds.contains(w.course)).toList();
+    final wbs = app.bank.workbooks.where((w) => app.bank.coursesOf(w).any(courseIds.contains)).toList();
 
     return LayoutBuilder(builder: (context, box) {
       final cols = box.maxWidth >= 1200 ? 4 : (box.maxWidth >= 860 ? 3 : 2);

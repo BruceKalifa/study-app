@@ -207,6 +207,9 @@ class Problem {
   /// Authored twin (쌍둥이 변형) of another problem.
   final String? twinOf;
 
+  /// 출처 (기출 문항: "2024학년도 9월 모의평가 15번").
+  final String? source;
+
   /// Created by the user in the app.
   final bool custom;
 
@@ -232,6 +235,7 @@ class Problem {
     this.variantSeed,
     this.passageId,
     this.twinOf,
+    this.source,
     this.custom = false,
   });
 
@@ -292,6 +296,7 @@ class Problem {
       variantSeed: _int(j['variantSeed']),
       passageId: _strOrNull(j['passageId']),
       twinOf: _strOrNull(j['twinOf']),
+      source: _strOrNull(j['source']),
       custom: j['custom'] == true,
     );
   }
@@ -321,6 +326,7 @@ class Problem {
     if (variantSeed != null) m['variantSeed'] = variantSeed;
     if (passageId != null) m['passageId'] = passageId;
     if (twinOf != null) m['twinOf'] = twinOf;
+    if (source != null) m['source'] = source;
     if (custom) m['custom'] = true;
     return m;
   }
@@ -374,6 +380,7 @@ class Problem {
       variantSeed: clearVariant ? null : (variantSeed ?? this.variantSeed),
       passageId: passageId,
       twinOf: twinOf,
+      source: source,
       custom: custom ?? this.custom,
     );
   }
@@ -568,6 +575,9 @@ class Workbook {
   final String level;
   final String desc;
   final List<String> problemIds;
+
+  /// 시리즈 이름 (예: FLOW TYPE) — such workbooks may mix several courses.
+  final String series;
   const Workbook({
     required this.id,
     required this.title,
@@ -575,6 +585,7 @@ class Workbook {
     this.level = '기본',
     this.desc = '',
     this.problemIds = const <String>[],
+    this.series = '',
   });
 
   factory Workbook.fromJson(Map<String, dynamic> j) => Workbook(
@@ -584,6 +595,7 @@ class Workbook {
         level: _str(j['level'], '기본'),
         desc: _str(j['desc']),
         problemIds: _strList(j['problems']),
+        series: _str(j['series']),
       );
 
   static List<Workbook> listFromJson(Object? decoded) {

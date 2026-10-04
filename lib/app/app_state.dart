@@ -552,9 +552,9 @@ class AppState extends ChangeNotifier {
     final ids = myCourseIds;
     final picked = [
       for (final id in learner.workbooks)
-        if (bank.workbook(id) case final w? when ids.contains(w.course)) w
+        if (bank.workbook(id) case final w? when bank.coursesOf(w).any(ids.contains)) w
     ];
-    return picked.isNotEmpty ? picked : bank.workbooks.where((w) => ids.contains(w.course)).toList();
+    return picked.isNotEmpty ? picked : bank.workbooks.where((w) => bank.coursesOf(w).any(ids.contains)).toList();
   }
 
   /// (solved, total) for a workbook.

@@ -30,7 +30,7 @@ class WorkbookScreen extends StatelessWidget {
     final firstOpen = ps.indexWhere((p) => !app.isSolved(p.id));
 
     return Scaffold(
-      appBar: AppBar(title: Text(course?.name ?? '문제집')),
+      appBar: AppBar(title: Text(w.series.isNotEmpty ? w.series : (course?.name ?? '문제집'))),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(32, 8, 32, 40),
         children: [
@@ -131,6 +131,10 @@ class _Row extends StatelessWidget {
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkSoft)),
           ),
           const SizedBox(width: 12),
+          if (problem.source != null) ...[
+            Pill('기출', color: AppColors.accent, dense: true),
+            const SizedBox(width: 8),
+          ],
           if (problem.passageId != null) ...[
             const Pill('지문', color: AppColors.inkSoft, dense: true),
             const SizedBox(width: 8),
