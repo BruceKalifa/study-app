@@ -240,7 +240,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
       await tester.tap(row.first);
       await tester.pump(const Duration(milliseconds: 400));
       await _shot(tester, '42_teacher_wrong_detail');
-      await tester.tapAt(const Offset(20, 20));
+      await tester.tap(find.byIcon(Icons.close_rounded).last);
       await tester.pump(const Duration(milliseconds: 400));
     }
     await tester.tap(find.byKey(const Key('t-tab-recent')));

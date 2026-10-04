@@ -7,6 +7,7 @@ import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../services/account_api.dart';
 import '../widgets/common.dart';
+import '../widgets/math_text.dart';
 import '../widgets/problem_brief.dart';
 import 'library_screen.dart' show CourseBrowser;
 import 'questions_screen.dart';
@@ -651,9 +652,12 @@ class _TeacherStudentScreenState extends State<TeacherStudentScreen> {
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
           const Spacer(),
           FilterChip(
-            key: const Key('t-wrong-open-only'),
+            key: const Key('t-open-only'),
             label: const Text('해결 못 한 것만'),
             selected: _openOnly,
+            selectedColor: AppColors.ink,
+            checkmarkColor: Colors.white,
+            labelStyle: TextStyle(color: _openOnly ? Colors.white : AppColors.ink, fontWeight: FontWeight.w700),
             onSelected: (v) => setState(() => _openOnly = v),
           ),
         ]),
@@ -698,7 +702,7 @@ class _TeacherStudentScreenState extends State<TeacherStudentScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(p == null ? w.problemId : p.stem.replaceAll('\n', ' ').replaceAll(r'$', ''),
+            child: Text(p == null ? w.problemId : MathText.plain(p.stem).replaceAll('\n', ' '),
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkSoft)),
           ),
           const SizedBox(width: 12),

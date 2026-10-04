@@ -14,6 +14,16 @@ Color workbookLevelColor(String level) => switch (level) {
       _ => AppColors.inkSoft,
     };
 
+/// 커리큘럼 단계 색 (개념 → 유형 → 기출 → N제 → 모의고사).
+Color stageColor(String stage) => switch (stage) {
+      '개념' => AppColors.correct,
+      '유형' => const Color(0xFF0EA5E9),
+      '기출' => AppColors.blue,
+      'N제' => const Color(0xFF8C5BD6),
+      '모의고사' => AppColors.accent,
+      _ => AppColors.inkSoft,
+    };
+
 /// A 문제집 tile: course colour band, title, level, progress.
 class WorkbookCard extends StatelessWidget {
   const WorkbookCard({super.key, required this.workbook});
@@ -28,7 +38,7 @@ class WorkbookCard extends StatelessWidget {
         ? (course?.name ?? '')
         : '${workbook.series} · ${[for (final id in app.bank.coursesOf(workbook)) app.bank.subject(id)?.name ?? id].join('·')}';
     final (done, total) = app.workbookProgress(workbook);
-    final lv = workbookLevelColor(workbook.level);
+    final lv = stageColor(workbook.stage);
     return Card(
       key: Key('wbcard-${workbook.id}'),
       clipBehavior: Clip.antiAlias,
@@ -41,7 +51,7 @@ class WorkbookCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Pill(workbook.level, color: lv, dense: true),
+                  Pill(workbook.stage, color: lv, dense: true),
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(courseLabel,

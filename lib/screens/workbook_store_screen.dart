@@ -4,18 +4,9 @@ import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
 import '../widgets/common.dart';
-import '../widgets/workbook_card.dart' show workbookLevelColor;
+import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'dashboard_screen.dart' show courseIcon;
 import 'workbook_screen.dart';
-
-Color stageColor(String stage) => switch (stage) {
-      '개념' => AppColors.correct,
-      '유형' => const Color(0xFF0EA5E9),
-      '기출' => AppColors.blue,
-      'N제' => const Color(0xFF8C5BD6),
-      '모의고사' => AppColors.accent,
-      _ => AppColors.inkSoft,
-    };
 
 /// 문제집 고르기: 과목 → 커리큘럼 단계(개념 → 유형 → 기출 → N제 → 모의고사) → 내 교재에 담기.
 class WorkbookStoreScreen extends StatelessWidget {

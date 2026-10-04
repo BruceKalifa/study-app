@@ -5,9 +5,8 @@ import '../app/theme.dart';
 import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
-import '../widgets/workbook_card.dart' show workbookLevelColor;
+import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'solve_screen.dart';
-import 'workbook_store_screen.dart' show stageColor;
 
 /// One 문제집: problems in order, progress, 이어 풀기 / 틀린 것만.
 class WorkbookScreen extends StatelessWidget {
