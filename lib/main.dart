@@ -5,7 +5,7 @@ import 'app/app_state.dart';
 import 'app/storage.dart';
 import 'app/theme.dart';
 import 'core/problem_bank.dart';
-import 'screens/home_shell.dart';
+import 'screens/app_root.dart';
 import 'services/handwriting.dart';
 
 Future<void> main() async {
@@ -55,10 +55,10 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
     return AppScope(
       state: widget.state,
       child: MaterialApp(
-        title: '풀이노트',
+        title: kAppName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
-        home: const HomeShell(),
+        home: const AppRoot(),
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../services/handwriting.dart';
 import '../services/live_sync.dart';
 import '../widgets/common.dart';
 import 'onboarding_screen.dart';
+import 'teacher_shell.dart' show AccountCard;
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -49,7 +50,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Text('설정', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
         const SizedBox(height: 20),
 
-        // ---------------- profiles
+        // ---------------- account
+        const AccountCard(),
+        const SizedBox(height: 16),
+
+        // ---------------- profiles (로그인 없이 쓸 때만)
+        if (!app.signedIn)
         _Section(title: '학생 프로필', subtitle: '한 태블릿을 여러 학생이 쓰면 프로필을 나눠 기록을 따로 관리해요', children: [
           Wrap(spacing: 12, runSpacing: 12, children: [
             for (final p in app.profiles)
@@ -111,13 +117,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ]),
 
         // ---------------- study
-        _Section(title: '학년 · 목표 · 과목', subtitle: '오늘의 세트, 무한 풀기, 문제집이 이 설정을 따라요', children: [
+        _Section(title: '학년 · 목표 · 내 교재', subtitle: '오늘의 세트와 무한 풀기는 내 교재의 문제로 만들어져요', children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.school_outlined),
             title: Text('${app.learner.grade} · ${app.learner.goal} 목표',
                 style: const TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text('과목 ${app.myCourses.map((c) => c.name).join(', ')}'),
+            subtitle: Text(app.myWorkbooks.isEmpty
+                ? '내 교재가 비어 있어요'
+                : '내 교재 ${app.myWorkbooks.length}권 · ${app.myWorkbooks.map((w) => w.title).join(', ')}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
             trailing: FilledButton.tonal(
               key: const Key('edit-learner'),
               onPressed: () => Navigator.of(context)

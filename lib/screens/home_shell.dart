@@ -10,6 +10,7 @@ import 'community_screen.dart';
 import 'library_screen.dart';
 import 'onboarding_screen.dart';
 import 'planner_screen.dart';
+import 'questions_screen.dart';
 import 'subscription_screen.dart';
 import 'scratch_screen.dart';
 import 'settings_screen.dart';
@@ -34,9 +35,10 @@ class HomeShellState extends State<HomeShell> {
 
   static const _dests = [
     _Dest(Icons.home_outlined, Icons.home_rounded, '홈'),
-    _Dest(Icons.menu_book_outlined, Icons.menu_book_rounded, '문제집'),
+    _Dest(Icons.collections_bookmark_outlined, Icons.collections_bookmark_rounded, '내 교재'),
     _Dest(Icons.assignment_late_outlined, Icons.assignment_late_rounded, '오답노트'),
     _Dest(Icons.event_note_outlined, Icons.event_note_rounded, '학습관리'),
+    _Dest(Icons.contact_support_outlined, Icons.contact_support_rounded, '질문'),
     _Dest(Icons.forum_outlined, Icons.forum_rounded, '커뮤니티'),
     _Dest(Icons.insights_outlined, Icons.insights_rounded, '통계'),
     _Dest(Icons.history_rounded, Icons.history_rounded, '기록'),
@@ -59,16 +61,18 @@ class HomeShellState extends State<HomeShell> {
       case 3:
         return const PlannerScreen();
       case 4:
-        return const CommunityScreen();
+        return const QuestionsScreen();
       case 5:
-        return const StatsScreen();
+        return const CommunityScreen();
       case 6:
-        return const HistoryScreen();
+        return const StatsScreen();
       case 7:
-        return const ScratchScreen();
+        return const HistoryScreen();
       case 8:
-        return const EditorScreen();
+        return const ScratchScreen();
       case 9:
+        return const EditorScreen();
+      case 10:
         return const SubscriptionScreen();
       default:
         return const SettingsScreen();
@@ -105,6 +109,7 @@ class HomeShellState extends State<HomeShell> {
           dests: _dests,
           onTap: go,
           due: due,
+          answers: app.unreadAnswers,
           profileName: app.profile.name,
           profileColor: Color(app.profile.color),
           live: app.live,
@@ -122,6 +127,7 @@ class _Rail extends StatelessWidget {
     required this.dests,
     required this.onTap,
     required this.due,
+    required this.answers,
     required this.profileName,
     required this.profileColor,
     required this.live,
@@ -131,6 +137,7 @@ class _Rail extends StatelessWidget {
   final List<_Dest> dests;
   final ValueChanged<int> onTap;
   final int due;
+  final int answers;
   final String profileName;
   final Color profileColor;
   final LiveSync? live;
@@ -156,7 +163,7 @@ class _Rail extends StatelessWidget {
             child: const Icon(Icons.draw_rounded, color: Colors.white, size: 26),
           ),
           const SizedBox(height: 6),
-          const Text('풀이노트',
+          const Text(kAppName,
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5, letterSpacing: -0.3)),
           const SizedBox(height: 18),
           Expanded(
@@ -166,7 +173,9 @@ class _Rail extends StatelessWidget {
                   _RailItem(
                     dest: dests[i],
                     selected: index == i,
-                    badge: i == 2 && due > 0 ? '$due' : null,
+                    badge: i == 2 && due > 0
+                        ? '$due'
+                        : (i == 4 && answers > 0 ? '$answers' : null),
                     onTap: () => onTap(i),
                   ),
               ]),
@@ -185,7 +194,7 @@ class _Rail extends StatelessWidget {
               ),
             ),
           GestureDetector(
-            onTap: () => onTap(10),
+            onTap: () => onTap(11),
             child: Tooltip(
               message: profileName,
               child: CircleAvatar(

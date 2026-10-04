@@ -1,0 +1,122 @@
+# 계정 · 선생님-학생 연결 · 풀이 기록 · 1:1 질문 API
+
+선생님 서버(`server/`)가 제공한다 (`server/accounts.js`, `server/questions.js`). 앱은 콘텐츠·커뮤니티 API와 같은 주소를 쓴다.
+모든 응답은 JSON, 오류는 `{ "error": "한국어 메시지" }` + 400/401/403/404/409/413/429.
+
+## 인증
+
+가입·로그인 응답의 `token` 을 이후 요청에 `Authorization: Bearer <token>` 으로 보낸다.
+토큰은 180일 동안 쓰이지 않으면 만료된다. 서버에는 토큰의 sha256 해시만, 비밀번호는 scrypt 해시(+salt)만 저장한다.
+
+| 요청 | 본문 | 응답 |
+|---|---|---|
+| `POST /api/auth/signup` | `{ role: "student"\|"teacher", loginId, password, name, grade? }` | `{ token, user, communityKey, counts, inviteCode? \| teachers? }` |
+| `POST /api/auth/login` | `{ loginId, password }` | 위와 같음 |
+| `POST /api/auth/logout` | – | `{ ok }` (이 토큰만 끊김) |
+| `GET /api/me` | – | `{ user, communityKey, counts, inviteCode?, studentCount? \| teachers? }` |
+| `POST /api/me` | `{ name?, grade? }` | `GET /api/me` 와 같음 |
+| `POST /api/me/password` | `{ current, next }` | `{ ok }` (다른 기기의 로그인은 모두 끊김) |
+
+- `loginId`: 영문 소문자·숫자로 시작하는 4~20자 (영문·숫자·`.`·`_`·`-`). 대소문자는 구분하지 않는다(소문자로 저장). 이미 있으면 409.
+- `password`: 6~100자. `name`: 1~20자. `grade`(학생만): `고1 고2 고3 N수` 또는 빈 값.
+- 로그인을 8번 틀리면 그 아이디는 10분 잠긴다(429). 가입은 IP 당 1시간 30번까지.
+- `user`: `{ id, role, loginId, name, grade?(학생), createdAt }`
+- `communityKey`: 커뮤니티·순위 API 의 `userId` 로 쓰는 본인 전용 키 (다른 사람에게는 보이지 않는다).
+- `counts`: `{ unreadQuestions, openQuestions }` — 학생은 "선생님이 답한 안 읽은 질문", 선생님은 "답을 기다리는 질문".
+- 선생님: `inviteCode`(6자리, 0/O·1/I 없음), `studentCount`. 학생: `teachers: [{ id, name }]`.
+
+## 선생님 ⇄ 학생 연결
+
+학생이 선생님의 **초대 코드**를 입력해 연결한다. 한 학생이 여러 선생님(학원·과외)과 연결될 수 있다(최대 10명).
+선생님은 **자기에게 연결된 학생의 기록만** 볼 수 있다.
+
+| 요청 | 누가 | 응답 |
+|---|---|---|
+| `POST /api/student/teachers` `{ code }` | 학생 | `{ teacher: { id, name } }` (틀린 코드 404, 공백·하이픈·소문자 허용) |
+| `DELETE /api/student/teachers/:teacherId` | 학생 | `{ ok }` |
+| `POST /api/teacher/invite` | 선생님 | `{ inviteCode }` 새 코드 (예전 코드는 더 이상 안 됨, 이미 연결된 학생은 그대로) |
+| `DELETE /api/teacher/students/:id` | 선생님 | `{ ok }` |
+
+## 풀이 기록 (학생 → 서버)
+
+`POST /api/student/sync` (학생) — 셋 다 선택:
+
+```json
+{
+  "attempts": [ { "id": "앱의 풀이 id", "pid": "phy1-mech-005~v12", "base": "phy1-mech-005", "sub": "phy1",
+                  "unit": "역학", "topic": "운동량", "ans": "2", "exp": "4", "ok": false, "ms": 41000,
+                  "at": 1791100000000, "mode": "practice" } ],
+  "learner": { "grade": "고3", "goal": "수능", "workbooks": ["wb-phy1-real1"], "examName": "수능", "examDate": 0, … },
+  "wrongNote": ["phy1-mech-005"]
+}
+```
+
+→ `{ ok, stored, total, syncedAt }`
+
+- `attempts` 는 앱의 `Attempt.toJson()` 모양 그대로. 같은 `id` 는 한 번만 저장(다시 보내도 됨). 한 번에 2000개, 학생당 최근 30000개 보관.
+- `learner`: 앱 학습 설정 전체(64KB 까지) — 새 기기에서 되살릴 때 쓴다. `grade` 가 있으면 계정 학년도 바뀐다.
+- `wrongNote`: 지금 오답노트에 남아 있는 원래 문제 id 목록(복습으로 졸업한 것은 빠짐).
+
+`GET /api/student/records` (학생) → `{ attempts, learner, wrongNote, syncedAt }` — 새 기기에서 로그인했을 때 되살리기.
+
+## 선생님 화면
+
+### `GET /api/teacher/students`
+
+```json
+{ "inviteCode": "K7Q2MX",
+  "students": [ { "id": "u_…", "name": "오예진", "grade": "고3", "joinedAt": 0, "syncedAt": 0, "lastActiveAt": 0,
+                  "solved": 120, "correct": 88,
+                  "today": { "solved": 12, "correct": 9, "timeMs": 900000 },
+                  "week":  { "solved": 60, "correct": 41, "timeMs": 5400000 },
+                  "wrongOpen": 7 } ] }
+```
+
+최근에 푼 학생이 위. `wrongOpen` = 오답노트에 남은 문제 수. 날짜는 한국 시간(`TZ_OFFSET_MIN`, 기본 540) 기준.
+
+### `GET /api/teacher/students/:id`
+
+```json
+{ "student": { …위 요약… },
+  "learner": { "grade", "goal", "workbooks": [], "examName", "examDate" },
+  "wrong": [ { "baseId", "problemId": "마지막으로 틀린 문제(변형이면 변형 id)", "subjectId", "unit", "topic",
+               "answer": "학생이 쓴 답", "expected": "정답", "wrongAt", "lastAt", "lastCorrect",
+               "tries", "correct", "wrongs", "open": true } ],
+  "bySubject": [ { "subjectId", "solved", "correct", "timeMs" } ],
+  "byDay": [ { "day": "2026-10-05", "solved", "correct", "timeMs" } ],   // 최근 14일
+  "recent": [ …최근 풀이 150개 (최신이 앞), attempts 와 같은 모양… ] }
+```
+
+`wrong` 은 한 번이라도 틀린 문제(변형·쌍둥이는 원래 문제로 묶음). 오답노트에 남은 것(`open`) 먼저, 최근에 틀린 순.
+학생이 `wrongNote` 를 보낸 적 없으면 "마지막 풀이가 오답"이면 `open`.
+
+## 1:1 질문
+
+학생이 연결된 선생님에게 문제·풀이 사진과 함께 질문하고, 선생님이 글이나 **필기 그림**으로 답한다.
+
+| 요청 | 누가 | 응답 |
+|---|---|---|
+| `POST /api/questions` `{ teacherId, problemId?, title?, body, image? }` | 학생 | `{ question }` |
+| `GET /api/questions?status=open\|answered\|resolved\|all&student=` | 둘 다 | `{ questions: [요약] }` (최근 바뀐 순, 300개) |
+| `GET /api/questions/:id` | 참여자 | `{ question }` + 읽음 표시 |
+| `POST /api/questions/:id/messages` `{ body?, image? }` | 참여자 | `{ question }` |
+| `POST /api/questions/:id/resolve` | 참여자 | `{ ok }` |
+| `GET /api/questions/:id/images/:imageId` | 참여자 | 그림 (PNG/JPEG) |
+
+- `image`: `data:image/png;base64,…` 또는 base64 (PNG·JPEG, 2.5MB 까지). 파일은 `DATA_DIR/question-images/` 에 저장.
+- `body` 3000자까지, `title` 80자(없으면 "질문"). 내용과 그림이 둘 다 없으면 400. 연결 안 된 선생님에게 질문하면 403.
+- 상태: 학생이 쓰면 `open`, 선생님이 답하면 `answered`, `resolve` 하면 `resolved`. 해결 뒤에도 메시지를 쓰면 다시 열린다.
+- 연결을 끊어도 이미 주고받은 질문은 두 사람이 계속 볼 수 있다. 다른 사람에게는 404.
+- 요약: `{ id, student: { id, name, grade }, teacher: { id, name }, problemId, title, preview, hasImage, status, createdAt, updatedAt, messageCount, lastFrom, unread }`
+- `question` = 요약 + `messages: [ { id, from: "student"|"teacher", name, body, image: "/api/questions/…/images/…"|null, at, mine } ]`
+
+## 저장
+
+`DATA_DIR/accounts.json`(계정·세션), `study.json`(학생별 기록), `questions.json`, `question-images/`.
+모두 임시 파일에 쓴 뒤 이름 바꾸기(원자적). 점검: `npm run test:accounts`.
+
+## 나중에 (실서비스)
+
+- 클라우드 서버 + HTTPS (지금은 같은 와이파이의 선생님 컴퓨터).
+- 소셜 로그인(카카오·구글·애플), 비밀번호 찾기(휴대폰·이메일 인증), 선생님 계정 인증.
+- 구독 결제 상태를 계정에 저장.

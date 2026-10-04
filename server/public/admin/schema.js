@@ -19,6 +19,7 @@
   const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수'];
   const TRACKS = ['수능', '내신', '공통'];
   const WB_LEVELS = ['기본', '실전', '심화', '모의고사'];
+  const WB_STAGES = ['개념', '유형', '기출', 'N제', '모의고사'];
   const RESERVED_COURSE_IDS = ['workbooks', 'index', '_index', 'admin'];
 
   const COURSE_ID_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
@@ -748,6 +749,8 @@
       else if (courseIds && !courseIds.has(wb.course)) rep.err(where, 'course', `과목 "${wb.course}" 가 없습니다`);
       if (wb.level != null && !WB_LEVELS.includes(wb.level)) rep.err(where, 'level', `수준은 ${WB_LEVELS.join('·')} 중 하나여야 합니다`);
       if (wb.desc != null && !isStr(wb.desc)) rep.err(where, 'desc', '설명은 글자여야 합니다');
+      if (wb.stage != null && wb.stage !== '' && !WB_STAGES.includes(wb.stage)) rep.err(where, 'stage', `단계는 ${WB_STAGES.join('·')} 중 하나여야 합니다`);
+      for (const k of ['scope', 'publisher', 'series']) if (wb[k] != null && !isStr(wb[k])) rep.err(where, k, '글자여야 합니다');
       if (!Array.isArray(wb.problems)) { rep.err(where, 'problems', '문항 목록(problems)이 필요합니다'); return; }
       if (!wb.problems.length) rep.err(where, 'problems', '문항을 하나 이상 넣으세요');
       const inWb = new Set();
@@ -779,7 +782,7 @@
   }
 
   return {
-    GROUPS, GROUP_ORDER, LEVELS, GRADES, TRACKS, WB_LEVELS, RESERVED_COURSE_IDS, COURSE_ID_RE, ITEM_ID_RE,
+    GROUPS, GROUP_ORDER, LEVELS, GRADES, TRACKS, WB_LEVELS, WB_STAGES, RESERVED_COURSE_IDS, COURSE_ID_RE, ITEM_ID_RE,
     splitMath, countDollars, parseBlocks, inlineTokens, parseEmphasis, plain, tableCells,
     ExprError, parseExpr, evaluate, exprNames, fmtNum, roundTo, paramChoices, renderPlaceholders, makeVariant, seededRandom,
     Report, checkText, validateProblem, validatePassage, validateCourseMeta, validateCourse, validateWorkbooks,

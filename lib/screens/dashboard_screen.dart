@@ -9,6 +9,7 @@ import '../widgets/common.dart';
 import '../widgets/workbook_card.dart';
 import 'exam_setup.dart';
 import 'solve_screen.dart';
+import 'workbook_store_screen.dart';
 
 /// 홈: 오늘의 오답 변형 세트 · 순공 · 무한 풀기 · 내 문제집 · 할 일 · 약점 유형.
 class DashboardScreen extends StatelessWidget {
@@ -26,7 +27,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
-    final courses = app.myCourses;
+    final books = app.myWorkbooks;
     final l = app.learner;
     final dday = app.dDay;
 
@@ -43,11 +44,20 @@ class DashboardScreen extends StatelessWidget {
                     style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
                 const SizedBox(height: 6),
                 Text(
-                  '${l.grade} · ${l.goal} 목표 · ${courses.isEmpty ? '과목 없음' : courses.length == 1 ? courses.first.name : '${courses.first.name} 외 ${courses.length - 1}과목'}',
+                  '${l.grade} · ${l.goal} 목표 · ${books.isEmpty ? '내 교재 없음' : '내 교재 ${books.length}권'}',
                   style: const TextStyle(fontSize: 15.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
                 ),
               ]),
             ),
+            if (app.unreadAnswers > 0) ...[
+              InkWell(
+                key: const Key('home-answers'),
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => onNavigate(4),
+                child: Pill('선생님 답변 ${app.unreadAnswers}개', icon: Icons.mark_chat_unread_rounded, color: AppColors.correct),
+              ),
+              const SizedBox(width: 10),
+            ],
             if (app.streak > 0) ...[
               Pill('${app.streak}일 연속', icon: Icons.local_fire_department_rounded, color: AppColors.accent),
               const SizedBox(width: 10),
@@ -55,7 +65,7 @@ class DashboardScreen extends StatelessWidget {
             if (!app.subscribed)
               InkWell(
                 borderRadius: BorderRadius.circular(20),
-                onTap: () => onNavigate(9),
+                onTap: () => onNavigate(10),
                 child: Pill('무료 체험 ${app.trialDaysLeft}일 남음', icon: Icons.workspace_premium_rounded, color: AppColors.blue),
               ),
             if (l.examDate > 0) ...[
@@ -102,50 +112,73 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          // ---------- endless
-          const SectionHeader('무한 풀기', subtitle: '맞히면 더 어렵게, 틀리면 쉽게 · 문제가 끝없이 이어져요'),
-          Wrap(spacing: 12, runSpacing: 12, children: [
-            _EndlessChip(
-              key: const Key('endless-all'),
-              label: '내 과목 전체',
-              icon: Icons.all_inclusive_rounded,
-              color: AppColors.ink,
-              onTap: () => SolveScreen.endless(context, title: '내 과목 전체'),
-            ),
-            for (final c in courses)
-              _EndlessChip(
-                key: Key('endless-${c.id}'),
-                label: c.name,
-                icon: courseIcon(c),
-                color: Color(c.color),
-                onTap: () => SolveScreen.endless(context, courseId: c.id),
-              ),
-            _EndlessChip(
-              label: '모의고사 만들기',
-              icon: Icons.timer_outlined,
-              color: AppColors.inkSoft,
-              outlined: true,
-              onTap: () => showExamSetup(context),
-            ),
-          ]),
-          const SizedBox(height: 32),
-
-          // ---------- workbooks
-          SectionHeader('내 문제집',
-              subtitle: '순서대로 풀며 진도를 채워요',
-              trailing: TextButton(onPressed: () => onNavigate(1), child: const Text('전체 보기'))),
+          // ---------- workbooks (내 교재)
+          SectionHeader('내 교재',
+              subtitle: books.isEmpty ? '문제집을 골라 담으면 여기에서 바로 풀 수 있어요' : '순서대로 풀며 진도를 채워요',
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                TextButton.icon(
+                  key: const Key('home-add-books'),
+                  onPressed: () => WorkbookStoreScreen.open(context),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('문제집 담기'),
+                ),
+                if (books.isNotEmpty) TextButton(onPressed: () => onNavigate(1), child: const Text('전체 보기')),
+              ])),
           SizedBox(
             height: 178,
-            child: app.myWorkbooks.isEmpty
-                ? const Card(child: Center(child: Text('내 과목의 문제집이 아직 없어요', style: TextStyle(color: AppColors.inkMuted))))
+            child: books.isEmpty
+                ? Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => WorkbookStoreScreen.open(context),
+                      child: const Center(
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.collections_bookmark_rounded, color: AppColors.inkMuted, size: 30),
+                          SizedBox(width: 12),
+                          Text('개념서 · 유형서 · 기출 · N제 · 모의고사 중에서 골라 담아 보세요',
+                              style: TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 15.5)),
+                        ]),
+                      ),
+                    ),
+                  )
                 : ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: app.myWorkbooks.length,
+                    itemCount: books.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 14),
-                    itemBuilder: (context, i) => SizedBox(width: 290, child: WorkbookCard(workbook: app.myWorkbooks[i])),
+                    itemBuilder: (context, i) => SizedBox(width: 290, child: WorkbookCard(workbook: books[i])),
                   ),
           ),
           const SizedBox(height: 32),
+
+          // ---------- endless (내 교재에서만)
+          if (books.isNotEmpty) ...[
+            const SectionHeader('무한 풀기', subtitle: '내 교재 문제로 · 맞히면 더 어렵게, 틀리면 쉽게'),
+            Wrap(spacing: 12, runSpacing: 12, children: [
+              _EndlessChip(
+                key: const Key('endless-all'),
+                label: '내 교재 전체',
+                icon: Icons.all_inclusive_rounded,
+                color: AppColors.ink,
+                onTap: () => SolveScreen.endless(context, title: '내 교재 전체'),
+              ),
+              for (final w in books.take(6))
+                _EndlessChip(
+                  key: Key('endless-wb-${w.id}'),
+                  label: w.title,
+                  icon: app.bank.subject(w.course) == null ? Icons.menu_book_rounded : courseIcon(app.bank.subject(w.course)!),
+                  color: Color(app.bank.subject(w.course)?.color ?? 0xFF5B6475),
+                  onTap: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
+                ),
+              _EndlessChip(
+                label: '모의고사 만들기',
+                icon: Icons.timer_outlined,
+                color: AppColors.inkSoft,
+                outlined: true,
+                onTap: () => showExamSetup(context),
+              ),
+            ]),
+            const SizedBox(height: 32),
+          ],
 
           // ---------- todo + weak topics
           _flex(wide, [
@@ -256,6 +289,7 @@ class _DailySetCard extends StatelessWidget {
     ];
     final hasWrong = variants + review > 0;
     final white70 = Colors.white.withValues(alpha: 0.72);
+    final noBooks = app.myWorkbooks.isEmpty;
 
     Widget chip(String label, int n, Color c) => Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -304,9 +338,13 @@ class _DailySetCard extends StatelessWidget {
             ]),
             const SizedBox(height: 6),
             Text(
-              hasWrong
-                  ? '틀린 문제를 쌍둥이 문항과 변형으로 다시 풀고, 약한 유형을 채웠어요.'
-                  : '아직 오답이 없어서 내 과목의 새 문제로 채웠어요. 틀리면 내일 세트에 변형이 나와요.',
+              total == 0 && noBooks
+                  ? '문제집을 골라 내 교재에 담으면, 내 교재의 진도와 틀린 문제의 변형으로 매일 세트를 만들어 드려요.'
+                  : total == 0
+                      ? '내 교재를 다 풀었어요! 새 문제집을 담거나 무한 풀기로 이어 가세요.'
+                      : hasWrong
+                          ? '틀린 문제를 쌍둥이 문항과 변형으로 다시 풀고, 내 교재의 진도를 채웠어요.'
+                          : '아직 오답이 없어서 내 교재의 다음 문제로 채웠어요. 틀리면 내일 세트에 변형이 나와요.',
               style: TextStyle(color: white70, fontSize: 15, height: 1.5),
             ),
             const SizedBox(height: 14),
@@ -314,9 +352,18 @@ class _DailySetCard extends StatelessWidget {
               if (variants > 0) chip('오답 변형', variants, AppColors.accent),
               if (review > 0) chip('복습', review, AppColors.review),
               if (weak > 0) chip('약점 유형', weak, const Color(0xFFB58CFF)),
-              if (fresh > 0) chip('새 문제', fresh, const Color(0xFF6FC3FF)),
+              if (fresh > 0) chip('오늘의 진도', fresh, const Color(0xFF6FC3FF)),
             ]),
             const SizedBox(height: 18),
+            if (total == 0)
+              FilledButton.icon(
+                key: const Key('daily-pick-books'),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
+                onPressed: () => WorkbookStoreScreen.open(context),
+                icon: const Icon(Icons.collections_bookmark_rounded),
+                label: Text(noBooks ? '문제집 고르러 가기' : '문제집 더 담기'),
+              )
+            else
             FilledButton.icon(
               key: const Key('daily-start'),
               style: FilledButton.styleFrom(

@@ -4,6 +4,8 @@
       "id": "wb-phy1-concept",
       "title": "물리학Ⅰ 개념 완성",
       "course": "phy1",
+      "stage": "개념",
+      "scope": "역학·전자기·파동",
       "level": "기본",
       "desc": "교과 개념을 유형별로 한 바퀴 — 기본 난이도 문항 위주",
       "problems": [
@@ -25,6 +27,7 @@
       "id": "wb-phy1-real1",
       "title": "물리학Ⅰ 실전 N제 1",
       "course": "phy1",
+      "stage": "N제",
       "level": "실전",
       "desc": "수능 3점 수준의 계산·<보기> 문항",
       "problems": [
@@ -46,6 +49,7 @@
       "id": "wb-phy2-deep",
       "title": "물리학Ⅱ 심화 문제",
       "course": "phy2",
+      "stage": "N제",
       "level": "심화",
       "desc": "원운동·전자기·파동의 고난도 문항",
       "problems": [
@@ -67,6 +71,7 @@
       "id": "wb-earth1-concept",
       "title": "지구과학Ⅰ 핵심 유형",
       "course": "earth1",
+      "stage": "유형",
       "level": "기본",
       "desc": "고체 지구부터 우주까지 빈출 개념 확인",
       "problems": [
@@ -88,6 +93,7 @@
       "id": "wb-earth1-mock1",
       "title": "지구과학Ⅰ 미니 모의고사 1회",
       "course": "earth1",
+      "stage": "모의고사",
       "level": "모의고사",
       "desc": "단원별 5문항씩, 실제 시험처럼 시간을 재고 풀어 보세요",
       "problems": [
@@ -112,6 +118,8 @@
       "id": "wb-math-common",
       "title": "고1 공통수학 기초",
       "course": "math",
+      "stage": "개념",
+      "scope": "공통수학",
       "level": "기본",
       "desc": "다항식·방정식·부등식 기본기 다지기",
       "problems": [
@@ -124,9 +132,69 @@
       ]
     },
     {
+      "id": "wb-math1-concept",
+      "title": "수학Ⅰ 개념 완성",
+      "course": "math",
+      "stage": "개념",
+      "scope": "수학Ⅰ",
+      "level": "기본",
+      "desc": "지수와 로그 · 삼각함수 · 수열 — 교과서 개념을 문제로 확인",
+      "problems": [
+        "math-exp-002",
+        "math-exp-003",
+        "math-exp-004",
+        "math-trig-001",
+        "math-trig-002",
+        "math-trig-004",
+        "math-trig-005",
+        "math-seq-001",
+        "math-seq-003",
+        "math-seq-007"
+      ]
+    },
+    {
+      "id": "wb-math1-type",
+      "title": "수학Ⅰ 유형 정리",
+      "course": "math",
+      "stage": "유형",
+      "scope": "수학Ⅰ",
+      "level": "실전",
+      "desc": "자주 나오는 유형을 한 번씩 — 개념 다음 단계",
+      "problems": [
+        "math-exp-001",
+        "math-exp-005",
+        "math-trig-003",
+        "math-trig-006",
+        "math-seq-002",
+        "math-seq-004",
+        "math-seq-005",
+        "math-seq-006"
+      ]
+    },
+    {
+      "id": "wb-math2-concept",
+      "title": "수학Ⅱ 개념 완성",
+      "course": "math",
+      "stage": "개념",
+      "scope": "수학Ⅱ",
+      "level": "기본",
+      "desc": "함수의 극한 · 미분 · 적분 기본 문항",
+      "problems": [
+        "math-calc-001",
+        "math-calc-002",
+        "math-calc-003",
+        "math-calc-004",
+        "math-calc-005",
+        "math-calc-006",
+        "math-calc-009"
+      ]
+    },
+    {
       "id": "wb-math-real1",
       "title": "수학Ⅰ·Ⅱ 실전 N제 1",
       "course": "math",
+      "stage": "N제",
+      "scope": "수학Ⅰ·수학Ⅱ",
       "level": "실전",
       "desc": "지수·로그, 삼각함수, 수열, 미적분 실전 문항",
       "problems": [
@@ -148,6 +216,7 @@
       "id": "wb-integ-concept",
       "title": "통합과학 개념 다지기",
       "course": "integ",
+      "stage": "개념",
       "level": "기본",
       "desc": "고1 통합과학 핵심 개념 확인 문제",
       "problems": [
@@ -169,6 +238,8 @@
       "id": "wb-kor-read",
       "title": "국어 독서 지문 훈련",
       "course": "kor-read",
+      "stage": "유형",
+      "scope": "독서",
       "level": "실전",
       "desc": "인문·사회·과학기술 지문 3개 — 내용 일치, 추론, <보기> 적용",
       "problems": [
@@ -187,6 +258,8 @@
       "id": "wb-eng-focus",
       "title": "영어 빈칸·주제 집중",
       "course": "eng",
+      "stage": "유형",
+      "scope": "독해",
       "level": "실전",
       "desc": "대의 파악(주제·요지·제목·함축)과 빈칸 추론 집중 훈련",
       "problems": [
@@ -201,6 +274,7 @@
       "id": "wb-soc-data",
       "title": "통합사회 자료 해석",
       "course": "soc-int",
+      "stage": "유형",
       "level": "실전",
       "desc": "표 자료를 읽고 계산·해석하는 문항 모음",
       "problems": [

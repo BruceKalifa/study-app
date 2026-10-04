@@ -568,6 +568,15 @@ class Subject {
 }
 
 /// 문제집 (assets/problems/workbooks.json).
+/// 커리큘럼 단계 — 문제집 고르기 화면이 이 순서로 보여 준다.
+const List<String> kWorkbookStages = ['개념', '유형', '기출', 'N제', '모의고사'];
+
+String _stageFromLevel(String level) => switch (level) {
+      '기본' => '개념',
+      '모의고사' => '모의고사',
+      _ => 'N제',
+    };
+
 class Workbook {
   final String id;
   final String title;
@@ -578,6 +587,16 @@ class Workbook {
 
   /// 시리즈 이름 (예: FLOW TYPE) — such workbooks may mix several courses.
   final String series;
+
+  /// 커리큘럼 단계: 개념 | 유형 | 기출 | N제 | 모의고사 (없으면 level 로 짐작).
+  final String stage;
+
+  /// 범위 (예: 수학Ⅰ, 공통수학1, 역학) — 같은 과목 안에서 다시 나눌 때.
+  final String scope;
+
+  /// 만든 곳 (예: LAST30 ITEM LAB).
+  final String publisher;
+
   const Workbook({
     required this.id,
     required this.title,
@@ -586,17 +605,32 @@ class Workbook {
     this.desc = '',
     this.problemIds = const <String>[],
     this.series = '',
+    this.stage = '개념',
+    this.scope = '',
+    this.publisher = '',
   });
 
-  factory Workbook.fromJson(Map<String, dynamic> j) => Workbook(
-        id: _str(j['id']),
-        title: _str(j['title']),
-        course: _str(j['course']),
-        level: _str(j['level'], '기본'),
-        desc: _str(j['desc']),
-        problemIds: _strList(j['problems']),
-        series: _str(j['series']),
-      );
+  int get stageIndex {
+    final i = kWorkbookStages.indexOf(stage);
+    return i < 0 ? kWorkbookStages.length : i;
+  }
+
+  factory Workbook.fromJson(Map<String, dynamic> j) {
+    final level = _str(j['level'], '기본');
+    final stage = _str(j['stage']);
+    return Workbook(
+      id: _str(j['id']),
+      title: _str(j['title']),
+      course: _str(j['course']),
+      level: level,
+      desc: _str(j['desc']),
+      problemIds: _strList(j['problems']),
+      series: _str(j['series']),
+      stage: kWorkbookStages.contains(stage) ? stage : _stageFromLevel(level),
+      scope: _str(j['scope']),
+      publisher: _str(j['publisher']),
+    );
+  }
 
   static List<Workbook> listFromJson(Object? decoded) {
     final m = _map(decoded);

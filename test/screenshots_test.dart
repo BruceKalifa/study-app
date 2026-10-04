@@ -17,7 +17,11 @@ import 'package:study_app/app/theme.dart';
 import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/ink/ink_model.dart';
+import 'package:study_app/screens/app_root.dart';
 import 'package:study_app/screens/history_screen.dart';
+import 'package:study_app/screens/questions_screen.dart';
+import 'package:study_app/screens/workbook_store_screen.dart';
+import 'package:study_app/services/account_api.dart';
 import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/result_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
@@ -95,7 +99,12 @@ Future<AppState> _seeded() async {
     }
   }
   s.seedAttempts(list);
-  s.completeOnboarding(name: '선주', grade: '고2', goal: '수능', courses: const [], workbooks: const []);
+  s.completeOnboarding(
+      name: '선주',
+      grade: '고2',
+      goal: '수능',
+      courses: const [],
+      workbooks: const ['wb-phy1-concept', 'wb-phy1-real1', 'wb-math1-concept', 'wb-math-real1', 'wb-earth1-mock1']);
   s.addTodo('수학Ⅰ 지수함수 20문제');
   s.addTodo('영어 단어 Day 12');
   s.toggleTodo(s.todos.first.id);
@@ -142,6 +151,144 @@ Future<void> _rest(WidgetTester tester) =>
     tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 600)));
 
 class _RealHttp extends HttpOverrides {}
+
+Future<void> _waitNet(WidgetTester tester, [int rounds = 4]) async {
+  for (var k = 0; k < rounds; k++) {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 600)));
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+/// Teacher + students with records and questions on the CI server, then the teacher's and a student's screens.
+Future<void> _teacherShots(WidgetTester tester, String server) async {
+  HttpOverrides.global = _RealHttp();
+  final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+  final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+  final bank = (await tester.runAsync(() => ProblemBank.load(rootBundle)))!;
+  final setup = await tester.runAsync(() async {
+    final (tToken, tMe) = await AccountApi(server).signup(role: 'teacher', loginId: 'shot$stamp', password: 'teach-pass', name: '우네');
+    final students = <(String, String)>[];
+    final rnd = math.Random(7);
+    for (final (i, (name, grade)) in [('오예진', '고3'), ('김선주', '고2'), ('박민수', '고3'), ('이서연', 'N수')].indexed) {
+      final (sToken, _) = await AccountApi(server)
+          .signup(role: 'student', loginId: 'st$i$stamp', password: 'stud-pass', name: name, grade: grade);
+      final api = AccountApi(server, sToken);
+      await api.joinTeacher(tMe.inviteCode!);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final ps = bank.all.where((p) => p.subjectId == 'phy1' || p.subjectId == 'math').toList()..shuffle(rnd);
+      final atts = <Attempt>[];
+      for (var k = 0; k < 18 + i * 7; k++) {
+        final p = ps[k % ps.length];
+        final ok = rnd.nextDouble() < 0.68;
+        atts.add(Attempt(
+          id: 'shot-$i-$k',
+          problemId: p.id,
+          baseId: p.id,
+          subjectId: p.subjectId,
+          unit: p.unit,
+          topic: p.topic,
+          answer: ok ? p.answer : (p.isChoice ? '${(int.parse(p.answer) % 5) + 1}' : '7'),
+          expected: p.answer,
+          correct: ok,
+          timeMs: 40000 + rnd.nextInt(200000),
+          at: now - (k % 9) * Duration.millisecondsPerDay - rnd.nextInt(3600000),
+          mode: 'practice',
+          hasInk: false,
+        ));
+      }
+      await api.sync(
+        attempts: atts,
+        learner: {'grade': grade, 'goal': '수능', 'workbooks': ['wb-phy1-concept', 'wb-math1-concept'], 'examName': '수능', 'examDate': now + 45 * Duration.millisecondsPerDay},
+        wrongNote: [for (final a in atts) if (!a.correct) a.baseId],
+      );
+      if (i < 3) {
+        final wrong = atts.firstWhere((a) => !a.correct);
+        await api.ask(
+          teacherId: tMe.userId,
+          title: ['운동량 보존 질문', '수열 귀납적 정의', '등가속도 그래프'][i],
+          body: [r'충돌 후 속도를 $m_1v_1 = m_2v_2$ 로 구하면 왜 틀려요?', '점화식을 어떻게 세우는지 모르겠어요', '기울기가 가속도인 이유가 궁금해요'][i],
+          problemId: wrong.problemId,
+          imagePng: png,
+        );
+      }
+      students.add((name, sToken));
+    }
+    final teacher = AccountApi(server, tToken);
+    final qs = await teacher.questions();
+    await teacher.reply(qs.last.id, body: r'운동량은 $p = mv$ 이고, 충돌 전후 **합**이 같아요. 필기로 정리했어요!', imagePng: png);
+    return (tMe.loginId, students.first.$2);
+  });
+  final (teacherLogin, _) = setup!;
+
+  final tApp = (await tester.runAsync(() async {
+    final a = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+    await a.init();
+    await a.login(server: server, loginId: teacherLogin, password: 'teach-pass');
+    return a;
+  }))!;
+  await tester.pumpWidget(_wrap(tApp, const AppRoot()));
+  await _waitNet(tester);
+  await _shot(tester, '40_teacher_students');
+  final card = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('t-student-'));
+  if (card.evaluate().isNotEmpty) {
+    await tester.tap(card.first);
+    await tester.pump(const Duration(milliseconds: 400));
+    await _waitNet(tester);
+    await _shot(tester, '41_teacher_student_wrong');
+    final row = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('t-wrong-'));
+    if (row.evaluate().isNotEmpty) {
+      await tester.tap(row.first);
+      await tester.pump(const Duration(milliseconds: 400));
+      await _shot(tester, '42_teacher_wrong_detail');
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+    await tester.tap(find.byKey(const Key('t-tab-recent')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await _shot(tester, '43_teacher_student_recent');
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 500));
+  }
+  await tester.tap(find.byKey(const Key('t-tab-1')));
+  await tester.pump(const Duration(milliseconds: 300));
+  await _waitNet(tester);
+  await _shot(tester, '44_teacher_inbox');
+  final q = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('q-q_'));
+  if (q.evaluate().isNotEmpty) {
+    await tester.tap(q.first);
+    await tester.pump(const Duration(milliseconds: 400));
+    await _waitNet(tester);
+    await _shot(tester, '45_teacher_thread');
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
+  // 학생: 질문 탭 (답변 온 질문 포함)
+  final sApp = (await tester.runAsync(() async {
+    final a = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+    await a.init();
+    await a.login(server: server, loginId: 'st0$stamp', password: 'stud-pass');
+    return a;
+  }))!;
+  await tester.pumpWidget(_wrap(sApp, const AppRoot()));
+  await _waitNet(tester, 2);
+  await _shot(tester, '46_student_home_signed_in');
+  await tester.tap(find.text('질문').first);
+  await tester.pump(const Duration(milliseconds: 400));
+  await _waitNet(tester);
+  await _shot(tester, '47_student_questions');
+  final sq = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('q-q_'));
+  if (sq.evaluate().isNotEmpty) {
+    await tester.tap(sq.first);
+    await tester.pump(const Duration(milliseconds: 400));
+    await _waitNet(tester);
+    await _shot(tester, '48_student_thread');
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+  await tester.pumpWidget(_wrap(sApp, AskTeacherScreen(problem: bank.byId('phy1-mech-005'), snapshot: null)));
+  await _shot(tester, '49_ask_teacher');
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -195,9 +342,9 @@ void main() {
     }
 
     // 2..11 tabs
-    const tabs = ['문제집', '오답노트', '학습관리', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
+    const tabs = ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
     for (var i = 0; i < tabs.length; i++) {
-      await tester.tap(find.text(tabs[i]).last);
+      await tester.tap(find.text(tabs[i]).first);
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
@@ -215,7 +362,7 @@ void main() {
         await _write(tester, c + const Offset(150, 140), _wave());
       }
       await _shot(tester,
-          '${(i + 2).toString().padLeft(2, '0')}_${['library', 'wrongnote', 'planner', 'community', 'stats', 'history', 'scratch', 'editor', 'subscription', 'settings'][i]}');
+          '${(i + 2).toString().padLeft(2, '0')}_${['shelf', 'wrongnote', 'planner', 'questions_offline', 'community', 'stats', 'history', 'scratch', 'editor', 'subscription', 'settings'][i]}');
     }
 
     // onboarding (fresh learner)
@@ -232,7 +379,33 @@ void main() {
       await tester.tap(find.byKey(const Key('onb-next')));
       await tester.pump(const Duration(milliseconds: 300));
     }
-    await _shot(tester, '21_onboarding_courses');
+    await _shot(tester, '21_onboarding_books');
+    await tester.tap(find.byKey(const Key('store-course-math')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('store-add-wb-math1-concept')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await _shot(tester, '21b_onboarding_books_math');
+
+    // welcome (login)
+    final fresh2 = (await tester.runAsync(() async {
+      final bank = await ProblemBank.load(rootBundle);
+      final f = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+      await f.init();
+      return f;
+    }))!;
+    await tester.pumpWidget(_wrap(fresh2, const AppRoot()));
+    await _shot(tester, '30_welcome');
+    await tester.tap(find.byKey(const Key('welcome-student')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('회원가입'));
+    await _shot(tester, '31_welcome_signup');
+
+    // catalog
+    await tester.pumpWidget(_wrap(app, const WorkbookStoreScreen(initialCourse: 'math')));
+    await _shot(tester, '32_store_math');
+
+    // 선생님 화면 · 질문 (CI 서버)
+    if (server != null) await _teacherShots(tester, server);
 
     // workbook
     await tester.pumpWidget(_wrap(app, const WorkbookScreen(workbookId: 'wb-phy1-concept')));

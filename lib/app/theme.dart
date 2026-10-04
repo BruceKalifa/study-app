@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+/// 앱 이름 — 바꿀 때는 여기와 tools/patch_android.sh 의 android:label 을 함께 고친다.
+const String kAppName = '풀이노트';
+
 /// Design tokens — "paper & ink": warm paper surfaces, deep ink navy text,
 /// one coral accent, subject colours for wayfinding.
 class AppColors {

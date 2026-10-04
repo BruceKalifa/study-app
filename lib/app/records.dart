@@ -1,4 +1,7 @@
 /// Learning records: attempts and per-problem state (오답노트 / 복습 일정).
+library;
+
+import '../services/account_api.dart' show Account;
 
 class Attempt {
   final String id;
@@ -174,17 +177,26 @@ class Profile {
   int color;
   final int createdAt;
 
-  Profile({required this.id, required this.name, required this.color, required this.createdAt});
+  /// Signed-in 학생/선생님 account (null = offline profile, records stay on this tablet).
+  Account? account;
+
+  Profile({required this.id, required this.name, required this.color, required this.createdAt, this.account});
 
   String get initial => name.isEmpty ? '?' : name.characters1;
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'color': color, 'createdAt': createdAt};
+  /// Profiles made for an account are named after its user id.
+  static String idForAccount(String userId) => 'a_$userId';
+  bool get isAccountProfile => id.startsWith('a_');
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'color': color, 'createdAt': createdAt, if (account != null) 'account': account!.toJson()};
 
   static Profile fromJson(Map<String, dynamic> j) => Profile(
         id: j['id'] as String,
         name: (j['name'] as String?) ?? '학생',
         color: (j['color'] as num?)?.toInt() ?? 0xFF2F6BFF,
         createdAt: (j['createdAt'] as num?)?.toInt() ?? 0,
+        account: Account.fromJson(j['account']),
       );
 }
 

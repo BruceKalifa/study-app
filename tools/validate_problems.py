@@ -731,6 +731,7 @@ SUBJECT_ID_RE = re.compile(r"^[a-z0-9-]+$")
 # workbooks.json
 WORKBOOK_FILE = "workbooks.json"
 WB_LEVELS = ("기본", "실전", "심화", "모의고사")
+WB_STAGES = ("개념", "유형", "기출", "N제", "모의고사")
 WB_ID_RE = re.compile(r"^[a-z0-9-]+$")
 
 
@@ -997,7 +998,12 @@ def validate_workbooks(ctx: dict, courses: dict, errs, warns):
             errs.append(f"{where}: level must be one of {'/'.join(WB_LEVELS)}, got {wb.get('level')!r}")
         if "desc" in wb and not isinstance(wb["desc"], str):
             errs.append(f"{where}: desc must be a string")
-        unknown = set(wb) - {"id", "title", "course", "level", "desc", "problems", "series"}
+        if "stage" in wb and wb["stage"] not in WB_STAGES:
+            errs.append(f"{where}: stage must be one of {'/'.join(WB_STAGES)}, got {wb.get('stage')!r}")
+        for k in ("scope", "publisher", "series"):
+            if k in wb and not isinstance(wb[k], str):
+                errs.append(f"{where}: {k} must be a string")
+        unknown = set(wb) - {"id", "title", "course", "level", "desc", "problems", "series", "stage", "scope", "publisher"}
         if unknown:
             warns.append(f"{where}: unknown field(s) {sorted(unknown)}")
         plist = wb.get("problems")

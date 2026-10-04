@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
+import 'workbook_store_screen.dart' show WorkbookCatalog;
 
-/// First run (and "학습 설정 바꾸기"): 학년 → 목표 → 과목 → 문제집.
+/// First run (and "학습 설정 바꾸기"): 이름·학년 → 목표 → 문제집 고르기(내 교재).
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, this.editing = false});
 
@@ -20,23 +21,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late final TextEditingController _name;
   String _grade = '고2';
   String _goal = '수능';
-  final Set<String> _courses = {};
-  final Set<String> _workbooks = {};
-  bool _coursesTouched = false;
-  bool _workbooksTouched = false;
+  final List<String> _workbooks = [];
 
   @override
   void initState() {
     super.initState();
     final app = AppScope.read(context);
-    _name = TextEditingController(text: app.profile.name == '학생' ? '' : app.profile.name);
+    final acc = app.account;
+    _name = TextEditingController(text: acc != null ? acc.name : (app.profile.name == '학생' ? '' : app.profile.name));
+    if (acc != null && acc.grade.isNotEmpty) _grade = acc.grade;
     if (widget.editing || app.learner.onboarded) {
       _grade = app.learner.grade;
       _goal = app.learner.goal;
-      _courses.addAll(app.learner.courses);
       _workbooks.addAll(app.learner.workbooks);
-      _coursesTouched = _courses.isNotEmpty;
-      _workbooksTouched = _workbooks.isNotEmpty;
+    } else if (kGrades.contains(app.learner.grade) && acc != null && acc.grade.isEmpty) {
+      _grade = app.learner.grade;
     }
   }
 
@@ -46,25 +45,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  List<Subject> _gradeCourses(AppState app) => app.coursesForGrade(_grade);
-
-  Set<String> _effectiveCourses(AppState app) =>
-      _coursesTouched ? _courses : {for (final s in _gradeCourses(app)) s.id};
-
-  List<Workbook> _availableWorkbooks(AppState app) {
-    final ids = _effectiveCourses(app);
-    return app.bank.workbooks.where((w) => app.bank.coursesOf(w).any(ids.contains)).toList();
-  }
-
   void _finish(AppState app) {
-    final courses = _effectiveCourses(app).toList();
-    final wbs = _workbooksTouched ? _workbooks.where((id) => _availableWorkbooks(app).any((w) => w.id == id)).toList() : <String>[];
     app.completeOnboarding(
       name: _name.text,
       grade: _grade,
       goal: _goal,
-      courses: courses.length == _gradeCourses(app).length ? <String>[] : courses,
-      workbooks: wbs,
+      courses: const <String>[],
+      workbooks: List<String>.of(_workbooks),
     );
     if (widget.editing && Navigator.of(context).canPop()) Navigator.of(context).pop();
   }
@@ -72,21 +59,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
-    const titles = ['반가워요!', '목표가 무엇인가요?', '공부할 과목을 골라요', '풀 문제집을 골라요'];
+    const titles = ['반가워요!', '목표가 무엇인가요?', '풀 문제집을 골라요'];
     const subs = [
-      '학년에 맞는 과목과 문제집을 준비할게요.',
+      '학년에 맞는 과목과 문제집을 보여 드릴게요.',
       '목표에 맞춰 D-day와 오늘의 세트를 짜 드려요.',
-      '고른 과목에서만 오늘의 세트와 무한 풀기 문제가 나와요. 나중에 언제든 바꿀 수 있어요.',
-      '문제집은 순서대로 풀 수 있는 세트예요. 안 고르면 내 과목의 문제집이 모두 보여요.',
+      '과목별로 개념서부터 유형·기출·N제·모의고사까지 있어요. 고른 문제집이 "내 교재"에 담기고, 내 교재의 문제로 오늘의 세트와 무한 풀기가 만들어져요. 나중에 언제든 더 담을 수 있어요.',
     ];
-    final last = _step == 3;
+    final last = _step == 2;
+    final n = _workbooks.length;
     return Scaffold(
       backgroundColor: AppColors.paper,
       appBar: widget.editing ? AppBar(title: const Text('학습 설정')) : null,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 820),
+            constraints: BoxConstraints(maxWidth: last ? 1100 : 820),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -99,10 +86,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: const Icon(Icons.edit_rounded, color: Colors.white, size: 22),
                     ),
                     const SizedBox(width: 12),
-                    const Text('풀이노트', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+                    const Text(kAppName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
                   ],
                   const Spacer(),
-                  for (var i = 0; i < 4; i++)
+                  for (var i = 0; i < 3; i++)
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       width: i == _step ? 28 : 10,
@@ -114,11 +101,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                 ]),
-                const SizedBox(height: 34),
+                const SizedBox(height: 30),
                 Text(titles[_step], style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1.4)),
                 const SizedBox(height: 8),
                 Text(subs[_step], style: const TextStyle(fontSize: 16, color: AppColors.inkSoft, height: 1.5)),
-                const SizedBox(height: 26),
+                const SizedBox(height: 22),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
@@ -140,7 +127,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       style: OutlinedButton.styleFrom(minimumSize: const Size(120, 56)),
                       child: const Text('이전'),
                     ),
-                  const Spacer(),
+                  if (last) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        n == 0 ? '아직 고른 문제집이 없어요' : '내 교재 $n권: ${[for (final id in _workbooks) app.bank.workbook(id)?.title ?? id].join(', ')}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.inkSoft),
+                      ),
+                    ),
+                  ] else
+                    const Spacer(),
+                  const SizedBox(width: 12),
                   FilledButton.icon(
                     key: Key(last ? 'onb-start' : 'onb-next'),
                     onPressed: last ? () => _finish(app) : () => setState(() => _step++),
@@ -149,7 +148,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       backgroundColor: last ? AppColors.accent : AppColors.ink,
                     ),
                     icon: Icon(last ? Icons.rocket_launch_rounded : Icons.arrow_forward_rounded),
-                    label: Text(last ? (widget.editing ? '저장하기' : '시작하기 · 7일 무료 체험') : '다음'),
+                    label: Text(last
+                        ? (widget.editing
+                            ? '저장하기'
+                            : n == 0
+                                ? '나중에 고르고 시작하기'
+                                : '$n권 담고 시작하기')
+                        : '다음'),
                   ),
                 ]),
               ]),
@@ -178,15 +183,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 key: Key('grade-$g'),
                 label: g,
                 selected: _grade == g,
-                onTap: () => setState(() {
-                  if (_grade != g) {
-                    _grade = g;
-                    _coursesTouched = false;
-                    _courses.clear();
-                    _workbooksTouched = false;
-                    _workbooks.clear();
-                  }
-                }),
+                onTap: () => setState(() => _grade = g),
                 width: 120,
               ),
           ]),
@@ -211,64 +208,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
         ]);
-      case 2:
-        final courses = _gradeCourses(app);
-        final sel = _effectiveCourses(app);
-        if (courses.isEmpty) return const Text('이 학년의 과목이 아직 없어요.');
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final g in SubjectGroup.all)
-            if (courses.any((c) => c.group == g.id)) ...[
-              _Label(g.name, color: Color(g.color)),
-              Wrap(spacing: 10, runSpacing: 10, children: [
-                for (final c in courses.where((c) => c.group == g.id))
-                  FilterChip(
-                    key: Key('course-${c.id}'),
-                    label: Text('${c.name}  ·  ${c.problems.length}문항'),
-                    selected: sel.contains(c.id),
-                    selectedColor: Color(c.color).withValues(alpha: 0.16),
-                    checkmarkColor: Color(c.color),
-                    onSelected: (v) => setState(() {
-                      if (!_coursesTouched) {
-                        _courses
-                          ..clear()
-                          ..addAll(sel);
-                        _coursesTouched = true;
-                      }
-                      v ? _courses.add(c.id) : _courses.remove(c.id);
-                    }),
-                  ),
-              ]),
-              const SizedBox(height: 22),
-            ],
-        ]);
       default:
-        final wbs = _availableWorkbooks(app);
-        if (wbs.isEmpty) return const Text('고른 과목의 문제집이 아직 없어요. 무한 풀기와 오늘의 세트로 시작할 수 있어요.');
-        final sel = _workbooksTouched ? _workbooks : {for (final w in wbs) w.id};
-        return Column(children: [
-          for (final w in wbs)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: CheckboxListTile(
-                key: Key('wb-${w.id}'),
-                value: sel.contains(w.id),
-                onChanged: (v) => setState(() {
-                  if (!_workbooksTouched) {
-                    _workbooks
-                      ..clear()
-                      ..addAll(sel);
-                    _workbooksTouched = true;
-                  }
-                  v == true ? _workbooks.add(w.id) : _workbooks.remove(w.id);
-                }),
-                tileColor: AppColors.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: Text(w.title, style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text(
-                    '${app.bank.subject(w.course)?.name ?? ''} · ${w.level} · ${w.problemIds.length}문항${w.desc.isEmpty ? '' : '\n${w.desc}'}'),
-              ),
-            ),
-        ]);
+        return WorkbookCatalog(
+          grade: _grade,
+          shrinkWrap: true,
+          isSelected: _workbooks.contains,
+          onToggle: (w) => setState(() {
+            if (_workbooks.contains(w.id)) {
+              _workbooks.remove(w.id);
+            } else {
+              _workbooks.add(w.id);
+            }
+          }),
+        );
     }
   }
 }

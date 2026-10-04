@@ -12,10 +12,12 @@ import 'package:study_app/app/theme.dart';
 import 'package:study_app/core/problem.dart';
 import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/variants.dart';
+import 'package:study_app/screens/app_root.dart';
 import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
+import 'package:study_app/services/account_api.dart';
 import 'package:study_app/services/community_api.dart';
 import 'package:study_app/services/content_sync.dart';
 
@@ -23,7 +25,10 @@ Future<AppState> _state({bool onboard = true}) async {
   final bank = await ProblemBank.load(rootBundle);
   final s = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
   await s.init();
-  if (onboard) s.completeOnboarding(name: '학생', grade: '고2', goal: '수능', courses: const [], workbooks: const []);
+  if (onboard) {
+    s.completeOnboarding(
+        name: '학생', grade: '고2', goal: '수능', courses: const [], workbooks: [for (final w in s.bank.workbooks) w.id]);
+  }
   return s;
 }
 
@@ -120,8 +125,8 @@ void main() {
     await tester.pumpWidget(_app(s!));
     await tester.pump(const Duration(seconds: 1));
     expect(find.byKey(const Key('daily-start')), findsOneWidget);
-    for (final tab in ['문제집', '오답노트', '학습관리', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
-      await tester.tap(find.text(tab).last);
+    for (final tab in ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
+      await tester.tap(find.text(tab).first); // the rail comes first
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump(const Duration(milliseconds: 600));
       expect(tester.takeException(), isNull, reason: 'tab $tab');
@@ -339,7 +344,7 @@ void main() {
     expect(app.streak, 1);
   });
 
-  testWidgets('onboarding: name, grade, goal, courses, workbooks → home', (tester) async {
+  testWidgets('onboarding: name, grade, goal, then pick books from the catalog → 내 교재 → home', (tester) async {
     _tabletSize(tester);
     final s = (await tester.runAsync(() => _state(onboard: false)))!;
     await tester.pumpWidget(_app(s));
@@ -348,18 +353,28 @@ void main() {
     await tester.enterText(find.byKey(const Key('onb-name')), '예진');
     await tester.tap(find.byKey(const Key('grade-고3')));
     await tester.pump();
+    expect(find.byKey(const Key('grade-중2')), findsNothing, reason: '고등 전용');
     for (var i = 0; i < 2; i++) {
       await tester.tap(find.byKey(const Key('onb-next')));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
     }
-    expect(find.byKey(const Key('course-phy2')), findsOneWidget);
-    expect(find.byKey(const Key('course-integ')), findsNothing, reason: '통합과학 is 고1');
-    expect(find.byKey(const Key('grade-중2')), findsNothing, reason: '고등 전용');
-    await tester.tap(find.byKey(const Key('onb-next')));
+    // 커리큘럼별 카탈로그: 고3 과목만
+    expect(find.byKey(const Key('store-course-phy2')), findsOneWidget);
+    expect(find.byKey(const Key('store-course-integ')), findsNothing, reason: '통합과학 is 고1');
+    await tester.tap(find.byKey(const Key('store-course-phy2')));
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.byKey(const Key('store-add-wb-phy2-deep')));
+    await tester.tap(find.byKey(const Key('store-add-wb-phy2-deep')));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('store-course-math')));
+    await tester.tap(find.byKey(const Key('store-course-math')));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('wb-wb-phy2-deep')), findsOneWidget);
+    expect(find.byKey(const Key('store-scope-수학Ⅰ')), findsOneWidget, reason: '범위로 나눠 보기');
+    await tester.ensureVisible(find.byKey(const Key('store-add-wb-math1-concept')));
+    await tester.tap(find.byKey(const Key('store-add-wb-math1-concept')));
+    await tester.pump();
+    expect(find.text('2권 담고 시작하기'), findsOneWidget);
     await tester.tap(find.byKey(const Key('onb-start')));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
@@ -367,11 +382,97 @@ void main() {
     expect(s.learner.grade, '고3');
     expect(s.learner.goal, '수능');
     expect(s.profile.name, '예진');
-    expect(s.myCourseIds, {'phy1', 'phy2', 'earth1', 'math', 'kor-read', 'eng'});
-    expect(s.bank.subjects.every((c) => c.level == 'high' || c.id == 'custom'), isTrue);
+    expect(s.learner.workbooks, ['wb-phy2-deep', 'wb-math1-concept']);
+    expect(s.myCourseIds, {'phy2', 'math'});
+    final mine = {for (final p in s.myProblems) p.id};
     expect(s.dailySet.problemIds, isNotEmpty);
-    expect(s.dailyProblems.every((p) => s.myCourseIds.contains(p.subjectId)), isTrue);
+    expect(s.dailyProblems.every((p) => mine.contains(p.id)), isTrue, reason: '내 교재 문제만');
     expect(s.trialDaysLeft, AppState.trialDays);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('내 교재: problems come only from the books on the shelf', () async {
+    final app = await _state(onboard: false);
+    app.completeOnboarding(name: '학생', grade: '고2', goal: '수능', courses: const [], workbooks: const ['wb-phy1-concept']);
+    final book = {for (final p in app.bank.problemsOf(app.bank.workbook('wb-phy1-concept')!)) p.id};
+    expect(app.dailyProblems.every((p) => book.contains(p.id)), isTrue);
+    expect(app.dailySet.reasons.values.toSet(), {'new'});
+    // 오늘의 진도는 책 순서대로
+    expect(app.dailySet.problemIds.first, app.bank.workbook('wb-phy1-concept')!.problemIds.first);
+    final feed = EndlessFeed();
+    for (var i = 0; i < 8; i++) {
+      final p = app.nextEndless(feed);
+      expect(p, isNotNull);
+      expect(book.contains(p!.familyId), isTrue, reason: '무한 풀기도 내 교재에서만');
+    }
+    // 빼면 비고, 담으면 다시 생긴다
+    app.removeWorkbook('wb-phy1-concept');
+    expect(app.myWorkbooks, isEmpty);
+    expect(app.dailySet.problemIds, isEmpty);
+    expect(app.nextEndless(EndlessFeed()), isNull);
+    app.addWorkbook('wb-math1-concept');
+    expect(app.dailyProblems.every((p) => p.subjectId == 'math'), isTrue);
+    expect(app.dailyProblems, isNotEmpty);
+    // 틀린 문제의 변형은 책과 상관없이 오답 세트에 들어온다
+    final wrong = app.bank.byId('phy1-mech-009')!;
+    await app.record(wrong, answer: 'x', expected: wrong.answer, correct: false, timeMs: 1000, mode: 'practice');
+    app.rebuildDailySet();
+    expect(app.dailyProblems.any((p) => p.familyId == wrong.id), isTrue);
+    // 시험처럼: 내 교재의 책 한 권만으로도 무한 풀기
+    final only = EndlessFeed(workbookId: 'wb-math1-concept');
+    final ids = app.bank.workbook('wb-math1-concept')!.problemIds.toSet();
+    expect(ids.contains(app.nextEndless(only)!.familyId), isTrue);
+  });
+
+  testWidgets('empty shelf: home sends the student to the catalog; 담기 fills 내 교재', (tester) async {
+    _tabletSize(tester);
+    final s = (await tester.runAsync(() => _state(onboard: false)))!;
+    s.completeOnboarding(name: '학생', grade: '고2', goal: '수능', courses: const [], workbooks: const []);
+    await tester.pumpWidget(_app(s));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('daily-start')), findsNothing);
+    await tester.tap(find.byKey(const Key('daily-pick-books')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('문제집 고르기'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('store-course-math')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.byKey(const Key('store-add-wb-math1-concept')));
+    await tester.tap(find.byKey(const Key('store-add-wb-math1-concept')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(s.learner.workbooks, ['wb-math1-concept']);
+    expect(find.text('내 교재 1권'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('daily-start')), findsOneWidget);
+    expect(find.byKey(const Key('wbcard-wb-math1-concept')), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('welcome: 학생/선생님 → 로그인 form validates; 로그인 없이 쓰기 → onboarding', (tester) async {
+    _tabletSize(tester);
+    final s = (await tester.runAsync(() => _state(onboard: false)))!;
+    expect(s.needsWelcome, isTrue);
+    await tester.pumpWidget(_app(s, home: const AppRoot()));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('welcome-student')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('welcome-teacher')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('auth-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('auth-error')), findsOneWidget);
+    await tester.tap(find.text('회원가입'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('auth-name')), findsOneWidget);
+    expect(find.byKey(const Key('auth-grade-고3')), findsNothing, reason: '선생님은 학년 없음');
+    await tester.tap(find.byKey(const Key('welcome-back')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('welcome-offline')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(s.offlineMode, isTrue);
+    expect(find.text('반가워요!'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -650,4 +751,85 @@ void main() {
       expect(g2.entries.every((e) => e.grade == '고2'), isTrue);
     }, _RealHttp());
   }, skip: server == null ? 'COMMUNITY_SERVER not set' : false);
+
+  test('accounts: student syncs records, asks the teacher with a picture, teacher answers; new tablet restores', () async {
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final bank = await ProblemBank.load(rootBundle);
+      final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+      // 선생님 (API 로 바로 가입)
+      final (tToken, tMe) = await AccountApi(server!)
+          .signup(role: 'teacher', loginId: 't$stamp', password: 'teach-pass', name: '우네 선생님');
+      final teacher = AccountApi(server, tToken);
+      expect(tMe.inviteCode, hasLength(6));
+
+      // 학생 앱: 회원가입 → 온보딩 → 선생님 연결
+      final st = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+      await st.init();
+      expect(st.needsWelcome, isTrue);
+      await st.signup(server: server, role: 'student', loginId: 's$stamp', password: 'stud-pass', name: '오예진', grade: '고3');
+      expect(st.signedIn, isTrue);
+      expect(st.isTeacher, isFalse);
+      expect(st.needsWelcome, isFalse);
+      expect(st.needsOnboarding, isTrue);
+      expect(st.learner.grade, '고3');
+      st.completeOnboarding(name: '오예진', grade: '고3', goal: '수능', courses: const [], workbooks: const ['wb-phy1-concept']);
+      final t = await st.joinTeacher(' ${tMe.inviteCode!.toLowerCase()} ');
+      expect(t.name, '우네 선생님');
+      expect(st.myTeachers.single.id, tMe.userId);
+      expect(st.settings.serverUrl, server, reason: '계정 서버가 문항·커뮤니티 서버');
+
+      // 풀이 → 서버로
+      final p1 = bank.byId('phy1-mech-001')!;
+      final p2 = bank.byId('phy1-mech-002')!;
+      await st.record(p1, answer: '9', expected: p1.answer, correct: false, timeMs: 30000, mode: 'practice');
+      await st.record(p2, answer: p2.answer, expected: p2.answer, correct: true, timeMs: 20000, mode: 'practice');
+      expect(await st.syncRecords(), isTrue);
+      expect(st.unsyncedCount, 0);
+
+      final (_, students) = await teacher.students();
+      final mine = students.singleWhere((x) => x.name == '오예진');
+      expect(mine.solved, 2);
+      expect(mine.wrongOpen, 1);
+      final detail = await teacher.student(mine.id);
+      expect(detail.wrong.single.baseId, 'phy1-mech-001');
+      expect(detail.wrong.single.answer, '9');
+      expect(detail.workbooks, ['wb-phy1-concept']);
+      expect(detail.recent.first.problemId, 'phy1-mech-002');
+
+      // 질문 (풀이 사진) → 선생님 답장 (필기 그림)
+      final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+      final q = await st.api!.ask(teacherId: tMe.userId, body: r'왜 $a$ 가 음수예요?', problemId: p1.id, imagePng: png);
+      expect(q.status, 'open');
+      expect(q.messages.single.image, isNotNull);
+      final inbox = await teacher.questions(status: 'open');
+      expect(inbox.any((x) => x.id == q.id && x.unread), isTrue);
+      final read = await teacher.question(q.id);
+      expect(read.student.name, '오예진');
+      final answered = await teacher.reply(q.id, body: '감속이라서 그래요', imagePng: png);
+      expect(answered.status, 'answered');
+      await st.refreshMe();
+      expect(st.unreadAnswers, 1);
+      final thread = await st.api!.question(q.id);
+      expect(thread.messages.last.fromTeacher, isTrue);
+      expect(thread.messages.last.name, '우네 선생님');
+      await st.refreshMe();
+      expect(st.unreadAnswers, 0);
+
+      // 다른 태블릿에서 로그인 → 기록 · 내 교재 되살리기
+      final other = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+      await other.init();
+      await other.login(server: server, loginId: 'S$stamp', password: 'stud-pass');
+      expect(other.attempts.length, 2);
+      expect(other.stateOf('phy1-mech-001').inWrongNote, isTrue);
+      expect(other.learner.workbooks, ['wb-phy1-concept']);
+      expect(other.needsOnboarding, isFalse);
+      expect(other.myTeachers.single.name, '우네 선생님');
+
+      // 로그아웃 → 다시 첫 화면
+      await other.logout();
+      expect(other.needsWelcome, isTrue);
+      st.dispose();
+      other.dispose();
+    }, _RealHttp());
+  }, skip: server == null ? 'COMMUNITY_SERVER not set' : false, timeout: const Timeout(Duration(minutes: 2)));
 }

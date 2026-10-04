@@ -10,6 +10,7 @@ import '../core/problem_bank.dart';
 import '../core/variants.dart';
 import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
+import '../services/account_api.dart';
 import '../services/community_api.dart';
 import '../services/content_sync.dart';
 import '../services/live_sync.dart';
@@ -58,6 +59,23 @@ class AppState extends ChangeNotifier {
   String syncMessage = '';
   bool syncing = false;
 
+  // accounts (학생 / 선생님)
+  /// The user chose "로그인 없이 쓰기" on the welcome screen.
+  bool offlineMode = false;
+
+  /// Server address last used on the welcome screen.
+  String lastServer = '';
+
+  /// Latest /api/me (counts for badges, linked teachers, invite code).
+  MeInfo? me;
+
+  /// Attempts already sent to the server (attempts only grow; reset → 0).
+  int _syncedUpTo = 0;
+  bool _recordsSyncing = false;
+  Timer? _recordsTimer;
+  Timer? _meTimer;
+  String lastRecordsSync = '';
+
   LiveSync? _live;
   LiveSync? get live => _live;
 
@@ -74,6 +92,8 @@ class AppState extends ChangeNotifier {
         final j = jsonDecode(raw) as Map<String, dynamic>;
         profiles = [for (final p in (j['list'] as List? ?? const [])) Profile.fromJson((p as Map).cast<String, dynamic>())];
         currentId = j['current'] as String?;
+        offlineMode = j['offline'] == true;
+        lastServer = (j['server'] as String?) ?? '';
       } catch (e) {
         debugPrint('profiles.json broken: $e');
       }
@@ -87,6 +107,7 @@ class AppState extends ChangeNotifier {
     await _loadProfileData();
     ready = true;
     notifyListeners();
+    _afterSignIn(restore: false);
   }
 
   int get _now => DateTime.now().millisecondsSinceEpoch;
@@ -106,6 +127,8 @@ class AppState extends ChangeNotifier {
     studyStartedAt = null;
     todos = [];
     scores = [];
+    _syncedUpTo = 0;
+    me = null;
     final raw = await storage.read(_pp('state.json'));
     if (raw != null) {
       try {
@@ -131,6 +154,7 @@ class AppState extends ChangeNotifier {
         studyStartedAt = (j['studyStart'] as num?)?.toInt();
         todos = [for (final x in (j['todos'] as List? ?? const [])) TodoItem.fromJson(m(x))];
         scores = [for (final x in (j['scores'] as List? ?? const [])) ExamScore.fromJson(m(x))];
+        _syncedUpTo = (j['synced'] as num?)?.toInt() ?? 0;
       } catch (e) {
         debugPrint('state.json broken: $e');
       }
@@ -148,6 +172,10 @@ class AppState extends ChangeNotifier {
   void onResumed() {
     _live?.reconnect();
     reportStudy();
+    if (account != null) {
+      refreshMe();
+      syncRecords();
+    }
   }
 
   void _configureLive() {
@@ -183,13 +211,19 @@ class AppState extends ChangeNotifier {
       'studyStart': studyStartedAt,
       'todos': [for (final x in todos) x.toJson()],
       'scores': [for (final x in scores) x.toJson()],
+      'synced': _syncedUpTo,
     });
     await storage.write(_pp('state.json'), data);
   }
 
   Future<void> _saveProfiles() => storage.write(
         'profiles.json',
-        jsonEncode({'current': profile.id, 'list': [for (final p in profiles) p.toJson()]}),
+        jsonEncode({
+          'current': profile.id,
+          'list': [for (final p in profiles) p.toJson()],
+          'offline': offlineMode,
+          'server': lastServer,
+        }),
       );
 
   // ------------------------------------------------------------ profiles
@@ -297,48 +331,6 @@ class AppState extends ChangeNotifier {
     return out;
   }
 
-  /// Today's mix: due 오답 reviews (as variants when possible) + new problems.
-  List<Problem> todayMix() {
-    final goal = math.max(5, settings.dailyGoal);
-    final now = _now;
-    final out = <Problem>[];
-    final due = states.values.where((s) => s.isDue(now)).toList()
-      ..sort((a, b) => (a.nextReviewAt ?? 0).compareTo(b.nextReviewAt ?? 0));
-    for (final s in due.take((goal / 2).ceil())) {
-      final p = problem(s.baseId);
-      if (p == null) continue;
-      out.add(p.hasTemplate && _rand.nextBool() ? makeVariant(p) : p);
-    }
-    final fresh = problemsWhere(onlyUnsolved: true)..shuffle(_rand);
-    // spread over subjects
-    fresh.sort((a, b) => a.difficulty.compareTo(b.difficulty));
-    final bySubject = <String, List<Problem>>{};
-    for (final p in fresh) {
-      bySubject.putIfAbsent(p.subjectId, () => []).add(p);
-    }
-    final queues = bySubject.values.toList()..shuffle(_rand);
-    var i = 0;
-    while (out.length < goal && queues.any((q) => q.isNotEmpty)) {
-      final q = queues[i % queues.length];
-      if (q.isNotEmpty) out.add(q.removeAt(0));
-      i++;
-    }
-    if (out.length < goal) {
-      final weakest = bank.all.where((p) => !out.any((o) => baseIdOf(o) == p.id)).toList()
-        ..sort((a, b) => _acc(a.id).compareTo(_acc(b.id)));
-      for (final p in weakest.take(goal - out.length)) {
-        out.add(p.hasTemplate ? makeVariant(p) : p);
-      }
-    }
-    return out;
-  }
-
-  double _acc(String baseId) {
-    final s = states[baseId];
-    if (s == null || s.attempts == 0) return 0.5;
-    return s.correct / s.attempts;
-  }
-
   // ------------------------------------------------------------ recording
   Future<Attempt> record(
     Problem p, {
@@ -378,6 +370,7 @@ class AppState extends ChangeNotifier {
     }
     _changed();
     reportStudy(now: false);
+    _scheduleRecordsSync();
     final l = _live;
     if (l != null) {
       l.sendAnswer(problemId: p.id, answer: answer, correct: correct, timeMs: timeMs);
@@ -480,6 +473,7 @@ class AppState extends ChangeNotifier {
     s.resolvedAt = _now;
     s.nextReviewAt = null;
     _changed();
+    _scheduleRecordsSync();
   }
 
   void addToWrongNote(String baseId) {
@@ -537,25 +531,64 @@ class AppState extends ChangeNotifier {
           if (s.id != ProblemBank.customSubjectId && (s.grades.isEmpty || s.grades.contains(grade))) s
       ];
 
-  /// The learner's courses (all courses of the grade when none were picked).
+  /// 내 교재: the workbooks the student put on the shelf (in the order they were added).
+  /// Problems come only from these books (plus 오답 변형 of problems the student got wrong).
+  List<Workbook> get myWorkbooks => [
+        for (final id in learner.workbooks)
+          if (bank.workbook(id) case final w?) w
+      ];
+
+  bool hasWorkbook(String id) => learner.workbooks.contains(id);
+
+  /// Courses of 내 교재 (a series book may span several courses).
   List<Subject> get myCourses {
-    final picked = [
-      for (final id in learner.courses)
-        if (bank.subject(id) case final s?) s
+    final ids = <String>{for (final w in myWorkbooks) ...bank.coursesOf(w)};
+    return [
+      for (final s in bank.subjects)
+        if (ids.contains(s.id)) s
     ];
-    return picked.isNotEmpty ? picked : coursesForGrade(learner.grade);
   }
 
   Set<String> get myCourseIds => {for (final s in myCourses) s.id};
 
-  List<Workbook> get myWorkbooks {
-    final ids = myCourseIds;
-    final picked = [
-      for (final id in learner.workbooks)
-        if (bank.workbook(id) case final w? when bank.coursesOf(w).any(ids.contains)) w
+  /// Every problem in 내 교재, book by book in book order (no duplicates).
+  List<Problem> get myProblems {
+    final seen = <String>{};
+    return [
+      for (final w in myWorkbooks)
+        for (final p in bank.problemsOf(w))
+          if (seen.add(p.id)) p
     ];
-    return picked.isNotEmpty ? picked : bank.workbooks.where((w) => bank.coursesOf(w).any(ids.contains)).toList();
   }
+
+  Set<String> get _myProblemIds => {for (final p in myProblems) p.id};
+
+  /// Put a book on the shelf (내 교재에 담기).
+  void addWorkbook(String id) {
+    if (learner.workbooks.contains(id) || bank.workbook(id) == null) return;
+    learner.workbooks = [...learner.workbooks, id];
+    _refreshDailyIfUntouched();
+    _changed();
+    _scheduleRecordsSync();
+  }
+
+  void removeWorkbook(String id) {
+    if (!learner.workbooks.contains(id)) return;
+    learner.workbooks = learner.workbooks.where((w) => w != id).toList();
+    _refreshDailyIfUntouched();
+    _changed();
+    _scheduleRecordsSync();
+  }
+
+  /// A new shelf changes today's set unless the student already started it.
+  void _refreshDailyIfUntouched() {
+    final d = _daily;
+    if (d == null || d.done.isEmpty) _daily = null;
+  }
+
+  /// Books in the catalog for a course (a series counts for every course it covers).
+  List<Workbook> workbooksForCourse(String courseId) =>
+      bank.workbooks.where((w) => bank.coursesOf(w).contains(courseId)).toList();
 
   /// (solved, total) for a workbook.
   (int, int) workbookProgress(Workbook w) {
@@ -581,7 +614,7 @@ class AppState extends ChangeNotifier {
       ..grade = grade
       ..goal = goal
       ..courses = courses
-      ..workbooks = workbooks
+      ..workbooks = [for (final w in workbooks) if (bank.workbook(w) != null) w]
       ..onboarded = true;
     if (learner.examDate == 0) {
       final d = defaultSuneungDate(DateTime.now());
@@ -589,14 +622,16 @@ class AppState extends ChangeNotifier {
       learner.examName = goal == '내신' ? '기말고사' : '수능';
     }
     if (learner.trialStartedAt == 0) learner.trialStartedAt = _now;
-    _daily = null; // rebuild today's set for the new courses
+    _daily = null; // rebuild today's set for the new books
     _configureLive();
     _changed();
+    _scheduleRecordsSync();
   }
 
   void updateLearner(void Function(Learner l) fn) {
     fn(learner);
     _changed();
+    _scheduleRecordsSync();
   }
 
   // ------------------------------------------------------------ D-day
@@ -652,8 +687,8 @@ class AppState extends ChangeNotifier {
 
   DailySet _buildDaily(String day) {
     final target = math.max(6, settings.dailyGoal);
-    final mine = myCourseIds;
-    bool inMine(Problem p) => mine.isEmpty || mine.contains(p.subjectId);
+    final books = myWorkbooks;
+    final mineIds = _myProblemIds;
     final ids = <String>[];
     final why = <String, String>{};
     final usedFamilies = <String>{};
@@ -669,7 +704,7 @@ class AppState extends ChangeNotifier {
     for (final st in wrongs) {
       if (ids.length >= (target * 0.6).ceil()) break;
       final base = problem(st.baseId);
-      if (base == null || !inMine(base)) continue;
+      if (base == null) continue;
       final twins = bank.twinsOf(base.id).where((t) => !_attempted(t.id)).toList()..shuffle(_rand);
       if (twins.isNotEmpty) {
         add(twins.first, 'twin');
@@ -678,6 +713,7 @@ class AppState extends ChangeNotifier {
       } else {
         final similar = bank.all
             .where((p) =>
+                mineIds.contains(p.id) &&
                 p.subjectId == base.subjectId &&
                 p.topic == base.topic &&
                 p.id != base.id &&
@@ -697,27 +733,25 @@ class AppState extends ChangeNotifier {
       if (ids.length >= (target * 0.75).ceil()) break;
       if (usedFamilies.contains(st.baseId)) continue;
       final base = problem(st.baseId);
-      if (base != null && inMine(base)) add(base, 'review');
+      if (base != null) add(base, 'review');
     }
-    // 3) 약점 유형의 새 문항
+    // 3) 약점 유형 — 내 교재에서 아직 안 푼 같은 유형
     for (final (topic, _, _) in weakTopics) {
       if (ids.length >= (target * 0.9).ceil()) break;
-      final cands = bank.all
-          .where((p) => p.topic == topic && inMine(p) && !isSolved(p.id) && !usedFamilies.contains(p.id))
-          .toList();
+      final cands = [
+        for (final p in myProblems)
+          if (p.topic == topic && !isSolved(p.id) && !usedFamilies.contains(p.id)) p
+      ];
       if (cands.isNotEmpty) add(cands[_rand.nextInt(cands.length)], 'weak');
     }
-    // 4) 내 과목의 새 문항 (과목을 고르게)
-    final byCourse = <String, List<Problem>>{};
-    for (final p in bank.all) {
-      if (!inMine(p) || isSolved(p.id) || usedFamilies.contains(p.id) || p.passageId != null) continue;
-      byCourse.putIfAbsent(p.subjectId, () => []).add(p);
-    }
-    for (final l in byCourse.values) {
-      l.shuffle(_rand);
-      l.sort((a, b) => a.difficulty.compareTo(b.difficulty));
-    }
-    final queues = byCourse.values.toList()..shuffle(_rand);
+    // 4) 오늘의 진도 — 내 교재마다 안 푼 문제를 책 순서대로 (책을 번갈아)
+    final queues = [
+      for (final w in books)
+        [
+          for (final p in bank.problemsOf(w))
+            if (!isSolved(p.id) && !usedFamilies.contains(p.id) && p.passageId == null) p
+        ]
+    ].where((q) => q.isNotEmpty).toList();
     var i = 0;
     while (ids.length < target && queues.any((q) => q.isNotEmpty)) {
       final q = queues[i % queues.length];
@@ -807,8 +841,13 @@ class AppState extends ChangeNotifier {
 
   // ------------------------------------------------------------ 커뮤니티 · 순위
   /// null when no server address is set.
-  CommunityApi? get community =>
-      settings.serverUrl.trim().isEmpty ? null : CommunityApi(settings.serverUrl, profile.id);
+  CommunityApi? get community {
+    final a = account;
+    if (a != null && a.server.trim().isNotEmpty) {
+      return CommunityApi(a.server, a.communityKey.isNotEmpty ? a.communityKey : profile.id);
+    }
+    return settings.serverUrl.trim().isEmpty ? null : CommunityApi(settings.serverUrl, profile.id);
+  }
 
   /// Name shown on posts: the nickname, or the masked real name (오XX).
   String get communityName => learner.nickname.trim().isNotEmpty ? learner.nickname.trim() : maskName(profile.name);
@@ -862,11 +901,11 @@ class AppState extends ChangeNotifier {
   // ------------------------------------------------------------ 무한 풀기
   /// Next problem for an endless session (adaptive difficulty).
   Problem? nextEndless(EndlessFeed f) {
-    final mine = myCourseIds;
-    final pool = bank.all.where((p) {
-      if (f.courseId != null ? p.subjectId != f.courseId : !(mine.isEmpty || mine.contains(p.subjectId))) {
-        return false;
-      }
+    final source = f.workbookId != null
+        ? (bank.workbook(f.workbookId!) == null ? const <Problem>[] : bank.problemsOf(bank.workbook(f.workbookId!)!))
+        : myProblems;
+    final pool = source.where((p) {
+      if (f.courseId != null && p.subjectId != f.courseId) return false;
       if (f.unit != null && p.unit != f.unit) return false;
       if (f.topic != null && p.topic != f.topic) return false;
       return !f.seenFamilies.contains(p.familyId);
@@ -884,7 +923,7 @@ class AppState extends ChangeNotifier {
     var p = pick(pool.where((p) => !isSolved(p.id)).toList()) ?? pick(pool);
     if (p == null) {
       // everything seen in this session: keep going with variants
-      final again = bank.all.where((x) {
+      final again = source.where((x) {
         if (f.courseId != null && x.subjectId != f.courseId) return false;
         if (f.unit != null && x.unit != f.unit) return false;
         if (f.topic != null && x.topic != f.topic) return false;
@@ -897,11 +936,245 @@ class AppState extends ChangeNotifier {
     return p;
   }
 
+  // ------------------------------------------------------------ 계정 (학생 / 선생님)
+  Account? get account => profile.account;
+  bool get signedIn => account != null;
+  bool get isTeacher => account?.isTeacher == true;
+
+  /// First screen: sign in, sign up, or use the app without an account.
+  bool get needsWelcome => account == null && !offlineMode;
+
+  AccountApi? get api {
+    final a = account;
+    return a == null ? null : AccountApi.of(a);
+  }
+
+  Future<void> login({required String server, required String loginId, required String password}) async {
+    final (token, info) = await AccountApi(server).login(loginId.trim(), password);
+    await _signIn(server: server, token: token, info: info);
+  }
+
+  Future<void> signup({
+    required String server,
+    required String role,
+    required String loginId,
+    required String password,
+    required String name,
+    String grade = '',
+  }) async {
+    final (token, info) = await AccountApi(server)
+        .signup(role: role, loginId: loginId.trim(), password: password, name: name.trim(), grade: grade);
+    await _signIn(server: server, token: token, info: info, fresh: true, grade: grade);
+  }
+
+  Future<void> _signIn({
+    required String server,
+    required String token,
+    required MeInfo info,
+    bool fresh = false,
+    String grade = '',
+  }) async {
+    final acc = Account(
+      server: server.trim(),
+      token: token,
+      userId: info.userId,
+      loginId: info.loginId,
+      role: info.role,
+      name: info.name,
+      grade: info.grade,
+      communityKey: info.communityKey,
+    );
+    if (ready) await saveNow();
+    final pid = Profile.idForAccount(info.userId);
+    var p = profiles.where((x) => x.id == pid).firstOrNull;
+    if (p == null) {
+      const colors = [0xFF2F6BFF, 0xFFFF6B4A, 0xFF169C6B, 0xFF8B5CF6, 0xFFE8A317, 0xFF0EA5E9, 0xFFEC4899];
+      p = Profile(id: pid, name: info.name, color: colors[profiles.length % colors.length], createdAt: _now);
+      profiles = [...profiles, p];
+    }
+    p
+      ..account = acc
+      ..name = info.name;
+    profile = p;
+    lastServer = acc.server;
+    offlineMode = false;
+    await _loadProfileData();
+    // the account's server is also where problems, community and live view live
+    if (settings.serverUrl.trim().isEmpty) settings.serverUrl = acc.server;
+    if (fresh && !acc.isTeacher && grade.isNotEmpty) learner.grade = grade;
+    me = info;
+    await _saveProfiles();
+    await saveNow();
+    notifyListeners();
+    await _afterSignIn(restore: !fresh);
+  }
+
+  /// Restore records on a new tablet, then keep syncing.
+  Future<void> _afterSignIn({required bool restore}) async {
+    final a = account;
+    _meTimer?.cancel();
+    if (a == null) return;
+    _meTimer = Timer.periodic(const Duration(seconds: 90), (_) => refreshMe());
+    if (a.isTeacher) return;
+    if (restore && attempts.isEmpty) {
+      try {
+        final r = await AccountApi.of(a).records();
+        if (r.attempts.isNotEmpty) {
+          seedAttempts(r.attempts);
+          final wn = r.wrongNote;
+          if (wn != null) {
+            final keep = wn.toSet();
+            for (final s in states.values) {
+              if (s.inWrongNote && !keep.contains(s.baseId)) {
+                s.inWrongNote = false;
+                s.resolvedAt ??= s.lastAt;
+              }
+            }
+          }
+        }
+        _syncedUpTo = attempts.length;
+        final l = r.learner;
+        if (l != null && l.isNotEmpty) learner = Learner.fromJson(l);
+        _daily = null;
+        _changed();
+      } catch (e) {
+        debugPrint('restore: $e');
+      }
+    }
+    await syncRecords();
+  }
+
+  Future<void> logout() async {
+    final a = account;
+    if (a == null) return;
+    await syncRecords();
+    try {
+      await AccountApi.of(a).logout();
+    } catch (_) {}
+    await saveNow();
+    _meTimer?.cancel();
+    _recordsTimer?.cancel();
+    profile.account = null;
+    me = null;
+    offlineMode = false;
+    await _saveProfiles();
+    notifyListeners();
+  }
+
+  /// "로그인 없이 쓰기": keep records on this tablet only.
+  Future<void> useOffline() async {
+    offlineMode = true;
+    if (profile.isAccountProfile || profile.account != null) {
+      final local = profiles.where((p) => !p.isAccountProfile && p.account == null).firstOrNull;
+      if (local != null) {
+        profile = local;
+      } else {
+        final p = Profile(id: _newId(), name: '학생', color: 0xFF2F6BFF, createdAt: _now);
+        profiles = [...profiles, p];
+        profile = p;
+      }
+      await _loadProfileData();
+    }
+    await _saveProfiles();
+    notifyListeners();
+  }
+
+  /// Back to the welcome screen from the offline mode (to sign in).
+  Future<void> showWelcome() async {
+    offlineMode = false;
+    await _saveProfiles();
+    notifyListeners();
+  }
+
+  /// Account details changed on the server (name, grade, teachers, counts).
+  Future<void> refreshMe() async {
+    final a = account;
+    if (a == null) return;
+    try {
+      final info = await AccountApi.of(a).me();
+      me = info;
+      if (info.name != a.name) {
+        a.name = info.name;
+        profile.name = info.name;
+        await _saveProfiles();
+      }
+      notifyListeners();
+    } on ApiError catch (e) {
+      if (e.unauthorized) {
+        // 비밀번호를 바꾸는 등으로 로그인이 끊김 → 다시 로그인
+        profile.account = null;
+        me = null;
+        await _saveProfiles();
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<PersonRef> joinTeacher(String code) async {
+    final t = await api!.joinTeacher(code);
+    await refreshMe();
+    return t;
+  }
+
+  Future<void> leaveTeacher(String teacherId) async {
+    await api!.leaveTeacher(teacherId);
+    await refreshMe();
+  }
+
+  List<PersonRef> get myTeachers => me?.teachers ?? const [];
+  int get unreadAnswers => me?.unreadQuestions ?? 0;
+  int get openQuestions => me?.openQuestions ?? 0;
+
+  void _scheduleRecordsSync() {
+    if (account == null || isTeacher) return;
+    _recordsTimer?.cancel();
+    _recordsTimer = Timer(const Duration(seconds: 4), syncRecords);
+  }
+
+  /// Send new attempts, 학습 설정 and the 오답노트 to the server (teacher view, other tablets).
+  Future<bool> syncRecords() async {
+    final a = account;
+    if (a == null || a.isTeacher || _recordsSyncing) return false;
+    _recordsSyncing = true;
+    _recordsTimer?.cancel();
+    try {
+      final api = AccountApi.of(a);
+      if (_syncedUpTo > attempts.length) _syncedUpTo = 0;
+      final wrong = [for (final s in states.values) if (s.inWrongNote) s.baseId];
+      var sent = false;
+      while (_syncedUpTo < attempts.length || !sent) {
+        final end = math.min(attempts.length, _syncedUpTo + 1000);
+        await api.sync(
+          attempts: attempts.sublist(_syncedUpTo, end),
+          learner: sent ? null : learner.toJson(),
+          wrongNote: sent ? null : wrong,
+        );
+        _syncedUpTo = end;
+        sent = true;
+      }
+      lastRecordsSync = '방금 저장됨';
+      _scheduleSave();
+      return true;
+    } on ApiError catch (e) {
+      lastRecordsSync = e.message;
+      if (e.unauthorized) await refreshMe();
+      return false;
+    } catch (e) {
+      lastRecordsSync = '$e';
+      return false;
+    } finally {
+      _recordsSyncing = false;
+    }
+  }
+
+  int get unsyncedCount => math.max(0, attempts.length - _syncedUpTo);
+
   // ------------------------------------------------------------ reset
   Future<void> resetRecords() async {
     attempts = [];
     states = {};
     _daily = null;
+    _syncedUpTo = 0;
     await storage.deleteDir(_pp('ink'));
     await storage.deleteDir(_pp('drafts'));
     _changed();
@@ -966,6 +1239,8 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _saveTimer?.cancel();
     _reportTimer?.cancel();
+    _recordsTimer?.cancel();
+    _meTimer?.cancel();
     _live?.dispose();
     super.dispose();
   }
@@ -1028,7 +1303,10 @@ class AppScope extends InheritedNotifier<AppState> {
 
 /// State of one 무한 풀기 session: what to draw from and how hard.
 class EndlessFeed {
-  EndlessFeed({this.courseId, this.unit, this.topic, this.level = 2.5});
+  EndlessFeed({this.courseId, this.unit, this.topic, this.workbookId, this.level = 2.5});
+
+  /// Problems come from 내 교재 (or only this book).
+  final String? workbookId;
   final String? courseId;
   final String? unit;
   final String? topic;

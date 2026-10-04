@@ -7,6 +7,7 @@ import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/workbook_card.dart' show workbookLevelColor;
 import 'solve_screen.dart';
+import 'workbook_store_screen.dart' show stageColor;
 
 /// One 문제집: problems in order, progress, 이어 풀기 / 틀린 것만.
 class WorkbookScreen extends StatelessWidget {
@@ -28,6 +29,15 @@ class WorkbookScreen extends StatelessWidget {
     final unsolved = [for (final p in ps) if (!app.isSolved(p.id)) p];
     final wrong = [for (final p in ps) if (app.stateOf(p.id).inWrongNote) p];
     final firstOpen = ps.indexWhere((p) => !app.isSolved(p.id));
+    final onShelf = app.hasWorkbook(w.id);
+    // 내 교재에 없는 책은 미리보기 — 풀기 버튼을 누르면 담고 바로 시작
+    void solve(VoidCallback go) {
+      if (!onShelf) {
+        app.addWorkbook(w.id);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('「${w.title}」을(를) 내 교재에 담았어요')));
+      }
+      go();
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(w.series.isNotEmpty ? w.series : (course?.name ?? '문제집'))),
@@ -37,7 +47,12 @@ class WorkbookScreen extends StatelessWidget {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Pill(w.level, color: workbookLevelColor(w.level)),
+                Wrap(spacing: 8, children: [
+                  Pill(w.stage, color: stageColor(w.stage)),
+                  Pill(w.level, color: workbookLevelColor(w.level)),
+                  if (w.scope.isNotEmpty) Pill(w.scope, color: AppColors.inkSoft),
+                  if (w.publisher.isNotEmpty) Pill(w.publisher, color: AppColors.inkSoft),
+                ]),
                 const SizedBox(height: 10),
                 Text(w.title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.1)),
                 if (w.desc.isNotEmpty) ...[
@@ -61,11 +76,21 @@ class WorkbookScreen extends StatelessWidget {
               style: FilledButton.styleFrom(backgroundColor: color, minimumSize: const Size(0, 52)),
               onPressed: ps.isEmpty
                   ? null
-                  : () => SolveScreen.open(context,
-                      title: w.title, problems: firstOpen <= 0 ? ps : [...ps.sublist(firstOpen), ...ps.sublist(0, firstOpen)]),
+                  : () => solve(() => SolveScreen.open(context,
+                      title: w.title, problems: firstOpen <= 0 ? ps : [...ps.sublist(firstOpen), ...ps.sublist(0, firstOpen)])),
               icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(done == 0 ? '처음부터 풀기' : (unsolved.isEmpty ? '다시 풀기' : '이어 풀기 · ${unsolved.length}문항 남음')),
+              label: Text(!onShelf
+                  ? '내 교재에 담고 풀기'
+                  : done == 0
+                      ? '처음부터 풀기'
+                      : (unsolved.isEmpty ? '다시 풀기' : '이어 풀기 · ${unsolved.length}문항 남음')),
             ),
+            if (onShelf)
+              OutlinedButton.icon(
+                onPressed: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
+                icon: const Icon(Icons.all_inclusive_rounded),
+                label: const Text('무한 풀기'),
+              ),
             if (wrong.isNotEmpty)
               OutlinedButton.icon(
                 onPressed: () => SolveScreen.open(context,
@@ -76,9 +101,24 @@ class WorkbookScreen extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: ps.isEmpty
                   ? null
-                  : () => SolveScreen.open(context, title: '${w.title} · 모의고사', problems: ps, mode: 'exam', timeLimitMs: ps.length * 3 * 60000),
+                  : () => solve(() => SolveScreen.open(context,
+                      title: '${w.title} · 모의고사', problems: ps, mode: 'exam', timeLimitMs: ps.length * 3 * 60000)),
               icon: const Icon(Icons.timer_outlined),
               label: const Text('시험처럼 풀기'),
+            ),
+            TextButton.icon(
+              key: const Key('wb-toggle'),
+              onPressed: () {
+                if (onShelf) {
+                  app.removeWorkbook(w.id);
+                } else {
+                  app.addWorkbook(w.id);
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(onShelf ? '내 교재에서 뺐어요 · 푼 기록은 그대로 남아요' : '내 교재에 담았어요')));
+              },
+              icon: Icon(onShelf ? Icons.bookmark_remove_rounded : Icons.bookmark_add_rounded),
+              label: Text(onShelf ? '내 교재에서 빼기' : '내 교재에 담기'),
             ),
           ]),
           const SizedBox(height: 24),
@@ -88,7 +128,7 @@ class WorkbookScreen extends StatelessWidget {
               for (var i = 0; i < ps.length; i++) ...[
                 if (i > 0) const Divider(height: 1),
                 _Row(n: i + 1, problem: ps[i], color: color, onTap: () {
-                  SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]);
+                  solve(() => SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]));
                 }),
               ],
             ]),

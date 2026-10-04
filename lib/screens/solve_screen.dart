@@ -16,7 +16,9 @@ import '../widgets/answer_panel.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/problem_card.dart';
+import '../widgets/snapshot.dart';
 import 'community_screen.dart' show WritePostScreen;
+import 'questions_screen.dart' show AskTeacherScreen;
 import 'result_screen.dart';
 
 /// One problem per page, printed like a 모의고사 시험지; the rest of the page is writing space.
@@ -45,12 +47,16 @@ class SolveScreen extends StatefulWidget {
   final int? timeLimitMs;
 
   /// 무한 풀기 over the learner's courses (or one course / unit / 유형).
-  static Future<void> endless(BuildContext context, {String? courseId, String? unit, String? topic, String? title}) {
+  static Future<void> endless(BuildContext context,
+      {String? courseId, String? unit, String? topic, String? title, String? workbookId}) {
     final app = AppScope.read(context);
-    final feed = EndlessFeed(courseId: courseId, unit: unit, topic: topic);
+    final feed = EndlessFeed(courseId: courseId, unit: unit, topic: topic, workbookId: workbookId);
     final first = app.nextEndless(feed);
     if (first == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('풀 문제가 없어요')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(app.myWorkbooks.isEmpty && workbookId == null
+              ? '먼저 문제집을 골라 내 교재에 담아 주세요'
+              : '풀 문제가 없어요')));
       return Future.value();
     }
     final name = title ?? topic ?? unit ?? (courseId == null ? '무한 풀기' : app.bank.subject(courseId)?.name ?? '무한 풀기');
@@ -96,6 +102,9 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   Timer? _draftTimer;
   InkController? _ink;
   final GlobalKey<InkCanvasState> _canvasKey = GlobalKey<InkCanvasState>();
+
+  /// The page (problem + handwriting) — attached to questions as a picture.
+  final GlobalKey _pageShot = GlobalKey(debugLabel: 'page-shot');
   final ExamSheetKeys _sheet = ExamSheetKeys();
   StreamSubscription<LiveMessage>? _msgSub;
   late AppState _app;
@@ -615,11 +624,14 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         ? const SizedBox()
         : Stack(children: [
             Positioned.fill(
-              child: InkCanvas(
-                key: _canvasKey,
-                controller: ink,
-                onTapPage: _onTapPage,
-                underlay: sheet,
+              child: RepaintBoundary(
+                key: _pageShot,
+                child: InkCanvas(
+                  key: _canvasKey,
+                  controller: ink,
+                  onTapPage: _onTapPage,
+                  underlay: sheet,
+                ),
               ),
             ),
             Positioned(
@@ -759,12 +771,11 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.auto_awesome_rounded, size: 19),
             label: const Text('변형'),
           ),
-        if (_app.community != null)
+        if (_app.community != null || _app.signedIn)
           TextButton.icon(
             key: const Key('ask'),
-            onPressed: _palmSafe(() => Navigator.of(context)
-                .push(MaterialPageRoute<bool>(builder: (_) => WritePostScreen(problem: p.isVariant ? (_app.problem(p.familyId) ?? p) : p)))),
-            icon: const Icon(Icons.forum_rounded, size: 19),
+            onPressed: _palmSafe(_ask),
+            icon: const Icon(Icons.contact_support_rounded, size: 19),
             label: const Text('질문'),
           ),
         if (!graded.correct)
@@ -878,6 +889,13 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             onPressed: _showHint,
             icon: const Icon(Icons.lightbulb_outline_rounded),
           ),
+        if (!_exam && app.signedIn && !app.isTeacher)
+          IconButton(
+            key: const Key('ask-anytime'),
+            tooltip: '선생님께 질문 (지금 풀이 화면을 함께 보내요)',
+            onPressed: _palmSafe(_ask),
+            icon: const Icon(Icons.contact_support_outlined),
+          ),
         if (widget.feed != null)
           TextButton(key: const Key('endless-stop'), onPressed: _finish, child: const Text('그만 풀기')),
         IconButton(
@@ -888,6 +906,53 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         ),
       ]),
     );
+  }
+
+  /// 질문: 선생님께 (지금 페이지 사진과 함께) 또는 커뮤니티에.
+  Future<void> _ask() async {
+    final app = _app;
+    final p = _p;
+    final canTeacher = app.signedIn && !app.isTeacher;
+    final canCommunity = app.community != null;
+    var choice = canTeacher ? 'teacher' : 'community';
+    if (canTeacher && canCommunity) {
+      final picked = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        builder: (c) => SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(
+              key: const Key('ask-teacher'),
+              leading: const Icon(Icons.co_present_rounded, color: AppColors.correct),
+              title: const Text('선생님께 질문', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: Text(app.myTeachers.isEmpty
+                  ? '선생님과 먼저 연결해요 (초대 코드)'
+                  : '지금 풀이 화면을 사진으로 함께 보내요 · ${app.myTeachers.map((t) => t.name).join(', ')}'),
+              onTap: () => Navigator.pop(c, 'teacher'),
+            ),
+            ListTile(
+              key: const Key('ask-community'),
+              leading: const Icon(Icons.forum_rounded, color: AppColors.blue),
+              title: const Text('커뮤니티 질문 게시판에', style: TextStyle(fontWeight: FontWeight.w800)),
+              subtitle: const Text('다른 수험생들과 함께 풀어 봐요'),
+              onTap: () => Navigator.pop(c, 'community'),
+            ),
+            const SizedBox(height: 12),
+          ]),
+        ),
+      );
+      if (picked == null) return;
+      choice = picked;
+    }
+    if (!mounted) return;
+    if (choice == 'community') {
+      await Navigator.of(context).push(MaterialPageRoute<bool>(
+          builder: (_) => WritePostScreen(problem: p.isVariant ? (app.problem(p.familyId) ?? p) : p)));
+      return;
+    }
+    final shot = await capturePng(_pageShot, pixelRatio: 1.0);
+    if (!mounted) return;
+    await AskTeacherScreen.open(context, problem: p, snapshot: shot);
   }
 
   void _onExamTimeout() {

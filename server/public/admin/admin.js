@@ -1325,6 +1325,11 @@
         ${fieldHtml('course', '과목', `<select data-wf="course">${st.courses.map((c) => `<option value="${esc(c.id)}" ${c.id === w.course ? 'selected' : ''}>${esc(c.subject)}</option>`).join('')}${st.courses.some((c) => c.id === w.course) ? '' : `<option selected value="${esc(w.course)}">${esc(w.course)} (없음)</option>`}</select>`)}
         ${fieldHtml('level', '수준', `<select data-wf="level"><option value="">(없음)</option>${S.WB_LEVELS.map((l) => `<option ${l === w.level ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
       </div>
+      <div class="grid3">
+        ${fieldHtml('stage', '커리큘럼 단계', `<select data-wf="stage"><option value="">(수준으로 짐작)</option>${S.WB_STAGES.map((l) => `<option ${l === w.stage ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
+        ${fieldHtml('scope', '범위 <em>선택</em>', `<input data-wf="scope" value="${esc(w.scope || '')}" placeholder="예: 수학Ⅰ, 공통수학1">`)}
+        ${fieldHtml('publisher', '만든 곳 <em>선택</em>', `<input data-wf="publisher" value="${esc(w.publisher || '')}" placeholder="예: LAST30 ITEM LAB">`)}
+      </div>
       ${fieldHtml('desc', '설명 <em>한 줄</em>', `<input data-wf="desc" value="${esc(w.desc || '')}" placeholder="예: 교과 개념을 유형별로 한 바퀴">`)}
       <div class="sec">문항 순서 (${(w.problems || []).length}) <span class="fld-help" style="font-weight:500;letter-spacing:0">끌어서 순서 바꾸기</span></div>
       <div class="fld" data-fld="problems" style="margin:0">

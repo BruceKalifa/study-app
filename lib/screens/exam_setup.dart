@@ -48,7 +48,7 @@ class _ExamSetupState extends State<_ExamSetup> {
       content: SizedBox(
         width: 520,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('제한 시간 안에 풀고, 끝나면 한꺼번에 채점해요. 풀이 중에는 정답이 보이지 않아요.',
+          const Text('내 교재 문제로 제한 시간 안에 풀고, 끝나면 한꺼번에 채점해요. 풀이 중에는 정답이 보이지 않아요.',
               style: TextStyle(color: AppColors.inkSoft)),
           const SizedBox(height: 18),
           const Text('과목', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -93,7 +93,11 @@ class _ExamSetupState extends State<_ExamSetup> {
           style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
           onPressed: () {
             final rnd = math.Random();
-            final pool = app.problemsWhere(subjectId: _subject)..shuffle(rnd);
+            // 내 교재 문제에서만 출제
+            final pool = [
+              for (final p in app.myProblems)
+                if (_subject == null || p.subjectId == _subject) p
+            ]..shuffle(rnd);
             // spread difficulty: easy → hard like a real paper
             final picked = pool.take(_count).toList()..sort((a, b) => a.difficulty.compareTo(b.difficulty));
             final problems = <Problem>[
