@@ -118,7 +118,7 @@ void main() {
     final s = await tester.runAsync(_state);
     await tester.pumpWidget(_app(s!));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('오늘의 오답 변형 세트'), findsOneWidget);
+    expect(find.byKey(const Key('daily-start')), findsOneWidget);
     for (final tab in ['문제집', '오답노트', '학습관리', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
       await tester.tap(find.text(tab).last);
       await tester.pump(const Duration(milliseconds: 600));
@@ -361,7 +361,7 @@ void main() {
     await tester.tap(find.byKey(const Key('onb-start')));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('오늘의 오답 변형 세트'), findsOneWidget);
+    expect(find.byKey(const Key('daily-start')), findsOneWidget);
     expect(s.learner.grade, '중2');
     expect(s.learner.goal, '내신');
     expect(s.profile.name, '예진');

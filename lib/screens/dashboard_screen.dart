@@ -529,7 +529,7 @@ class _WeakTopics extends StatelessWidget {
       else
         Card(
           child: Column(children: [
-            for (final (topic, acc, n) in weak.take(4))
+            for (final (topic, acc, _) in weak.take(4))
               ListTile(
                 title: Text(topic, style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Padding(
