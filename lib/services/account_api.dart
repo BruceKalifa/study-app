@@ -502,4 +502,26 @@ class AccountApi {
   }
 
   Future<void> resolve(String id) => _req('POST', '/api/questions/${Uri.encodeComponent(id)}/resolve', body: const {});
+
+  /// A question picture (needs the login token).
+  Future<Uint8List> imageBytes(String path) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
+    try {
+      final req = await client.getUrl(Uri.parse(url(path))).timeout(const Duration(seconds: 8));
+      if (token.isNotEmpty) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      final res = await req.close().timeout(const Duration(seconds: 30));
+      final bb = BytesBuilder(copy: false);
+      await for (final chunk in res) {
+        bb.add(chunk);
+      }
+      if (res.statusCode >= 400) throw ApiError('그림을 불러오지 못했어요 (${res.statusCode})', res.statusCode);
+      return bb.takeBytes();
+    } on SocketException {
+      throw const ApiError('서버에 연결할 수 없어요');
+    } on TimeoutException {
+      throw const ApiError('서버 응답이 없어요');
+    } finally {
+      client.close(force: true);
+    }
+  }
 }

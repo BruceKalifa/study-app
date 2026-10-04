@@ -632,5 +632,9 @@ void main() {
     await tester.pumpWidget(_wrap(app, AttemptDetailScreen(attempt: withInk)));
     await tester.pump(const Duration(seconds: 3));
     await _shot(tester, '19_history_replay');
+    // requests started inside the fake clock (ranking report) finish or time out before the test ends
+    await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 90));
   });
 }

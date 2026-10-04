@@ -656,22 +656,14 @@ class _Bubble extends StatelessWidget {
             if (m.image != null) ...[
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => _ImageViewer(url: api.url(m.image!), headers: api.authHeaders))),
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute<void>(builder: (_) => _ImageViewer(api: api, path: m.image!))),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     color: Colors.white,
                     constraints: const BoxConstraints(maxHeight: 360),
-                    child: Image.network(
-                      api.url(m.image!),
-                      headers: api.authHeaders,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Text('그림을 불러오지 못했어요', style: TextStyle(color: AppColors.inkMuted)),
-                      ),
-                    ),
+                    child: AuthImage(api: api, path: m.image!),
                   ),
                 ),
               ),
@@ -684,9 +676,9 @@ class _Bubble extends StatelessWidget {
 }
 
 class _ImageViewer extends StatelessWidget {
-  const _ImageViewer({required this.url, required this.headers});
-  final String url;
-  final Map<String, String> headers;
+  const _ImageViewer({required this.api, required this.path});
+  final AccountApi api;
+  final String path;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -694,9 +686,68 @@ class _ImageViewer extends StatelessWidget {
         appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white),
         body: InteractiveViewer(
           maxScale: 6,
-          child: Center(child: Image.network(url, headers: headers, fit: BoxFit.contain)),
+          child: Center(child: AuthImage(api: api, path: path)),
         ),
       );
+}
+
+/// A question picture loaded with the login token (kept in memory for the session).
+class AuthImage extends StatefulWidget {
+  const AuthImage({super.key, required this.api, required this.path, this.width});
+  final AccountApi api;
+  final String path;
+  final double? width;
+
+  static final Map<String, Uint8List> _cache = {};
+
+  @override
+  State<AuthImage> createState() => _AuthImageState();
+}
+
+class _AuthImageState extends State<AuthImage> {
+  late Future<Uint8List> _f;
+
+  @override
+  void initState() {
+    super.initState();
+    _f = _load();
+  }
+
+  Future<Uint8List> _load() async {
+    final hit = AuthImage._cache[widget.path];
+    if (hit != null) return hit;
+    final b = await widget.api.imageBytes(widget.path);
+    if (AuthImage._cache.length > 40) AuthImage._cache.remove(AuthImage._cache.keys.first);
+    AuthImage._cache[widget.path] = b;
+    return b;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List>(
+      future: _f,
+      builder: (context, snap) {
+        final b = snap.data;
+        if (b != null) return Image.memory(b, width: widget.width, fit: BoxFit.contain, gaplessPlayback: true);
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.broken_image_outlined, color: AppColors.inkMuted),
+              const SizedBox(width: 8),
+              const Text('그림을 불러오지 못했어요', style: TextStyle(color: AppColors.inkMuted)),
+              TextButton(onPressed: () => setState(() => _f = _load()), child: const Text('다시')),
+            ]),
+          );
+        }
+        return const SizedBox(
+          width: 160,
+          height: 110,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+        );
+      },
+    );
+  }
 }
 
 // ───────────────────────────────────────────────────────────── ask
@@ -950,7 +1001,7 @@ class _HandwriteScreenState extends State<HandwriteScreen> {
     } else if (widget.imagePath != null && api != null) {
       underlay = Padding(
         padding: const EdgeInsets.only(top: 90),
-        child: Image.network(api.url(widget.imagePath!), headers: api.authHeaders, width: 1000, fit: BoxFit.fitWidth),
+        child: AuthImage(api: api, path: widget.imagePath!, width: 1000),
       );
     } else if (widget.problem != null) {
       final p = widget.problem!;

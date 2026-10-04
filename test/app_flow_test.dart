@@ -817,6 +817,8 @@ void main() {
       final thread = await st.api!.question(q.id);
       expect(thread.messages.last.fromTeacher, isTrue);
       expect(thread.messages.last.name, '우네 선생님');
+      expect(await st.api!.imageBytes(thread.messages.last.image!), png, reason: '선생님이 보낸 필기 그림');
+      expect(await teacher.imageBytes(thread.messages.first.image!), png, reason: '학생이 보낸 풀이 사진');
       await st.refreshMe();
       expect(st.unreadAnswers, 0);
 
