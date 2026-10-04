@@ -668,6 +668,13 @@ void main() {
     expect(again.importedBooks, isEmpty);
     expect(again.bank.subject('math')!.problems.length, before);
     expect(again.attempts.length, 1, reason: '푼 기록은 남는다');
+
+    // one file can carry several books
+    final both = await again.importBooks(sampleCollectionFile());
+    expect(both.map((b) => b.id), ['sample-type-01', 'sample-type-02']);
+    expect(again.importedBooks.length, 2);
+    expect(again.bank.byId('sample-type-02-cls-2'), isNotNull);
+    expect(again.hasWorkbook('sample-type-02'), isTrue);
   });
 
   test('MathText.compact / plain flatten block markup for lists', () {

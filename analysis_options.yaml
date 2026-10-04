@@ -4,6 +4,7 @@ analyzer:
   exclude:
     - build/**
     - server/**
+    - third_party/**
 linter:
   rules:
     prefer_const_constructors: false

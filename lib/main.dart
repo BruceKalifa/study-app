@@ -54,8 +54,9 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
     if (bytes == null) return;
     String msg;
     try {
-      final book = await widget.state.importBook(bytes);
-      msg = '「${book.title}」 교재를 넣었어요 (${book.problemCount}문항)';
+      final books = await widget.state.importBooks(bytes);
+      final n = books.fold<int>(0, (n, b) => n + b.problemCount);
+      msg = books.length == 1 ? '「${books.first.title}」 교재를 넣었어요 ($n문항)' : '교재 ${books.length}권을 넣었어요 ($n문항)';
     } on FormatException catch (e) {
       msg = e.message;
     } catch (e) {

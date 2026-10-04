@@ -3,12 +3,15 @@
 TeX 원본 교재 → 앱 문항 묶음 (.pulinote)  — 원문을 앱에서 다시 조판한다.
 
   python3 tools/tex_book.py <교재 폴더> <출력 폴더> [--preview]
+  python3 tools/tex_book.py collect <묶음.pulinote> <교재1.pulinote> …   (여러 권을 한 파일로)
 
 교재 폴더(교재모음 형식): 정보.txt (문항 목록 표) + TeX원본/*.tex
   - 문항: \\PairPage / \\SoloPage 칸의 \\TagBox{머리표}{출처} 다음 본문 (정보.txt 순서와 같다)
-  - 해설: \\SolBlock{제목}{본문} (본문이 빈 DAY 제목은 건너뜀)
-  - 본문 변환: $…$ 그대로, \\[…\\] → 가운데 수식 줄, \\kbox{…} → 조건 상자, tikzpicture → SVG 그림,
-    \\textbf → **굵게**, 빈 줄 → 문단
+  - 해설: \\SolBlock / \\SolBlockLast {제목}{본문} (본문이 빈 DAY 제목은 건너뜀)
+  - 본문 변환: $…$ 그대로, \\[…\\] → 가운데 수식 줄, \\kbox{…} → 조건 상자, \\TextTable → 나란히,
+    tabular → 표, itemize → 목록, \\textbf → **굵게**, 빈 줄 → 문단
+  - 그림: tikzpicture 를 원문 머리말 그대로 XeLaTeX 로 조판 → SVG (선·글자 모두 원문과 같음)
+필요: xelatex · pdftocairo (그림), node + katex (수식 검사), playwright (--preview)
 출력: <출력>/<id>.pulinote (gzip JSON — 앱 설정 → "교재 파일 가져오기")
 교재 내용은 저작물이므로 출력은 저장소에 넣지 않는다.
 """
@@ -686,10 +689,12 @@ def build(folder, outdir, preview=False):
     wb = {
         'id': book_id, 'title': title, 'course': main,
         'stage': stage if stage in ('개념', '유형', '기출', 'N제', '모의고사') else 'N제',
-        'scope': meta.get('범위', '').replace(' / ', ' · '),
+        # 고르기 화면의 범위 칩: 과목 묶음 (같은 시리즈끼리 같은 칩), 자세한 범위는 설명에
+        'scope': '·'.join(x.strip() for x in re.split(r'[,，]', meta.get('과목', '')) if x.strip()),
         'level': '심화' if stage == 'N제' else '기본',
         'publisher': meta.get('만든 곳', ''), 'series': series,
-        'desc': meta.get('시리즈', ''), 'problems': all_ids,
+        'desc': ' — '.join(x for x in (meta.get('시리즈', ''), meta.get('범위', '').replace(' / ', ' · ')) if x),
+        'problems': all_ids,
     }
     bundle = {'format': 'pulinote-bundle', 'version': 1, 'id': book_id, 'title': title,
               'courses': list(courses.values()), 'workbooks': [wb]}
@@ -822,6 +827,20 @@ def make_preview(bundle, outdir):
     return len(shots)
 
 
+def collect(out, files):
+    """여러 교재 파일을 한 파일로 (앱에서 한 번에 넣기): {format:'pulinote-collection', books:[…]}"""
+    books = [json.loads(gzip.decompress(open(f, 'rb').read())) for f in files]
+    raw = json.dumps({'format': 'pulinote-collection', 'version': 1, 'books': books}, ensure_ascii=False,
+                     separators=(',', ':')).encode('utf-8')
+    with open(out, 'wb') as f:
+        f.write(gzip.compress(raw, 9))
+    return {'file': out, 'books': [b['id'] for b in books], 'bytes': os.path.getsize(out)}
+
+
 if __name__ == '__main__':
+    if sys.argv[1:2] == ['collect']:
+        # python3 tools/tex_book.py collect <출력.pulinote> <교재1.pulinote> <교재2.pulinote> …
+        print(json.dumps(collect(sys.argv[2], sys.argv[3:]), ensure_ascii=False, indent=1))
+        sys.exit(0)
     a = [x for x in sys.argv[1:] if not x.startswith('--')]
     print(json.dumps(build(a[0], a[1], preview='--preview' in sys.argv), ensure_ascii=False, indent=1))

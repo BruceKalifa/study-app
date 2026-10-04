@@ -183,22 +183,25 @@ class AppState extends ChangeNotifier {
     _contentBank = ContentImport.merge(_baseBank.withPacks(_packs, workbooks: _packWorkbooks), _books);
   }
 
-  /// Adds a `.pulinote` 교재 file; a student also gets its 문제집 on the shelf. Throws [FormatException].
-  Future<BookBundle> importBook(List<int> bytes) async {
+  /// Adds a `.pulinote` 교재 file (one book or a collection); a student also gets the 문제집 on the shelf.
+  /// Throws [FormatException].
+  Future<List<BookBundle>> importBooks(List<int> bytes) async {
     final imports = ContentImport(storage);
-    final book = await imports.add(bytes);
+    final added = await imports.add(bytes);
     importedBooks = await imports.list();
     _books = await imports.loadAll();
     _composeContent();
     _rebuildBank();
     if (!isTeacher) {
-      for (final w in book.workbooks) {
+      for (final w in added.expand((b) => b.workbooks)) {
         if (!hasWorkbook(w.id)) addWorkbook(w.id);
       }
     }
     _changed();
-    return book;
+    return added;
   }
+
+  Future<BookBundle> importBook(List<int> bytes) async => (await importBooks(bytes)).first;
 
   Future<void> removeImportedBook(String id) async {
     final imports = ContentImport(storage);

@@ -15,6 +15,11 @@ dependencies:
   web_socket_channel: ^3.0.3
   flutter_svg: ^2.0.10
 
+# patched copy: Korean glyph fallback inside math + spacing kept at line breaks (third_party/flutter_math_fork/README.md)
+dependency_overrides:
+  flutter_math_fork:
+    path: third_party/flutter_math_fork
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

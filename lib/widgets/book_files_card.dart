@@ -34,8 +34,10 @@ class _BookFilesCardState extends State<BookFilesCard> {
       return;
     }
     try {
-      final book = await app.importBook(bytes);
-      _msg = '「${book.title}」을 넣었어요 · ${book.problemCount}문항${app.isTeacher ? '' : ' · 내 교재에 담았어요'}';
+      final books = await app.importBooks(bytes);
+      final n = books.fold<int>(0, (n, b) => n + b.problemCount);
+      final what = books.length == 1 ? '「${books.first.title}」을' : '교재 ${books.length}권을';
+      _msg = '$what 넣었어요 · $n문항${app.isTeacher ? '' : ' · 내 교재에 담았어요'}';
       _error = false;
     } on FormatException catch (e) {
       _msg = e.message;

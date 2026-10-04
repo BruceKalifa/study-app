@@ -47,8 +47,24 @@ class ContentImport {
   static const _indexPath = 'imports/_index.json';
   static const format = 'pulinote-bundle';
 
-  /// Bytes of a `.pulinote` file (gzip or plain JSON) → the bundle JSON. Throws [FormatException].
-  static Map<String, dynamic> decode(List<int> bytes) {
+  /// Several books in one file: `{format:'pulinote-collection', books:[bundle, …]}`.
+  static const collection = 'pulinote-collection';
+
+  /// Bytes of a `.pulinote` file (gzip or plain JSON) → the bundle JSON(s). Throws [FormatException].
+  static List<Map<String, dynamic>> decodeAll(List<int> bytes) {
+    final j = _json(bytes);
+    if (j['format'] == collection) {
+      final books = j['books'];
+      if (books is! List || books.isEmpty) throw const FormatException('교재가 없어요');
+      return [for (final b in books) _check(b)];
+    }
+    return [_check(j)];
+  }
+
+  /// A single-book file → its bundle JSON. Throws [FormatException].
+  static Map<String, dynamic> decode(List<int> bytes) => _check(_json(bytes));
+
+  static Map<String, dynamic> _json(List<int> bytes) {
     List<int> raw = bytes;
     if (bytes.length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b) {
       try {
@@ -63,6 +79,11 @@ class ContentImport {
     } catch (_) {
       throw const FormatException('풀이노트 교재 파일이 아니에요');
     }
+    if (j is! Map) throw const FormatException('풀이노트 교재 파일이 아니에요');
+    return j.map((k, v) => MapEntry('$k', v));
+  }
+
+  static Map<String, dynamic> _check(Object? j) {
     if (j is! Map || j['format'] != format) throw const FormatException('풀이노트 교재 파일이 아니에요');
     final id = '${j['id'] ?? ''}';
     if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$').hasMatch(id)) throw const FormatException('교재 id 가 잘못됐어요');
@@ -94,16 +115,20 @@ class ContentImport {
   Future<void> _saveIndex(List<ImportedBook> books) =>
       storage.write(_indexPath, jsonEncode({'books': [for (final b in books) b.toJson()]}));
 
-  /// Validates and stores [bytes]; a book with the same id is replaced.
-  Future<BookBundle> add(List<int> bytes) async {
-    final j = decode(bytes);
-    final bundle = parse(j);
-    if (bundle.problemCount == 0) throw const FormatException('문항이 없어요');
-    await storage.write('imports/${bundle.id}.json', jsonEncode(j));
-    final books = (await list()).where((b) => b.id != bundle.id).toList()
-      ..add(ImportedBook(bundle.id, bundle.title, bundle.problemCount, DateTime.now().millisecondsSinceEpoch));
+  /// Validates and stores the book(s) in [bytes]; a book with the same id is replaced.
+  Future<List<BookBundle>> add(List<int> bytes) async {
+    final all = decodeAll(bytes);
+    final parsed = [for (final j in all) parse(j)];
+    if (parsed.any((b) => b.problemCount == 0)) throw const FormatException('문항이 없어요');
+    var books = await list();
+    for (var k = 0; k < all.length; k++) {
+      final bundle = parsed[k];
+      await storage.write('imports/${bundle.id}.json', jsonEncode(all[k]));
+      books = books.where((b) => b.id != bundle.id).toList()
+        ..add(ImportedBook(bundle.id, bundle.title, bundle.problemCount, DateTime.now().millisecondsSinceEpoch));
+    }
     await _saveIndex(books);
-    return bundle;
+    return parsed;
   }
 
   Future<void> remove(String id) async {
