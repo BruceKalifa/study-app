@@ -8,6 +8,7 @@ import '../services/handwriting.dart';
 import '../services/live_sync.dart';
 import '../widgets/common.dart';
 import 'onboarding_screen.dart';
+import '../widgets/update_dialog.dart' show UpdateTile;
 import 'teacher_shell.dart' show AccountCard;
 
 class SettingsScreen extends StatefulWidget {
@@ -52,6 +53,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         // ---------------- account
         const AccountCard(),
+        const SizedBox(height: 8),
+        const Card(child: Padding(padding: EdgeInsets.symmetric(horizontal: 18, vertical: 4), child: UpdateTile())),
         const SizedBox(height: 16),
 
         // ---------------- profiles (로그인 없이 쓸 때만)

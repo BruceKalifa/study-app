@@ -7,6 +7,8 @@ import 'app/theme.dart';
 import 'core/problem_bank.dart';
 import 'screens/app_root.dart';
 import 'services/handwriting.dart';
+import 'services/updater.dart';
+import 'widgets/update_dialog.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,10 +31,30 @@ class PulinoteApp extends StatefulWidget {
 }
 
 class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _nav = GlobalKey<NavigatorState>();
+  DateTime? _lastUpdateCheck;
+  bool _updateShown = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
+  }
+
+  /// 앱을 열 때(그리고 30분 넘게 지난 뒤 다시 열 때) 새 버전이 있으면 받아서 설치 화면을 띄운다.
+  Future<void> _checkUpdate() async {
+    if (!Updater.enabled || !Updater.supported || _updateShown) return;
+    final now = DateTime.now();
+    final last = _lastUpdateCheck;
+    if (last != null && now.difference(last) < const Duration(minutes: 30)) return;
+    _lastUpdateCheck = now;
+    final u = await Updater.check();
+    final ctx = _nav.currentState?.overlay?.context;
+    if (u == null || ctx == null || !ctx.mounted || _updateShown) return;
+    _updateShown = true;
+    await showUpdateDialog(ctx, u);
+    _updateShown = false;
   }
 
   @override
@@ -47,6 +69,7 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
       widget.state.saveNow();
     } else if (s == AppLifecycleState.resumed) {
       widget.state.onResumed();
+      _checkUpdate();
     }
   }
 
@@ -56,6 +79,7 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
       state: widget.state,
       child: MaterialApp(
         title: kAppName,
+        navigatorKey: _nav,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         home: const AppRoot(),

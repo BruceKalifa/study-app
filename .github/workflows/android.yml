@@ -99,8 +99,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # version.json: the app compares "build" with its own versionCode and updates itself
+          RUN=${{ github.run_number }} MSG="$(git log -1 --pretty=%s)" python3 -c "import json,os; json.dump({'build': int(os.environ['RUN']), 'notes': os.environ['MSG'][:200], 'apk': 'https://github.com/${{ github.repository }}/releases/download/latest/pulinote.apk'}, open('ci-out/version.json', 'w'), ensure_ascii=False)"
+          cat ci-out/version.json
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest ci-out/pulinote.apk \
+          gh release create latest ci-out/pulinote.apk ci-out/version.json \
             --title "최신 빌드 #${{ github.run_number }}" \
             --notes "커밋 ${GITHUB_SHA::7} 기준 자동 빌드입니다. 태블릿에서 pulinote.apk 를 내려받아 설치하세요." \
             --latest

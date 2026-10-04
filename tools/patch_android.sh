@@ -9,6 +9,19 @@ grep -q 'android.permission.INTERNET' "$M" || \
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <application#' "$M"
 grep -q 'usesCleartextTraffic' "$M" || \
   sed -i 's#<application#<application android:usesCleartextTraffic="true"#' "$M"
+# In-app updates: download the new APK and hand it to the system installer (FileProvider → cache/updates/)
+grep -q 'REQUEST_INSTALL_PACKAGES' "$M" || \
+  sed -i 's#<application#<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application#' "$M"
+grep -q 'pulinote_update_paths' "$M" || \
+  sed -i 's#</application>#    <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">\n            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/pulinote_update_paths"/>\n        </provider>\n    </application>#' "$M"
+mkdir -p android/app/src/main/res/xml
+cat > android/app/src/main/res/xml/pulinote_update_paths.xml <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>
+XML
+
 # App name
 sed -i 's#android:label="[^"]*"#android:label="풀이노트"#' "$M"
 
@@ -28,6 +41,14 @@ for G in android/app/build.gradle.kts android/app/build.gradle; do
     sed -i -E 's/^([[:space:]]*)signingConfig signingConfigs\.debug/&\n\1minifyEnabled false\n\1shrinkResources false/' "$G"
   fi
   grep -Eq 'isMinifyEnabled = false|minifyEnabled false' "$G" || { echo "ERROR: could not disable minify in $G"; cat "$G"; exit 1; }
+  # FileProvider for in-app updates
+  if ! grep -q 'androidx.core:core' "$G"; then
+    if [[ "$G" == *.kts ]]; then
+      printf '\ndependencies {\n    implementation("androidx.core:core:1.13.1")\n}\n' >> "$G"
+    else
+      printf "\ndependencies {\n    implementation 'androidx.core:core:1.13.1'\n}\n" >> "$G"
+    fi
+  fi
   echo "---- $G ----"; cat "$G"
 done
 
@@ -47,10 +68,60 @@ if [ -n "$MA" ]; then
   cat > "$MA" <<KT
 $PKG
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.view.MotionEvent
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class MainActivity : FlutterActivity() {
+    // In-app updates (lib/services/updater.dart)
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pulinote/update").setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "versionCode" -> {
+                        val info = packageManager.getPackageInfo(packageName, 0)
+                        @Suppress("DEPRECATION")
+                        val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
+                        result.success(code)
+                    }
+                    "canInstall" -> result.success(
+                        if (Build.VERSION.SDK_INT >= 26) packageManager.canRequestPackageInstalls() else true
+                    )
+                    "openInstallSettings" -> {
+                        if (Build.VERSION.SDK_INT >= 26) {
+                            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + packageName)))
+                        }
+                        result.success(true)
+                    }
+                    "install" -> {
+                        val path = call.argument<String>("path")
+                        if (path == null) {
+                            result.success(false)
+                        } else {
+                            val uri = FileProvider.getUriForFile(this, packageName + ".updates", File(path))
+                            val intent = Intent(Intent.ACTION_VIEW)
+                                .setDataAndType(uri, "application/vnd.android.package-archive")
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            } catch (e: Exception) {
+                result.error("update", e.message, null)
+            }
+        }
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val action = ev.actionMasked
         // Low latency: ask for unbuffered (un-batched) pen events, also when a palm touched first.
