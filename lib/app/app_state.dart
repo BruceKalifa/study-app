@@ -105,10 +105,13 @@ class AppState extends ChangeNotifier {
         debugPrint('profiles.json broken: $e');
       }
     }
-    if (profiles.isEmpty) {
+    final fresh = profiles.isEmpty;
+    if (fresh) {
       profiles = [Profile(id: _newId(), name: '학생', color: 0xFF2F6BFF, createdAt: _now)];
     }
     profile = profiles.firstWhere((p) => p.id == currentId, orElse: () => profiles.first);
+    // the first profile must be on disk right away, or a restart would start a new one (and lose the records)
+    if (fresh) await _saveProfiles();
     final (packs, wbs) = await ContentSync(storage).loadCached();
     _packs = packs;
     _packWorkbooks = wbs;

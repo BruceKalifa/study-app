@@ -217,6 +217,9 @@ class Problem {
   final String? label;
   final bool labelAccent;
 
+  /// 머리표 상자 색 (ARGB, 교재마다 다름 — 원문 \definecolor). null → 검정 (labelAccent 면 주황).
+  final int? labelColor;
+
   /// TeX 원문을 옮긴 문항: 원문처럼 본문 글꼴(Noto Serif KR)과 글줄 수식(text style)으로 그린다.
   final bool texStyle;
 
@@ -249,6 +252,7 @@ class Problem {
     this.custom = false,
     this.label,
     this.labelAccent = false,
+    this.labelColor,
     this.texStyle = false,
     this.points,
   });
@@ -314,6 +318,7 @@ class Problem {
       custom: j['custom'] == true,
       label: (_strOrNull(j['label']) ?? '').trim().isEmpty ? null : _str(j['label']).trim(),
       labelAccent: j['labelAccent'] == true,
+      labelColor: j['labelColor'] == null ? null : parseColor(j['labelColor'], 0xFF000000),
       texStyle: j['texStyle'] == true,
       points: _int(j['points']),
     );
@@ -348,6 +353,7 @@ class Problem {
     if (custom) m['custom'] = true;
     if (label != null) m['label'] = label;
     if (labelAccent) m['labelAccent'] = true;
+    if (labelColor != null) m['labelColor'] = colorToHex(labelColor!);
     if (texStyle) m['texStyle'] = true;
     if (points != null) m['points'] = points;
     return m;
@@ -406,6 +412,7 @@ class Problem {
       custom: custom ?? this.custom,
       label: label,
       labelAccent: labelAccent,
+      labelColor: labelColor,
       texStyle: texStyle,
       points: points,
     );

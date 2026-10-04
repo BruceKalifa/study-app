@@ -59,7 +59,24 @@ Map<String, dynamic> sampleBookJson() => {
                   '[[box]]\n흰 공 두 개: \${}_3\\mathrm{C}_2=3\$\n검은 공 두 개: \${}_2\\mathrm{C}_2=1\$\n[[/box]]\n'
                   '\$\$\\frac{3+1}{10}=\\frac{2}{5}\$\$\n따라서 \$p+q=7\$이다.',
               'label': '심화',
-              'labelAccent': true,
+              'labelColor': '#00707A',
+              'texStyle': true,
+              'points': 0,
+            },
+            {
+              'id': 'sample-type-01-hw-1',
+              'unit': '통계',
+              'topic': 'DAY 1 · 숙제 1(중)',
+              'difficulty': 3,
+              'type': 'short',
+              'stem': '확률변수 \$X\$가 정규분포 \$\\mathrm{N}(10,\\ 2^2)\$을 따른다.\n'
+                  '[[box]]\n• \$\\mathrm{P}(X\\le a)=0.5\$\n• \$\\mathrm{P}(X\\ge b)=0.159\$\n[[/box]]\n'
+                  '[[cols:58:39]]\n두 실수 \$a\$, \$b\$에 대하여 \$a+b\$의 값을 오른쪽 표준정규분포표를 이용하여 구하시오.\n[[col]]\n'
+                  '| \$z\$ | \$\\mathrm{P}(0\\le Z\\le z)\$ |\n|---|---|\n| \$1.0\$ | \$0.341\$ |\n| \$2.0\$ | \$0.477\$ |\n[[/cols]]',
+              'answer': '22',
+              'solution': '\$a=10\$이고 \$\\mathrm{P}(X\\ge b)=0.5-0.341\$이므로 \$\\dfrac{b-10}{2}=1\$, \$b=12\$이다.',
+              'label': '숙제 1 (중)',
+              'labelColor': '#D97757',
               'texStyle': true,
               'points': 0,
             },
@@ -77,7 +94,7 @@ Map<String, dynamic> sampleBookJson() => {
           'publisher': '풀이노트',
           'series': 'SAMPLE TYPE',
           'desc': '교재 파일 예시',
-          'problems': ['sample-type-01-cls-1', 'sample-type-01-cls-2'],
+          'problems': ['sample-type-01-cls-1', 'sample-type-01-cls-2', 'sample-type-01-hw-1'],
         },
       ],
     };

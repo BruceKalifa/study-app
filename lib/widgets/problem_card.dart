@@ -325,7 +325,7 @@ class TexLabel extends StatelessWidget {
       children: [
         Container(
           padding: EdgeInsets.symmetric(horizontal: fontSize * 0.42, vertical: fontSize * 0.14),
-          color: p.labelAccent ? AppTheme.texAccent : Colors.black,
+          color: p.labelColor != null ? Color(p.labelColor!) : (p.labelAccent ? AppTheme.texAccent : Colors.black),
           child: Text(p.label ?? '',
               style: TextStyle(
                   fontFamily: AppTheme.font, fontSize: fontSize, height: 1.3, fontWeight: FontWeight.w600, color: Colors.white)),

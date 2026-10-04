@@ -9,6 +9,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 ///   `[[box]]` … `[[/box]]`      조건 상자
 ///   `[[center]]` … `[[/center]]` 가운데 정렬
 ///   `[[svg]]<svg…>[[/svg]]`     그림 (TeX 원문의 TikZ 를 옮긴 것)
+///   `[[cols:58:39]]` … `[[col]]` … `[[/cols]]`  나란히 (비율)
 ///   `| a | b |`                표
 class MathText extends StatelessWidget {
   const MathText(
@@ -63,7 +64,7 @@ class MathText extends StatelessWidget {
   static String compact(String s) {
     if (!s.contains('[[') && !s.contains(r'$$')) return s;
     var t = s.replaceAll(RegExp(r'\[\[svg\]\][\s\S]*?\[\[/svg\]\]'), '[그림]');
-    t = t.replaceAll(RegExp(r'\[\[/?(box|center)\]\]'), '');
+    t = t.replaceAll(RegExp(r'\[\[/?(box|center|cols[^\]]*|col)\]\]'), '');
     t = t.replaceAllMapped(RegExp(r'\$\$([\s\S]*?)\$\$'), (m) => '\$${m[1]}\$');
     return t.replaceAll(RegExp(r'\n{2,}'), '\n').trim();
   }
@@ -156,6 +157,44 @@ class MathText extends StatelessWidget {
         } else {
           children.add(SizedBox(width: double.infinity, child: _structured(inner, base, TextAlign.center)));
         }
+        i = j + 1;
+        continue;
+      }
+      final cols = RegExp(r'^\[\[cols((?::\d+)*)\]\]$').firstMatch(l);
+      if (cols != null) {
+        var depth = 1;
+        var j = i + 1;
+        final parts = <List<String>>[[]];
+        while (j < lines.length) {
+          final t = lines[j].trim();
+          if (t.startsWith('[[cols')) depth++;
+          if (t == '[[/cols]]' && --depth == 0) break;
+          if (t == '[[col]]' && depth == 1) {
+            parts.add([]);
+          } else {
+            parts.last.add(lines[j]);
+          }
+          j++;
+        }
+        flush();
+        final weights = [
+          for (final w in cols.group(1)!.split(':').where((w) => w.isNotEmpty)) int.parse(w),
+        ];
+        children.add(Padding(
+          padding: EdgeInsets.symmetric(vertical: fs * 0.2),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (var k = 0; k < parts.length; k++) ...[
+              if (k > 0) SizedBox(width: fs * 0.8),
+              Expanded(
+                flex: k < weights.length ? weights[k] : 1,
+                child: Align(
+                  alignment: k == 0 ? Alignment.topLeft : Alignment.topRight,
+                  child: _structured(parts[k], base, align),
+                ),
+              ),
+            ],
+          ]),
+        ));
         i = j + 1;
         continue;
       }

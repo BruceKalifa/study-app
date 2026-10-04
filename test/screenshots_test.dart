@@ -558,6 +558,22 @@ void main() {
     unawaited(showSolutionSheet(tester.element(find.byType(SolveScreen)), texPs[1], null));
     await tester.pump(const Duration(milliseconds: 600));
     await _shot(tester, '29b_tex_solution');
+    await tester.pumpWidget(_wrap(
+        app,
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.open(context, title: 'SAMPLE TYPE 1회차', problems: [texPs[2]]),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await _shot(tester, '29c_solve_tex_table');
 
     // 9. solve — choice problem with 보기, handwriting on the page
     final choice = app.bank.all.firstWhere((p) => p.isChoice && p.boxItems.isNotEmpty && p.subjectId == 'phy1');

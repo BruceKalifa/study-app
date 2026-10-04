@@ -635,13 +635,13 @@ void main() {
 
     final book = await app.importBook(sampleBookFile());
     expect(book.title, 'SAMPLE TYPE 1회차');
-    expect(book.problemCount, 2);
+    expect(book.problemCount, 3);
     // problems join the existing 수학 course, the 문제집 is in the catalog and on the student's shelf
-    expect(app.bank.subject('math')!.problems.length, before + 2);
+    expect(app.bank.subject('math')!.problems.length, before + 3);
     final p = app.bank.byId('sample-type-01-cls-2')!;
     expect(p.texStyle, isTrue);
     expect(p.label, '심화');
-    expect(p.labelAccent, isTrue);
+    expect(p.labelColor, 0xFF00707A);
     expect(p.points, 0);
     expect(app.bank.workbook('sample-type-01'), isNotNull);
     expect(app.hasWorkbook('sample-type-01'), isTrue);
@@ -650,7 +650,7 @@ void main() {
 
     // importing again replaces (no duplicates)
     await app.importBook(sampleBookFile());
-    expect(app.bank.subject('math')!.problems.length, before + 2);
+    expect(app.bank.subject('math')!.problems.length, before + 3);
     expect(app.importedBooks.length, 1);
     await app.record(p, answer: '7', expected: p.answer, correct: true, timeMs: 1000, mode: 'practice');
     await app.saveNow();
@@ -685,7 +685,7 @@ void main() {
     final app = (await tester.runAsync(_state))!;
     await tester.runAsync(() => app.importBook(sampleBookFile()));
     final ps = app.bank.problemsOf(app.bank.workbook('sample-type-01')!);
-    expect(ps.length, 2);
+    expect(ps.length, 3);
     await tester.pumpWidget(_app(app,
         home: Builder(
           builder: (context) => Scaffold(
@@ -716,6 +716,14 @@ void main() {
     expect(find.byType(SvgPicture), findsOneWidget);
     expect(find.textContaining('<svg'), findsNothing);
     expect(tester.takeException(), isNull);
+    // 나란히 (글 | 표) and a list inside the box
+    await _penRest(tester);
+    await tester.tap(find.byKey(const Key('next')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(Table), findsOneWidget);
+    expect(find.textContaining('[[col'), findsNothing);
+    expect(tester.takeException(), isNull);
 
     // read-only views (선생님 화면 · 오답 상세) use the same markup
     await tester.pumpWidget(_app(app,
@@ -738,7 +746,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('books-msg')), findsOneWidget);
-    expect(find.textContaining('2문항'), findsWidgets);
+    expect(find.textContaining('3문항'), findsWidgets);
     expect(find.byKey(const Key('book-sample-type-01')), findsOneWidget);
     expect(app.hasWorkbook('sample-type-01'), isTrue);
 
@@ -755,6 +763,43 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byKey(const Key('book-sample-type-01')), findsNothing);
     expect(app.bank.workbook('sample-type-01'), isNull);
+  });
+
+  testWidgets('TeX 교재에서 쓰는 수식 어휘가 flutter_math 로 그려진다', (tester) async {
+    // tools/tex_book.py 로 옮긴 교재들의 명령·환경 (내용 없이 어휘만)
+    const snippets = [
+      r'\Big( x \Big) + \Bigl( y \Bigr) + \big( z \big) + \bigl( w \bigr)',
+      r'\Pi \alpha \beta \gamma \delta \mu \sigma \psi \varphi',
+      r'a \ast b \cap c \cup d \cdot e \circ f \div g \pm h \times i',
+      r'1, \cdots, n \dots \square \triangle \infty',
+      r'\dfrac{a}{b} + \tfrac12 + \frac{1}{2} + \sqrt{2} + \overline{X}',
+      r'\displaystyle\sum_{k=1}^{n} a_k \textstyle\int_a^b f(x)\,dx',
+      r'a \equiv 1 \pmod 3',
+      r'\left\{ t \,\middle|\, t \ge \dfrac32 \right\}',
+      r'x \in A, \ a \le b, \ c \ge d, \ e \ne f, \ g \neq h, \ p \mid q, \ X \sim \mathrm{N}(m,\ \sigma^2)',
+      r'\lim_{x \to 0} \log_2 x \iff y \leftarrow z',
+      r'{\rm A} \quad B \qquad C',
+      r'\text{①} + \text{(가)} + \boxed{\,\text{(나)}\,}',
+      r'\begin{aligned} f(x) &= x^2 \\ &= x \end{aligned}',
+      r'a_{n+1}=\begin{cases} a_n+2 & (a_n\le 0) \\ a_n-2 & (a_n>0) \end{cases}',
+      r'\left(\begin{array}{l} n\text{이 홀수} \\ n\text{이 짝수} \end{array}\right)',
+    ];
+    final failures = <String>[];
+    await tester.pumpWidget(MaterialApp(
+      home: SingleChildScrollView(
+        child: Column(children: [
+          for (final tex in snippets)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Math.tex(tex, onErrorFallback: (e) {
+                failures.add('$tex → ${e.message}');
+                return const SizedBox();
+              }),
+            ),
+        ]),
+      ),
+    ));
+    expect(failures, isEmpty, reason: failures.join('\n'));
   });
 
   test('content server: packs are downloaded, cached and reused offline', () async {

@@ -120,273 +120,285 @@ def problem_cells(tex):
 
 def solution_blocks(tex):
     out = []
-    for m in find_macro(tex, 'SolBlock'):
+    ms = sorted(list(find_macro(tex, 'SolBlock')) + list(find_macro(tex, 'SolBlockLast')), key=lambda m: m.start())
+    for m in ms:
         a, _ = args(tex, m.end(), 2)
         if a[1].strip():
             out.append((a[0], a[1]))
     return out
 
 
-# ───────────────────────── TikZ → SVG ─────────────────────────
+# ───────────────────────── 그림 (TikZ) → SVG ─────────────────────────
+class Figures:
+    """그림은 원문 TeX(같은 머리말·글꼴)로 그대로 조판한 뒤 SVG 벡터로 옮긴다 — 선·글자 모두 원문과 같다.
+
+    교재 하나의 그림을 한 번에 XeLaTeX(preview 패키지, 그림마다 한 쪽)로 만들고 pdftocairo 로 쪽마다 SVG 를 뽑은 뒤,
+    앱(flutter_svg)이 확실히 그리는 꼴(path · g · transform)로 단순하게 편다.
+    """
+
+    def __init__(self, preamble, workdir):
+        self.preamble = preamble
+        self.workdir = workdir
+        self.items = []
+
+    def add(self, tex):
+        self.items.append(tex)
+        return f'@@FIG{len(self.items) - 1}@@'
+
+    def compile(self):
+        if not self.items:
+            return []
+        os.makedirs(self.workdir, exist_ok=True)
+        pre = self.preamble.replace('\\begin{document}', '')
+        pre += '\n\\usepackage[active,tightpage]{preview}\n\\setlength\\PreviewBorder{1.5pt}\n'
+        body = '\n'.join('\\begin{preview}' + t + '\\end{preview}\n' for t in self.items)
+        doc = pre + '\\begin{document}\n\\pagestyle{empty}\n' + body + '\\end{document}\n'
+        tex = os.path.join(self.workdir, 'figs.tex')
+        with open(tex, 'w', encoding='utf-8') as f:
+            f.write(doc)
+        r = subprocess.run(['xelatex', '-interaction=nonstopmode', '-halt-on-error', 'figs.tex'],
+                           cwd=self.workdir, capture_output=True, text=True, timeout=600)
+        pdf = os.path.join(self.workdir, 'figs.pdf')
+        if r.returncode != 0 or not os.path.exists(pdf):
+            raise RuntimeError('그림 조판 실패:\n' + r.stdout[-2500:])
+        out = []
+        for k in range(len(self.items)):
+            svg_path = os.path.join(self.workdir, f'fig{k}.svg')
+            subprocess.run(['pdftocairo', '-svg', '-f', str(k + 1), '-l', str(k + 1), pdf, svg_path], check=True)
+            out.append(flatten_svg(open(svg_path, encoding='utf-8').read()))
+        return out
+
+
 KATEX_HOME = os.environ.get('KATEX_HOME', '/opt/npm-tools/node_modules')
-CM = 28.3465  # 1cm = 28.35pt
+SVG_NS = 'http://www.w3.org/2000/svg'
+XLINK = '{http://www.w3.org/1999/xlink}href'
 
 
-def tikz_to_svg(src, problems):
-    """간단한 TikZ (draw/fill/node/foreach, -- / controls / circle / rectangle) → SVG."""
-    opts_m = re.match(r'\s*\[([^\]]*)\]', src)
-    scale = 1.0
-    if opts_m:
-        sm = re.search(r'scale\s*=\s*([\d.]+)', opts_m.group(1))
-        if sm:
-            scale = float(sm.group(1))
-        src = src[opts_m.end():]
-    src = expand_foreach(src)
-    shapes = []
-    pts_all = []
+def flatten_svg(text):
+    """pdftocairo SVG → 글자 모양(<symbol>/<use>)을 펼친 단순한 SVG (pt 단위 숫자 width/height)."""
+    import copy
+    import xml.etree.ElementTree as ET
+    ET.register_namespace('', SVG_NS)
+    root = ET.fromstring(text.encode('utf-8'))
+    q = lambda t: f'{{{SVG_NS}}}{t}'
+    symbols = {}
+    for el in root.iter():
+        if el.tag in (q('symbol'), q('g')) and el.get('id'):
+            symbols[el.get('id')] = el
 
-    def P(x, y):
-        X, Y = float(x) * scale * CM, -float(y) * scale * CM
-        pts_all.append((X, Y))
-        return X, Y
+    def expand(parent):
+        for i, child in enumerate(list(parent)):
+            if child.tag == q('use'):
+                ref = (child.get(XLINK) or child.get('href') or '').lstrip('#')
+                sym = symbols.get(ref)
+                g = ET.Element(q('g'))
+                x, y = float(child.get('x', 0)), float(child.get('y', 0))
+                tr = child.get('transform', '')
+                g.set('transform', (tr + ' ' if tr else '') + f'translate({x:.3f},{y:.3f})')
+                for k in ('fill', 'stroke', 'style', 'fill-opacity', 'stroke-width'):
+                    if child.get(k):
+                        g.set(k, child.get(k))
+                if sym is not None:
+                    for c in sym:
+                        g.append(copy.deepcopy(c))
+                    expand(g)
+                parent.remove(child)
+                parent.insert(i, g)
+            else:
+                expand(child)
 
-    for stmt in split_statements(src):
-        stmt = stmt.strip()
-        if not stmt:
-            continue
-        m = re.match(r'\\(draw|fill|filldraw|path)\s*(\[[^\]]*\])?\s*(.*)$', stmt, re.S)
-        n = re.match(r'\\node\s*(\[[^\]]*\])?\s*at\s*\(([^)]*)\)\s*\{(.*)\}\s*$', stmt, re.S)
-        if n:
-            o = (n.group(1) or '')[1:-1]
-            x, y = [v.strip() for v in n.group(2).split(',')]
-            X, Y = P(x, y)
-            txt = re.sub(r'\\(footnotesize|small|scriptsize|tiny|large|normalsize)\s*', '', n.group(3)).strip()
-            size = 8.0 if 'footnotesize' in n.group(3) else (7.0 if 'scriptsize' in n.group(3) else 10.0)
-            color = 'white' if re.search(r'\bwhite\b', o) else '#000'
-            shapes.append(f'<text x="{X:.2f}" y="{Y + size * 0.35:.2f}" font-size="{size}" text-anchor="middle" '
-                          f'font-family="serif" fill="{color}">{escape(txt)}</text>')
-            continue
-        if not m:
-            problems.append(f'TikZ 문장을 그리지 못함: {stmt[:60]}')
-            continue
-        kind, o, path = m.group(1), (m.group(2) or '[]')[1:-1], m.group(3)
-        lw = 0.4
-        lwm = re.search(r'line width\s*=\s*([\d.]+)\s*pt', o)
-        if lwm:
-            lw = float(lwm.group(1))
-        if 'thick' in o and 'very' in o:
-            lw = 1.2
-        elif re.search(r'\bthick\b', o):
-            lw = 0.8
-        fill = 'none'
-        fm = re.search(r'fill\s*=\s*([a-z!0-9]+)', o)
-        if fm:
-            fill = color_of(fm.group(1))
-        elif kind in ('fill',):
-            fill = '#000'
-        stroke = 'none' if kind == 'fill' else '#000'
-        dash = ' stroke-dasharray="3 2"' if 'dashed' in o else ''
-        d, circles = path_to_d(path, P, problems)
-        for (cx, cy, r) in circles:
-            shapes.append(f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}" fill="{fill}" stroke="{stroke}" stroke-width="{lw}"{dash}/>')
-        if d:
-            shapes.append(f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{lw}"{dash}/>')
-    if not pts_all:
-        return None
-    xs = [p[0] for p in pts_all]
-    ys = [p[1] for p in pts_all]
-    pad = 10
-    x0, y0, x1, y1 = min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
-    w, h = x1 - x0, y1 - y0
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w:.1f}" height="{h:.1f}" '
-            f'viewBox="{x0:.2f} {y0:.2f} {w:.2f} {h:.2f}">{"".join(shapes)}</svg>')
-
-
-def color_of(c):
-    return {'white': '#fff', 'black': '#000', 'gray': '#888', 'lightgray': '#ccc'}.get(c.split('!')[0], '#000')
-
-
-def escape(t):
-    return t.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-
-
-def split_statements(src):
-    out, cur, depth = [], '', 0
-    for c in src:
-        if c == '{':
-            depth += 1
-        elif c == '}':
-            depth -= 1
-        if c == ';' and depth == 0:
-            out.append(cur)
-            cur = ''
-        else:
-            cur += c
-    out.append(cur)
+    defs = [d for d in root if d.tag == q('defs')]
+    for d in defs:
+        root.remove(d)
+    expand(root)
+    for el in root.iter():
+        for k in ('clip-path', 'mask'):
+            if k in el.attrib:
+                del el.attrib[k]
+    # empty groups / page rects left by cairo
+    w = float(re.sub(r'[a-z]+$', '', root.get('width', '0')))
+    h = float(re.sub(r'[a-z]+$', '', root.get('height', '0')))
+    root.set('width', f'{w:.2f}')
+    root.set('height', f'{h:.2f}')
+    if not root.get('viewBox'):
+        root.set('viewBox', f'0 0 {w:.2f} {h:.2f}')
+    out = ET.tostring(root, encoding='unicode')
+    # rgb(12%, 50%, 0%) → #1F8000 (모든 SVG 읽개가 아는 꼴)
+    out = re.sub(r'rgb\(\s*([\d.]+)%\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)',
+                 lambda m: '#' + ''.join(f'{round(float(v) * 2.55):02X}' for v in m.groups()), out)
+    out = re.sub(r'\s+', ' ', out)
+    out = re.sub(r'(\d+\.\d{3})\d+', r'\1', out)  # 숫자 자리 줄이기
     return out
 
 
-def expand_foreach(src):
-    while True:
-        m = re.search(r'\\foreach\s+((?:\\[a-zA-Z]+/?)+)\s+in\s*\{', src)
-        if not m:
-            return src
-        names = re.findall(r'\\([a-zA-Z]+)', m.group(1))
-        items, j = group_at(src, m.end() - 1)
-        j = skip_ws(src, j)
-        body, k = group_at(src, j)
-        out = []
-        for item in items.split(','):
-            vals = item.strip().split('/')
-            b = body
-            for nm, v in sorted(zip(names, vals), key=lambda t: -len(t[0])):
-                b = re.sub(r'\\' + nm + r'(?![A-Za-z])', v.strip(), b)
-            out.append(b)
-        src = src[:m.start()] + ' '.join(out) + src[k:]
-
-
-def path_to_d(path, P, problems):
-    toks = re.findall(r'\(([^)]*)\)|(--|\.\.|controls|and|circle|rectangle|cycle)', path)
-    d = []
-    circles = []
-    i = 0
-    cur = None
-    pending = None  # 'line' | 'curve' | 'circle' | 'rect'
-    ctrl = []
-    while i < len(toks):
-        coord, word = toks[i]
-        if coord:
-            parts = [v.strip() for v in coord.split(',')]
-            if pending == 'circle':
-                r = float(re.sub(r'[a-z]+', '', parts[0])) * (P(0, 0)[0] * 0 + 1)
-                # 반지름은 scale 만 곱한다
-                sx = abs(P(1, 0)[0] - P(0, 0)[0])
-                pts_last = cur
-                circles.append((pts_last[0], pts_last[1], r * sx))
-                pending = None
-            elif len(parts) == 2:
-                X, Y = P(parts[0], parts[1])
-                if pending == 'curve-ctrl':
-                    ctrl.append((X, Y))
-                elif pending == 'curve-end' or (pending is None and ctrl):
-                    c1, c2 = (ctrl + [ctrl[-1]])[:2]
-                    d.append(f'C {c1[0]:.2f} {c1[1]:.2f} {c2[0]:.2f} {c2[1]:.2f} {X:.2f} {Y:.2f}')
-                    ctrl = []
-                    pending = None
-                elif pending == 'line':
-                    d.append(f'L {X:.2f} {Y:.2f}')
-                    pending = None
-                elif pending == 'rect':
-                    a = cur
-                    d.append(f'M {a[0]:.2f} {a[1]:.2f} L {X:.2f} {a[1]:.2f} L {X:.2f} {Y:.2f} L {a[0]:.2f} {Y:.2f} Z')
-                    pending = None
-                else:
-                    d.append(f'M {X:.2f} {Y:.2f}')
-                cur = (X, Y)
-            else:
-                problems.append(f'TikZ 좌표를 읽지 못함: ({coord})')
-        else:
-            if word == '--':
-                pending = 'line'
-            elif word == '..':
-                pending = 'curve-ctrl' if pending is None else ('curve-end' if pending == 'curve-ctrl' else pending)
-            elif word == 'controls':
-                pending = 'curve-ctrl'
-            elif word == 'and':
-                pending = 'curve-ctrl'
-            elif word == 'circle':
-                pending = 'circle'
-            elif word == 'rectangle':
-                pending = 'rect'
-            elif word == 'cycle':
-                d.append('Z')
-        i += 1
-    # ".. controls (a) and (b) .. (c)" — 끝 '..' 다음 좌표가 끝점
-    return ' '.join(d), circles
-
-
 # ───────────────────────── 본문 변환 ─────────────────────────
+CIRCLED = '⓪①②③④⑤⑥⑦⑧⑨⑩'
+
+# 글 속 명령 → 글자 (나머지 꾸밈 명령은 버린다)
+TEXT_REP = {
+    'textbullet': '•', 'quad': '  ', 'qquad': '    ', 'noindent': '', 'par': '\n\n', 'newline': '\n',
+    'dots': '…', 'cdots': '⋯', 'ldots': '…', 'centering': '', 'raggedright': '', 'raggedleft': '',
+    'small': '', 'footnotesize': '', 'normalsize': '', 'scriptsize': '', 'large': '', 'tiny': '', 'Large': '',
+    'medskip': '\n\n', 'bigskip': '\n\n', 'smallskip': '\n\n', 'hfill': ' ', 'null': '', 'vfill': '',
+    'sanslabel': '', 'bfseries': '', 'mdseries': '', 'itshape': '', 'normalfont': '', 'selectfont': '',
+    'LaTeX': 'LaTeX', 'enspace': ' ', 'thinspace': ' ', 'hline': '', 'clearpage': '', 'newpage': '',
+    'linebreak': '\n', 'pagebreak': '', 'allowbreak': '', 'relax': '', 'protect': '', 'strut': '',
+    'textbar': '|', 'textendash': '–', 'textemdash': '—', 'S': '§', 'times': '×',
+}
+# 인자를 받아 버리는 명령 (인자 개수)
+DROP_ARGS = {'vspace': 1, 'hspace': 1, 'setlength': 2, 'renewcommand': 2, 'color': 1, 'needspace': 1,
+             'addtolength': 2, 'fontsize': 2, 'phantom': 1, 'label': 1, 'Section': 1, 'PageLead': 1, 'rule': 2}
+
+
+def expand_math(m):
+    """원문 머리말의 수식 매크로를 KaTeX 가 아는 꼴로."""
+    m = re.sub(r'\s+', ' ', m).strip()
+    for _ in range(4):
+        k = m.find('\\fitm')
+        if k < 0:
+            break
+        j = skip_ws(m, k + 5)
+        if j < len(m) and m[j] == '{':
+            inner, e = group_at(m, j)
+            m = m[:k] + inner.strip() + m[e:]
+        else:
+            m = m[:k] + m[k + 5:]
+    # array 열 지정의 @{…}·!{…} 는 KaTeX/flutter_math 가 모른다 (간격만 바뀜)
+    m = re.sub(r'(\\begin\{array\}\s*\{)([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}',
+               lambda x: x.group(1) + re.sub(r'[@!]\{[^{}]*\}', '', x.group(2)) + '}', m)
+    # 빈칸 상자: \\mbox{\\setlength{\\fboxsep}{..}\\fbox{(가)}} → \\boxed{(가)}
+    m = re.sub(r'\\mbox\s*\{\s*\\setlength\s*\{\\fboxsep\}\s*\{[^{}]*\}\s*\\fbox\s*\{([^{}]*)\}\s*\}', r'\\boxed{\1}', m)
+    m = re.sub(r'\\fbox\s*\{([^{}]*)\}', r'\\boxed{\1}', m)
+    m = re.sub(r'\\fboxsep\s*=?\s*[\d.]+\s*(pt|em|ex|mm)', '', m)
+    m = re.sub(r'\\setlength\s*\{\\fboxsep\}\s*\{[^{}]*\}', '', m)
+    # 수식 속 한글 빈칸 이름 (가)·(나) 는 글자로
+    m = re.sub(r'(?<!\\text\{)\(([가-힣])\)', r'\\text{(\1)}', m)
+    m = re.sub(r'\\circnum\s*\{(\d+)\}', lambda x: '\\text{' + CIRCLED[int(x.group(1))] + '}', m)
+    m = re.sub(r'\\textcircled\s*\{\\scriptsize\s*(\d+)\}', lambda x: '\\text{' + CIRCLED[int(x.group(1))] + '}', m)
+    return m.strip()
+
+
 class Conv:
-    def __init__(self):
+    def __init__(self, figs=None):
         self.problems = []
         self.math = []
+        self.figs = figs
+        self._lists = []
+
+    def mathed(self, m):
+        m = expand_math(m)
+        self.math.append(m)
+        return m
 
     def text(self, s):
         """TeX 본문 → 앱 표기"""
         s = strip_comments(s)
-        out = []
-        i = 0
         n = len(s)
         buf = ''
+        i = 0
         while i < n:
             c = s[i]
             if c == '$':
-                j = s.index('$', i + 1)
-                m = s[i + 1:j]
-                m = re.sub(r'\s+', ' ', m).strip()
-                self.math.append(m)
-                buf += '$' + m + '$'
+                if s.startswith('$$', i):
+                    j = s.index('$$', i + 2)
+                    buf += '\n$$' + self.mathed(s[i + 2:j]) + '$$\n'
+                    i = j + 2
+                    continue
+                j = i + 1
+                while True:
+                    j = s.index('$', j)
+                    if s[j - 1] != '\\':
+                        break
+                    j += 1
+                buf += '$' + self.mathed(s[i + 1:j]) + '$'
                 i = j + 1
                 continue
             if s.startswith('\\[', i):
                 j = s.index('\\]', i)
-                m = re.sub(r'\s+', ' ', s[i + 2:j]).strip()
-                self.math.append(m)
-                buf += '\n$$' + m + '$$\n'
+                buf += '\n$$' + self.mathed(s[i + 2:j]) + '$$\n'
                 i = j + 2
                 continue
-            if s.startswith('\\kbox', i) and not s[i + 5:i + 6].isalpha():
-                (inner,), j = args(s, i + 5, 1)
-                buf += '\n[[box]]\n' + self.block(inner) + '\n[[/box]]\n'
-                i = j
-                continue
-            if s.startswith('\\begin{center}', i):
-                j = s.index('\\end{center}', i)
-                inner = s[i + len('\\begin{center}'):j]
-                buf += '\n[[center]]\n' + self.block(inner) + '\n[[/center]]\n'
-                i = j + len('\\end{center}')
-                continue
-            if s.startswith('\\begin{tikzpicture}', i):
-                j = s.index('\\end{tikzpicture}', i)
-                svg = tikz_to_svg(s[i + len('\\begin{tikzpicture}'):j], self.problems)
-                if svg:
-                    buf += '\n[[svg]]' + svg + '[[/svg]]\n'
-                i = j + len('\\end{tikzpicture}')
-                continue
-            m = re.match(r'\\(textbf|textit|emph|underline|text|mathrm)\s*\{', s[i:])
-            if m:
-                (inner,), j = args(s, i + m.end() - 1, 1)
-                t = self.text(inner)
-                buf += {'textbf': f'**{t}**', 'underline': f'__{t}__'}.get(m.group(1), t)
-                i = j
-                continue
-            m = re.match(r'\\(vspace|hspace|vspace\*|hspace\*)\s*\{', s[i:])
-            if m:
-                _, j = args(s, i + m.end() - 1, 1)
-                i = j
+            if s.startswith('\\begin{', i):
+                (env,), j = args(s, i + 6, 1)
+                end = self.env_end(s, j, env)
+                inner = s[j:end]
+                after = end + len('\\end{' + env + '}')
+                buf += self.environment(env, inner)
+                i = after
                 continue
             m = re.match(r'\\([A-Za-z]+)\*?', s[i:])
             if m:
                 name = m.group(1)
-                rep = {
-                    'textbullet': '•', 'quad': '  ', 'qquad': '    ', 'noindent': '', 'par': '\n\n', 'newline': '\n',
-                    'dots': '…', 'cdots': '⋯', 'ldots': '…', 'centering': '', 'raggedright': '', 'small': '',
-                    'footnotesize': '', 'normalsize': '', 'medskip': '\n\n', 'bigskip': '\n\n', 'smallskip': '\n\n',
-                    'hfill': ' ', 'null': '', 'vfill': '', 'sanslabel': '', 'bfseries': '', 'LaTeX': 'LaTeX',
-                }
-                if name in rep:
-                    buf += rep[name]
+                j = i + m.end()
+                if name == 'kbox':
+                    (inner,), j = args(s, j, 1)
+                    buf += '\n[[box]]\n' + self.block(inner) + '\n[[/box]]\n'
+                    i = j
+                    continue
+                if name == 'TextTable':
+                    (left, right), j = args(s, j, 2)
+                    buf += '\n[[cols:58:39]]\n' + self.block(left) + '\n[[col]]\n' + self.block(right) + '\n[[/cols]]\n'
+                    i = j
+                    continue
+                if name in ('textbf', 'textit', 'emph', 'underline', 'text', 'mathrm', 'textrm', 'textsf', 'mbox',
+                            'sanslabel', 'textsc', 'texttt'):
+                    k = skip_ws(s, j)
+                    if k < n and s[k] == '{':
+                        (inner,), j = args(s, k, 1)
+                        t = self.text(inner)
+                        buf += {'textbf': f'**{t}**', 'underline': f'__{t}__'}.get(name, t)
+                        i = j
+                        continue
+                if name == 'fbox':
+                    (inner,), j = args(s, j, 1)
+                    buf += '$' + self.mathed('\\boxed{' + inner + '}') + '$'
+                    i = j
+                    continue
+                if name == 'fboxsep':
+                    mm = re.match(r'\s*=?\s*[\d.]+\s*(pt|em|ex|mm)', s[j:])
+                    i = j + (mm.end() if mm else 0)
+                    continue
+                if name in ('circnum', 'textcircled'):
+                    (inner,), j = args(s, j, 1)
+                    d = re.sub(r'\D', '', inner)
+                    buf += CIRCLED[int(d)] if d and int(d) < len(CIRCLED) else inner
+                    i = j
+                    continue
+                if name in DROP_ARGS:
+                    for _ in range(DROP_ARGS[name]):
+                        k = skip_ws(s, j)
+                        if k < n and s[k] == '[':
+                            j = s.index(']', k) + 1
+                            k = skip_ws(s, j)
+                        if k < n and s[k] == '{':
+                            _, j = args(s, k, 1)
+                        elif k < n and s[k] == '\\':
+                            mm = re.match(r'\\[A-Za-z]+', s[k:])
+                            j = k + (mm.end() if mm else 1)
+                    i = j
+                    continue
+                if name == 'item':
+                    buf += '\n' + self.item_mark() + ' '
+                    i = j
+                    continue
+                if name in TEXT_REP:
+                    buf += TEXT_REP[name]
+                    # "\textbullet\ " 같은 띄어쓰기는 아래 '\\ ' 처리
                 else:
                     self.problems.append(f'모르는 명령 \\{name}')
-                i += m.end()
+                i = j
                 continue
             if s.startswith('\\\\', i):
                 buf += '\n'
                 i += 2
+                k = skip_ws(s, i)
+                if k < n and s[k] == '[':
+                    i = s.index(']', k) + 1
                 continue
             if c == '\\' and i + 1 < n:
                 nxt = s[i + 1]
-                buf += {',': ' ', ' ': ' ', '%': '%', '&': '&', '#': '#', '_': '_', '$': '$', '{': '{', '}': '}', ';': ' '}.get(nxt, '')
+                buf += {',': ' ', ' ': ' ', '%': '%', '&': '&', '#': '#', '_': '_', '$': '$', '{': '{', '}': '}', ';': ' ',
+                        '!': ''}.get(nxt, '')
                 i += 2
                 continue
             if c in '{}':
@@ -416,13 +428,120 @@ class Conv:
             i += 1
         return self.paragraphs(buf)
 
+    @staticmethod
+    def env_end(s, j, env):
+        """matching \\end{env} (같은 환경이 겹쳐도)"""
+        depth = 1
+        pat = re.compile(r'\\(begin|end)\{' + re.escape(env) + r'\}')
+        for m in pat.finditer(s, j):
+            depth += 1 if m.group(1) == 'begin' else -1
+            if depth == 0:
+                return m.start()
+        raise ValueError(f'\\end{{{env}}} 없음')
+
+    def item_mark(self):
+        if not self._lists:
+            return '•'
+        kind, k = self._lists[-1]
+        self._lists[-1] = (kind, k + 1)
+        return '•' if kind == 'itemize' else f'{k + 1}.'
+
+    def environment(self, env, inner):
+        if env == 'tikzpicture':
+            if self.figs is None:
+                self.problems.append('그림(TikZ)을 옮기려면 figs 가 필요')
+                return ''
+            return '\n' + self.figs.add('\\begin{tikzpicture}' + inner + '\\end{tikzpicture}') + '\n'
+        if env == 'center':
+            return '\n[[center]]\n' + self.block(inner) + '\n[[/center]]\n'
+        if env in ('itemize', 'enumerate'):
+            self._lists.append((env, 0))
+            body = self.text(inner)
+            self._lists.pop()
+            return '\n' + body + '\n'
+        if env in ('tabular', 'tabular*', 'array'):
+            return '\n' + self.table(inner) + '\n'
+        if env in ('minipage', 'flushleft', 'flushright', 'raggedright', 'small', 'footnotesize', 'multicols', 'multicols*'):
+            inner = re.sub(r'^\s*(\[[^\]]*\])*\s*(\{[^{}]*\})?', '', inner, count=1) if env in ('minipage', 'multicols', 'multicols*') else inner
+            return '\n' + self.text(inner) + '\n'
+        if env in ('aligned', 'align', 'align*', 'gathered', 'cases', 'equation', 'equation*'):
+            return '\n$$' + self.mathed('\\begin{%s}%s\\end{%s}' % (env.rstrip('*') if env.startswith('align') else env, inner, env.rstrip('*') if env.startswith('align') else env)) + '$$\n'
+        self.problems.append(f'모르는 환경 {env}')
+        return '\n' + self.text(inner) + '\n'
+
+    def table(self, inner):
+        """tabular → 앱 표 (| a | b |). 첫 줄 아래 \\hline 이 있으면 머리글."""
+        k = skip_ws(inner, 0)
+        if k < len(inner) and inner[k] == '{':  # column spec
+            _, k = group_at(inner, k)
+        body = inner[k:]
+        # 칸 안의 환경(표 속 표, aligned …)은 잠시 감춰 두고 & · \\\\ 로 나눈다
+        hidden = []
+
+        def hide(text):
+            out, i = '', 0
+            while True:
+                m = re.compile(r'\\begin\{([^}]*)\}').search(text, i)
+                if not m:
+                    return out + text[i:]
+                end = self.env_end(text, m.end(), m.group(1)) + len('\\end{' + m.group(1) + '}')
+                hidden.append(text[m.start():end])
+                out += text[i:m.start()] + f'\x00{len(hidden) - 1}\x00'
+                i = end
+
+        def show(text):
+            return re.sub('\x00(\\d+)\x00', lambda m: hidden[int(m.group(1))], text)
+
+        body = hide(body)
+        rows, cur, depth, i = [], '', 0, 0
+        while i < len(body):
+            c = body[i]
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+            if depth == 0 and body.startswith('\\\\', i):
+                rows.append(cur)
+                cur = ''
+                i += 2
+                continue
+            cur += c
+            i += 1
+        rows.append(cur)
+        lines, header = [], False
+        for r_i, r in enumerate(rows):
+            raw = r
+            r = r.replace('\\hline', '').strip()
+            if not r:
+                continue
+            cells, cur, depth = [], '', 0
+            for c in r:
+                if c == '{':
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+                if c == '&' and depth == 0 and not cur.endswith('\\'):
+                    cells.append(cur)
+                    cur = ''
+                else:
+                    cur += c
+            cells.append(cur)
+            cells = [re.sub(r'\\multicolumn\s*\{\d+\}\s*\{[^}]*\}', '', x) for x in cells]
+            texts = [self.text(show(x)).replace('\n', ' ').replace('|', '｜').strip() for x in cells]
+            lines.append('| ' + ' | '.join(texts) + ' |')
+            if len(lines) == 1 and r_i + 1 < len(rows) and rows[r_i + 1].lstrip().startswith('\\hline') and len(rows) > 3:
+                header = True
+        if header and len(lines) > 1:
+            lines.insert(1, '|' + '---|' * lines[0].count(' | ') + '---|')
+        return '\n'.join(lines)
+
     def block(self, inner):
         """상자·가운데 블록 안: 문단마다 빈 줄을 두어 바깥 문단 정리에서 합쳐지지 않게."""
         return '\n\n'.join(self.text(inner).strip().split('\n'))
 
     @staticmethod
     def paragraphs(buf):
-        """빈 줄 = 문단, 문단 안의 줄바꿈 = 띄어쓰기 (TeX 처럼). 블록 표지는 제 줄에."""
+        """빈 줄 = 문단, 문단 안의 줄바꿈 = 띄어쓰기 (TeX 처럼). 블록 표지·표·목록은 제 줄에."""
         out_lines = []
         para = []
 
@@ -438,10 +557,12 @@ class Conv:
             if not line:
                 flush()
                 continue
-            if line.startswith('$$') or line.startswith('[[') or line.endswith(']]') and line.startswith('[['):
+            if line.startswith(('$$', '[[', '@@FIG', '|')):
                 flush()
                 out_lines.append(line)
                 continue
+            if re.match(r'^(•|\d+\.) ', line):  # 목록 항목은 새 줄에서 시작
+                flush()
             para.append(line)
         flush()
         return '\n'.join(out_lines)
@@ -468,13 +589,23 @@ def build(folder, outdir, preview=False):
     meta, rows = read_info(os.path.join(folder, '정보.txt'))
     texdir = os.path.join(folder, 'TeX원본')
     texs = [f for f in os.listdir(texdir) if f.endswith('.tex') and '통합본' in f] or [f for f in os.listdir(texdir) if f.endswith('.tex')]
-    tex = strip_comments(open(os.path.join(texdir, texs[0]), encoding='utf-8').read())
+    raw_tex = open(os.path.join(texdir, texs[0]), encoding='utf-8').read()
+    preamble = raw_tex[:raw_tex.index('\\begin{document}')]
+    tex = strip_comments(raw_tex)
     title = re.sub(r'\s*문항.*$', '', meta.get('교재명', os.path.basename(folder))).strip()
     series = meta.get('시리즈', '').split('(')[0].strip() or title.split()[0]
     num = re.search(r'(\d+)\s*회차', title)
     book_id = slug(series) + (f'-{int(num.group(1)):02d}' if num else '')
 
-    conv = Conv()
+    figs = Figures(preamble, os.path.join(outdir, '_figs', book_id))
+    # 머리표 색: \\TagBox* 정의의 \\colorbox{이름} → \\definecolor 의 RGB
+    colors = {'black': '#000000', 'white': '#FFFFFF'}
+    for m in re.finditer(r'\\definecolor\{(\w+)\}\{RGB\}\{(\d+),\s*(\d+),\s*(\d+)\}', preamble):
+        colors[m.group(1)] = '#' + ''.join(f'{int(v):02X}' for v in m.groups()[1:])
+    tag_colors = {}
+    for m in re.finditer(r'\\newcommand\{\\(TagBox[A-Z]?)\}\[2\]\{[^\n]*?\\colorbox\{(\w+)\}', preamble):
+        tag_colors[m.group(1)] = colors.get(m.group(2), '#000000')
+    conv = Conv(figs)
     cells = problem_cells(tex)
     sols = solution_blocks(tex)
     report = {'book': title, 'id': book_id, 'rows': len(rows), 'cells': len(cells), 'solutions': len(sols), 'issues': []}
@@ -492,11 +623,11 @@ def build(folder, outdir, preview=False):
         if k >= len(cells):
             break
         cell = cells[k]
-        tm = re.search(r'\\TagBox(C?)\s*\{', cell)
-        label, label_src, accent = '', '', False
+        tm = re.search(r'\\(TagBox[A-Z]?)\s*\{', cell)
+        label, label_src, label_color = '', '', None
         if tm:
             (label, label_src), j = args(cell, tm.end() - 1, 2)
-            accent = tm.group(1) == 'C'
+            label_color = tag_colors.get(tm.group(1))
             cell = cell[:tm.start()] + cell[j:]
         stem = conv.text(cell).strip()
         sol = conv.text(sols[k][1]).strip() if k < len(sols) else ''
@@ -531,14 +662,24 @@ def build(folder, outdir, preview=False):
             'points': 0,
             'tags': [title],
         }
-        if accent:
-            p['labelAccent'] = True
+        if label_color and label_color != '#000000':
+            p['labelColor'] = label_color
         src = r.get('출처', '').strip() or conv.text(label_src).strip()
         if src:
             p['source'] = src
         course['problems'].append(p)
         all_ids.append(p['id'])
+    # 그림: 원문 TeX 로 한꺼번에 조판해서 SVG 로 바꿔 넣는다
+    svgs = figs.compile()
+    report['figures'] = len(svgs)
+
+    def put(t):
+        return re.sub(r'@@FIG(\d+)@@', lambda m: '[[svg]]' + svgs[int(m.group(1))] + '[[/svg]]', t)
+
     for c in courses.values():
+        for p in c['problems']:
+            p['stem'] = put(p['stem'])
+            p['solution'] = put(p['solution'])
         c['units'] = list(dict.fromkeys(p['unit'] for p in c['problems']))
     stage = meta.get('커리큘럼 단계', 'N제').strip()
     main = max(courses.values(), key=lambda c: len(c['problems']))['subjectId']
