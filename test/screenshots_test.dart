@@ -198,7 +198,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
       }
       await api.sync(
         attempts: atts,
-        learner: {'grade': grade, 'goal': '수능', 'workbooks': ['wb-phy1-concept', 'wb-math1-concept'], 'examName': '수능', 'examDate': now + 45 * Duration.millisecondsPerDay},
+        learner: {'onboarded': true, 'grade': grade, 'goal': '수능', 'workbooks': ['wb-phy1-concept', 'wb-math1-concept'], 'examName': '수능', 'examDate': now + 45 * Duration.millisecondsPerDay},
         wrongNote: [for (final a in atts) if (!a.correct) a.baseId],
       );
       if (i < 3) {
@@ -232,6 +232,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
   final card = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('t-student-'));
   if (card.evaluate().isNotEmpty) {
     await tester.tap(card.first);
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await _waitNet(tester);
     await _shot(tester, '41_teacher_student_wrong');
@@ -247,20 +248,25 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
     await tester.pump(const Duration(milliseconds: 500));
     await _shot(tester, '43_teacher_student_recent');
     await tester.pageBack();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
   }
   await tester.tap(find.byKey(const Key('t-tab-1')));
+  await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
   await _waitNet(tester);
   await _shot(tester, '44_teacher_inbox');
   final q = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('q-q_'));
   if (q.evaluate().isNotEmpty) {
     await tester.tap(q.first);
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await _waitNet(tester);
     await _shot(tester, '45_teacher_thread');
     await tester.pageBack();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
   }
 
   // 학생: 질문 탭 (답변 온 질문 포함)
@@ -274,12 +280,14 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
   await _waitNet(tester, 2);
   await _shot(tester, '46_student_home_signed_in');
   await tester.tap(find.text('질문').first);
+  await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
   await _waitNet(tester);
   await _shot(tester, '47_student_questions');
   final sq = find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('q-q_'));
   if (sq.evaluate().isNotEmpty) {
     await tester.tap(sq.first);
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await _waitNet(tester);
     await _shot(tester, '48_student_thread');

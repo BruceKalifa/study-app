@@ -7,6 +7,7 @@ import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/ink_preview.dart';
 import '../widgets/math_text.dart';
+import 'questions_screen.dart' show AskTeacherScreen;
 import 'solve_screen.dart';
 
 class WrongNoteScreen extends StatefulWidget {
@@ -217,6 +218,13 @@ class _WrongCard extends StatelessWidget {
                 icon: const Icon(Icons.menu_book_outlined, size: 18),
                 label: const Text('해설'),
               ),
+              if (app.signedIn && !app.isTeacher)
+                TextButton.icon(
+                  key: Key('wn-ask-${p.id}'),
+                  onPressed: () => AskTeacherScreen.open(context, problem: p),
+                  icon: const Icon(Icons.contact_support_outlined, size: 18),
+                  label: const Text('선생님께 질문'),
+                ),
               if (state.inWrongNote)
                 TextButton.icon(
                   onPressed: () => app.markResolved(state.baseId),

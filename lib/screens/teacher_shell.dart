@@ -702,8 +702,9 @@ class _TeacherStudentScreenState extends State<TeacherStudentScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(p == null ? w.problemId : MathText.plain(p.stem).replaceAll('\n', ' '),
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkSoft)),
+            child: p == null
+                ? Text(w.problemId, style: const TextStyle(color: AppColors.inkMuted))
+                : MathText(p.stem.replaceAll('\n', ' '), maxLines: 1, style: const TextStyle(color: AppColors.inkSoft, fontSize: 14)),
           ),
           const SizedBox(width: 12),
           Text('학생 ${p != null && p.isChoice ? circled(int.tryParse(w.answer) ?? 0) : w.answer}',
