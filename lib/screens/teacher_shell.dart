@@ -9,6 +9,7 @@ import '../services/account_api.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/problem_brief.dart';
+import '../widgets/book_files_card.dart';
 import '../widgets/update_dialog.dart' show UpdateTile;
 import 'library_screen.dart' show CourseBrowser;
 import 'questions_screen.dart';
@@ -830,6 +831,8 @@ class TeacherSettingsScreen extends StatelessWidget {
         const AccountCard(),
         const SizedBox(height: 8),
         const Card(child: Padding(padding: EdgeInsets.symmetric(horizontal: 18, vertical: 4), child: UpdateTile())),
+        const SizedBox(height: 8),
+        const BookFilesCard(),
         const SizedBox(height: 16),
         Card(
           child: Column(children: [

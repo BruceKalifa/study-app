@@ -4,6 +4,7 @@ import '../app/theme.dart';
 import '../core/problem.dart';
 import 'common.dart';
 import 'math_text.dart';
+import 'problem_card.dart' show TexLabel;
 
 /// Compact read-only view of a problem (선생님 화면 · 질문 · 오답 상세):
 /// stem, <보기>, choices (정답 green, 학생 답 red), the student's answer and optionally the 해설.
@@ -37,11 +38,12 @@ class ProblemBrief extends StatelessWidget {
         if (p.unit.isNotEmpty) Pill(p.unit, color: AppColors.inkSoft, dense: true),
         if (p.topic.isNotEmpty) Pill(p.topic, color: AppColors.inkSoft, dense: true),
         if (p.isVariant || p.isTwin) const Pill('변형', color: AppColors.accent, dense: true, icon: Icons.auto_awesome_rounded),
-        if (p.source != null) Pill(p.source!, color: AppColors.accent, dense: true),
+        if (p.source != null && p.label == null) Pill(p.source!, color: AppColors.accent, dense: true),
         DifficultyDots(p.difficulty, size: 6),
       ]),
+      if (p.label != null) ...[const SizedBox(height: 10), TexLabel(p, fontSize: fs - 3.5)],
       const SizedBox(height: 12),
-      MathText(p.stem, style: TextStyle(fontSize: fs, color: AppColors.ink, height: 1.7)),
+      MathText(p.stem, texStyle: p.texStyle, style: TextStyle(fontSize: fs, color: AppColors.ink, height: 1.7, fontFamily: _face(p))),
       if (p.boxItems.isNotEmpty) ...[
         const SizedBox(height: 10),
         Container(
@@ -112,8 +114,12 @@ class ProblemBrief extends StatelessWidget {
         const Divider(height: 28),
         const Text('해설', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 6),
-        MathText(p.solution, style: TextStyle(fontSize: fs - 1, color: AppColors.ink, height: 1.7)),
+        MathText(p.solution,
+            texStyle: p.texStyle,
+            style: TextStyle(fontSize: fs - 1, color: AppColors.ink, height: 1.7, fontFamily: _face(p))),
       ],
     ]);
   }
+
+  static String? _face(Problem p) => p.texStyle ? AppTheme.texSerif : null;
 }

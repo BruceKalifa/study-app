@@ -38,6 +38,13 @@ class AppTheme {
   /// Exam-paper body face (나눔명조, OFL).
   static const String serif = 'NanumMyeongjo';
 
+  /// TeX 원문 교재의 본문 글꼴 (Noto Serif KR, OFL) — texStyle 문항.
+  static const String texSerif = 'NotoSerifKR';
+
+  /// 교재 머리표 색 (원문 definecolor{accent}{RGB}{217,119,87}, faintgray 150,148,140).
+  static const Color texAccent = Color(0xFFD97757);
+  static const Color texFaint = Color(0xFF96948C);
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.ink,

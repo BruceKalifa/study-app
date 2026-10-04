@@ -54,6 +54,12 @@
   ```
   칸 안에서도 수식·굵게·밑줄을 쓸 수 있다.
 - 줄바꿈은 `\n`, 문단 구분은 `\n\n`.
+- 블록 (한 줄에 하나씩, TeX 원문 교재를 옮길 때 `tools/tex_book.py` 가 쓴다):
+  - `$$…$$` — 가운데 수식 줄 (TeX 의 `\[…\]`)
+  - `[[box]]` … `[[/box]]` — 조건 상자 (안에 다른 표기 모두 사용 가능, 겹쳐도 됨)
+  - `[[center]]` … `[[/center]]` — 가운데 정렬
+  - `[[svg]]<svg …>[[/svg]]` — 그림. `width`/`height` 는 pt 단위(본문 9.2pt 기준으로 글자 크기에 맞춰 키움)
+  목록·미리보기에서는 그림은 `[그림]`, 상자는 그냥 글줄로 보인다.
 
 ## 문항 패밀리 (원본 + 쌍둥이 변형)
 
@@ -103,6 +109,17 @@
 | `template` | Template (선택) | 있으면 이 문제의 **변형문제**를 자동 생성 |
 | `passageId` | string (선택) | 지문형 문항이면 연결할 지문 id |
 | `twinOf` | string (선택) | 쌍둥이(변형) 문항이면 원본 문항 id |
+| `label` | string (선택) | 교재 머리표 (예: `기출문제`, `변형`, `심화`, `숙제 1 (중)`) — 검은 상자에 흰 글씨, 옆에 `source` |
+| `labelAccent` | bool (선택) | 머리표를 주황 상자로 |
+| `texStyle` | bool (선택) | TeX 원문 문항: 본문 글꼴 Noto Serif KR, 글줄 수식은 text style (원문처럼) |
+| `points` | int (선택) | 배점. 없으면 난이도로 2·3·4점, `0` 이면 표시하지 않음 |
+
+### 교재 파일 (.pulinote)
+
+TeX 원문 교재는 `python3 tools/tex_book.py <교재 폴더> <출력 폴더> [--preview]` 로
+`<id>.pulinote` (gzip JSON `{format:"pulinote-bundle", version:1, id, title, courses:[과목 파일 형식], workbooks:[문제집]}`) 를 만든다.
+앱 설정 → **교재 파일** → 파일 가져오기 (또는 다른 앱에서 "풀이노트로 열기") 로 넣는다.
+교재 내용은 저작물이므로 이 저장소·CI 에는 올리지 않는다 (테스트는 `test/fixtures/sample_book.dart` 의 지어낸 예시만 쓴다).
 
 ## Template (변형문제)
 

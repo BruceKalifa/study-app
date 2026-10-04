@@ -19,3 +19,7 @@ server/node_modules/
 server/data/
 ci-out/
 __pycache__/
+
+# tools for converting private textbooks (outputs never committed)
+tools/node_modules/
+!assets/fonts/NotoSerifKR-*.otf

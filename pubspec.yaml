@@ -13,6 +13,7 @@ dependencies:
   path_provider: ^2.1.6
   google_mlkit_digital_ink_recognition: ^0.16.1
   web_socket_channel: ^3.0.3
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +37,13 @@ flutter:
           weight: 700
         - asset: assets/fonts/Pretendard-ExtraBold.otf
           weight: 800
+    # TeX 원문 교재의 본문 글꼴 (Noto Serif CJK KR 의 한글·라틴 부분, OFL)
+    - family: NotoSerifKR
+      fonts:
+        - asset: assets/fonts/NotoSerifKR-Regular.otf
+          weight: 400
+        - asset: assets/fonts/NotoSerifKR-Bold.otf
+          weight: 700
     - family: NanumMyeongjo
       fonts:
         - asset: assets/fonts/NanumMyeongjo-Regular.ttf

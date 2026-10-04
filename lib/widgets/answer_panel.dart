@@ -255,7 +255,9 @@ Future<void> showSolutionSheet(BuildContext context, Problem p, GradedAnswer? g)
           ]),
           const SizedBox(height: 16),
           MathText(p.solution.isEmpty ? '해설이 없어요.' : p.solution,
-              style: const TextStyle(fontSize: 18, color: AppColors.ink, height: 1.8)),
+              texStyle: p.texStyle,
+              style: TextStyle(
+                  fontSize: 18, color: AppColors.ink, height: 1.8, fontFamily: p.texStyle ? AppTheme.texSerif : null)),
           if ((p.hint ?? '').isNotEmpty) ...[
             const SizedBox(height: 20),
             Container(

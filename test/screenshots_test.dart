@@ -1,5 +1,6 @@
 // Renders every main screen to PNG (real fonts) so the design can be reviewed from CI.
 // Runs only when SHOTS=1; output goes to ci-out/shots/.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -30,6 +31,8 @@ import 'package:study_app/screens/workbook_screen.dart';
 import 'package:study_app/services/community_api.dart';
 import 'package:study_app/app/learner.dart';
 import 'package:study_app/widgets/answer_panel.dart';
+
+import 'fixtures/sample_book.dart';
 
 final bool _enabled = Platform.environment['SHOTS'] == '1';
 final GlobalKey _boundary = GlobalKey();
@@ -529,6 +532,32 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await _shot(tester, '27_solve_endless');
+
+    // 교재 파일 (TeX 원문을 옮긴 문항): 조건 상자 · 가운데 수식 · 그림 · 머리표
+    await tester.runAsync(() => app.importBook(sampleBookFile()));
+    final texPs = app.bank.problemsOf(app.bank.workbook('sample-type-01')!);
+    await tester.pumpWidget(_wrap(
+        app,
+        Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.open(context, title: 'SAMPLE TYPE 1회차', problems: texPs),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await _shot(tester, '28_solve_tex_box');
+    await tester.tap(find.byKey(const Key('next')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await _shot(tester, '29_solve_tex_figure');
+    unawaited(showSolutionSheet(tester.element(find.byType(SolveScreen)), texPs[1], null));
+    await tester.pump(const Duration(milliseconds: 600));
+    await _shot(tester, '29b_tex_solution');
 
     // 9. solve — choice problem with 보기, handwriting on the page
     final choice = app.bank.all.firstWhere((p) => p.isChoice && p.boxItems.isNotEmpty && p.subjectId == 'phy1');

@@ -22,6 +22,11 @@ cat > android/app/src/main/res/xml/pulinote_update_paths.xml <<'XML'
 </paths>
 XML
 
+# 교재 파일(.pulinote): 다른 앱에서 "풀이노트로 열기" (content:// 파일, 확장자를 모르는 파일은 octet-stream)
+grep -q 'application/x-gzip' "$M" || \
+  sed -i '0,/<\/intent-filter>/s##</intent-filter>\n            <intent-filter>\n                <action android:name="android.intent.action.VIEW"/>\n                <category android:name="android.intent.category.DEFAULT"/>\n                <data android:scheme="content"/>\n                <data android:mimeType="application/octet-stream"/>\n                <data android:mimeType="application/gzip"/>\n                <data android:mimeType="application/x-gzip"/>\n            </intent-filter>#' "$M"
+grep -q 'application/x-gzip' "$M" || { echo "ERROR: could not add the VIEW intent-filter"; exit 1; }
+
 # App name
 sed -i 's#android:label="[^"]*"#android:label="풀이노트"#' "$M"
 
@@ -68,21 +73,106 @@ if [ -n "$MA" ]; then
   cat > "$MA" <<KT
 $PKG
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import android.view.MotionEvent
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 class MainActivity : FlutterActivity() {
+    // 교재 파일 (lib/services/content_import.dart → BookFiles)
+    private val pickRequest = 7301
+    private var pickResult: MethodChannel.Result? = null
+    private var opened: ByteArray? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        takeViewIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        takeViewIntent(intent)
+    }
+
+    private fun takeViewIntent(i: Intent?) {
+        if (i?.action != Intent.ACTION_VIEW) return
+        val uri = i.data ?: return
+        try {
+            opened = readUri(uri)
+        } catch (e: Exception) {
+            opened = null
+        }
+    }
+
+    private fun readUri(uri: Uri): ByteArray? = contentResolver.openInputStream(uri)?.use { input ->
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(65536)
+        var total = 0
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > 64 * 1024 * 1024) throw IllegalStateException("file too large")
+            out.write(buf, 0, n)
+        }
+        out.toByteArray()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == pickRequest) {
+            val r = pickResult
+            pickResult = null
+            val uri = data?.data
+            if (resultCode != Activity.RESULT_OK || uri == null) {
+                r?.success(null)
+            } else {
+                try {
+                    r?.success(readUri(uri))
+                } catch (e: Exception) {
+                    r?.error("read", e.message, null)
+                }
+            }
+            return
+        }
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     // In-app updates (lib/services/updater.dart)
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pulinote/files").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "pick" -> {
+                    pickResult?.success(null)
+                    pickResult = result
+                    val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                    try {
+                        @Suppress("DEPRECATION")
+                        startActivityForResult(i, pickRequest)
+                    } catch (e: Exception) {
+                        pickResult = null
+                        result.error("pick", e.message, null)
+                    }
+                }
+                "takeOpened" -> {
+                    val b = opened
+                    opened = null
+                    result.success(b)
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pulinote/update").setMethodCallHandler { call, result ->
             try {
                 when (call.method) {

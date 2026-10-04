@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,13 @@ import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
 import 'package:study_app/services/account_api.dart';
 import 'package:study_app/services/community_api.dart';
+import 'package:study_app/services/content_import.dart';
 import 'package:study_app/services/content_sync.dart';
+import 'package:study_app/widgets/book_files_card.dart';
+import 'package:study_app/widgets/problem_brief.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import 'fixtures/sample_book.dart';
 
 Future<AppState> _state({bool onboard = true}) async {
   final bank = await ProblemBank.load(rootBundle);
@@ -613,6 +620,141 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(app.scores.single.grades, {'국어': 2, '수학': 3});
     expect(tester.takeException(), isNull);
+  });
+
+  test('교재 파일: .pulinote import joins the bank, goes on the shelf, survives restart and can be removed', () async {
+    final storage = MemoryStorage();
+    final bank = await ProblemBank.load(rootBundle);
+    final app = AppState(storage: storage, baseBank: bank, enableLive: false);
+    await app.init();
+    app.completeOnboarding(name: '학생', grade: '고3', goal: '수능', courses: const [], workbooks: const ['wb-math1-concept']);
+    final before = app.bank.subject('math')!.problems.length;
+
+    expect(() => ContentImport.decode(utf8.encode('hello')), throwsFormatException);
+    expect(() => ContentImport.decode(gzip.encode(utf8.encode('{"format":"other"}'))), throwsFormatException);
+
+    final book = await app.importBook(sampleBookFile());
+    expect(book.title, 'SAMPLE TYPE 1회차');
+    expect(book.problemCount, 2);
+    // problems join the existing 수학 course, the 문제집 is in the catalog and on the student's shelf
+    expect(app.bank.subject('math')!.problems.length, before + 2);
+    final p = app.bank.byId('sample-type-01-cls-2')!;
+    expect(p.texStyle, isTrue);
+    expect(p.label, '심화');
+    expect(p.labelAccent, isTrue);
+    expect(p.points, 0);
+    expect(app.bank.workbook('sample-type-01'), isNotNull);
+    expect(app.hasWorkbook('sample-type-01'), isTrue);
+    expect(app.myProblems.map((p) => p.id), containsAll(['sample-type-01-cls-1', 'sample-type-01-cls-2']));
+    expect(app.importedBooks.single.id, 'sample-type-01');
+
+    // importing again replaces (no duplicates)
+    await app.importBook(sampleBookFile());
+    expect(app.bank.subject('math')!.problems.length, before + 2);
+    expect(app.importedBooks.length, 1);
+    await app.record(p, answer: '7', expected: p.answer, correct: true, timeMs: 1000, mode: 'practice');
+    await app.saveNow();
+
+    // a restart keeps the book
+    final again = AppState(storage: storage, baseBank: bank, enableLive: false);
+    await again.init();
+    expect(again.bank.byId('sample-type-01-cls-1')?.stem, contains('[[box]]'));
+    expect(again.hasWorkbook('sample-type-01'), isTrue);
+
+    await again.removeImportedBook('sample-type-01');
+    expect(again.bank.byId('sample-type-01-cls-1'), isNull);
+    expect(again.bank.workbook('sample-type-01'), isNull);
+    expect(again.hasWorkbook('sample-type-01'), isFalse);
+    expect(again.importedBooks, isEmpty);
+    expect(again.bank.subject('math')!.problems.length, before);
+    expect(again.attempts.length, 1, reason: '푼 기록은 남는다');
+  });
+
+  test('MathText.compact / plain flatten block markup for lists', () {
+    const src = '조건\n[[box]]\n(가) \$a_1=3\$\n\$\$a_{n+1}=\\dfrac{a_n}{2}\$\$\n[[/box]]\n[[center]]\n[[svg]]<svg width="10" height="10"></svg>[[/svg]]\n[[/center]]';
+    final c = MathText.compact(src);
+    expect(c.contains('[['), isFalse);
+    expect(c.contains(r'$$'), isFalse);
+    expect(c, contains('[그림]'));
+    expect(MathText.plain(src), isNot(contains('svg')));
+    expect(MathText.plain(src), contains('a_n+1=a_n/2'));
+  });
+
+  testWidgets('TeX 원문 교재: boxes, display math, figures and the 머리표 render; no 배점', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.runAsync(() => app.importBook(sampleBookFile()));
+    final ps = app.bank.problemsOf(app.bank.workbook('sample-type-01')!);
+    expect(ps.length, 2);
+    await tester.pumpWidget(_app(app,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => SolveScreen.open(context, title: 'SAMPLE', problems: ps),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        )));
+    await tester.tap(find.text('go'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('예제'), findsWidgets);
+    expect(find.text('풀이노트 예시 문항'), findsWidgets);
+    expect(find.byType(Math), findsWidgets);
+    bool hasPoints() => tester
+        .widgetList<RichText>(find.byType(RichText))
+        .any((t) => RegExp(r'\[\d점\]').hasMatch(t.text.toPlainText()));
+    expect(hasPoints(), isFalse);
+    expect(find.textContaining('[[box]]'), findsNothing);
+    await _penRest(tester);
+    await tester.tap(find.byKey(const Key('next')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('심화'), findsWidgets);
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(find.textContaining('<svg'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    // read-only views (선생님 화면 · 오답 상세) use the same markup
+    await tester.pumpWidget(_app(app,
+        home: Scaffold(
+            body: SingleChildScrollView(child: ProblemBrief(problem: ps[1], studentAnswer: '5', showSolution: true)))));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(find.text('심화'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('설정 → 교재 파일 가져오기 → 목록 → 빼기', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    BookFilesCard.picker = () async => Uint8List.fromList(sampleBookFile());
+    addTearDown(() => BookFilesCard.picker = BookFiles.pick);
+    await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: BookFilesCard()))));
+    await tester.tap(find.byKey(const Key('books-import')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('books-msg')), findsOneWidget);
+    expect(find.textContaining('2문항'), findsWidgets);
+    expect(find.byKey(const Key('book-sample-type-01')), findsOneWidget);
+    expect(app.hasWorkbook('sample-type-01'), isTrue);
+
+    BookFilesCard.picker = () async => Uint8List.fromList(utf8.encode('not a book'));
+    await tester.tap(find.byKey(const Key('books-import')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('풀이노트 교재 파일이 아니에요'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('book-remove-sample-type-01')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('books-remove-ok')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('book-sample-type-01')), findsNothing);
+    expect(app.bank.workbook('sample-type-01'), isNull);
   });
 
   test('content server: packs are downloaded, cached and reused offline', () async {

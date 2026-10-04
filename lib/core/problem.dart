@@ -213,6 +213,16 @@ class Problem {
   /// Created by the user in the app.
   final bool custom;
 
+  /// 교재 머리표 (예: 기출문제, 변형, 심화, 숙제 1 (중)) — 원문처럼 검은/주황 상자에 찍힌다.
+  final String? label;
+  final bool labelAccent;
+
+  /// TeX 원문을 옮긴 문항: 원문처럼 본문 글꼴(Noto Serif KR)과 글줄 수식(text style)으로 그린다.
+  final bool texStyle;
+
+  /// 배점 (null → 난이도로 2·3·4점, 0 → 표시하지 않음).
+  final int? points;
+
   const Problem({
     required this.id,
     required this.subjectId,
@@ -237,6 +247,10 @@ class Problem {
     this.twinOf,
     this.source,
     this.custom = false,
+    this.label,
+    this.labelAccent = false,
+    this.texStyle = false,
+    this.points,
   });
 
   bool get isTwin => twinOf != null;
@@ -298,6 +312,10 @@ class Problem {
       twinOf: _strOrNull(j['twinOf']),
       source: _strOrNull(j['source']),
       custom: j['custom'] == true,
+      label: (_strOrNull(j['label']) ?? '').trim().isEmpty ? null : _str(j['label']).trim(),
+      labelAccent: j['labelAccent'] == true,
+      texStyle: j['texStyle'] == true,
+      points: _int(j['points']),
     );
   }
 
@@ -328,6 +346,10 @@ class Problem {
     if (twinOf != null) m['twinOf'] = twinOf;
     if (source != null) m['source'] = source;
     if (custom) m['custom'] = true;
+    if (label != null) m['label'] = label;
+    if (labelAccent) m['labelAccent'] = true;
+    if (texStyle) m['texStyle'] = true;
+    if (points != null) m['points'] = points;
     return m;
   }
 
@@ -382,6 +404,10 @@ class Problem {
       twinOf: twinOf,
       source: source,
       custom: custom ?? this.custom,
+      label: label,
+      labelAccent: labelAccent,
+      texStyle: texStyle,
+      points: points,
     );
   }
 

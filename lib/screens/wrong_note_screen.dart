@@ -283,7 +283,10 @@ class _WrongCard extends StatelessWidget {
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
-            child: MathText(p.solution, style: const TextStyle(fontSize: 16, color: AppColors.ink, height: 1.7)),
+            child: MathText(p.solution,
+                texStyle: p.texStyle,
+                style: TextStyle(
+                    fontSize: 16, color: AppColors.ink, height: 1.7, fontFamily: p.texStyle ? AppTheme.texSerif : null)),
           ),
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('닫기'))],

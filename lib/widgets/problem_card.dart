@@ -35,8 +35,8 @@ class ExamSheetKeys {
   }
 }
 
-/// 배점 like a 모의고사 paper: easy 2점, normal 3점, hard 4점.
-int problemPoints(Problem p) => p.difficulty <= 2 ? 2 : (p.difficulty == 3 ? 3 : 4);
+/// 배점 like a 모의고사 paper: easy 2점, normal 3점, hard 4점 (교재 문항은 [Problem.points], 0 = 없음).
+int problemPoints(Problem p) => p.points ?? (p.difficulty <= 2 ? 2 : (p.difficulty == 3 ? 3 : 4));
 
 /// The printed part of the page, laid out like a 모의고사 시험지 at page scale (width 1000)
 /// under the ink. Everything else on the page is writing space.
@@ -98,7 +98,7 @@ class ProblemSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = problem;
-    final face = serif ? AppTheme.serif : AppTheme.font;
+    final face = serif ? (p.texStyle ? AppTheme.texSerif : AppTheme.serif) : AppTheme.font;
     final correctChoice = int.tryParse(p.answer);
     const sans = AppTheme.font;
     final k = zoom.clamp(0.4, 1.0);
@@ -176,7 +176,7 @@ class ProblemSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 DifficultyDots(p.difficulty, color: color, size: 8),
-                if (p.source != null) ...[
+                if (p.source != null && p.label == null) ...[
                   const SizedBox(width: 12),
                   Flexible(
                     child: Text(p.source!,
@@ -217,6 +217,11 @@ class ProblemSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (p.label != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: _indent, bottom: 12),
+                      child: TexLabel(p, fontSize: 17),
+                    ),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -243,10 +248,9 @@ class ProblemSheet extends StatelessWidget {
                       ),
                       Expanded(
                         // a stem that ends with a table gets its 배점 on the next line
-                        child: MathText(
-                            RegExp(r'\n\s*\|[^\n]*$').hasMatch(p.stem)
-                                ? '${p.stem}\n[${problemPoints(p)}점]'
-                                : '${p.stem}  [${problemPoints(p)}점]',
+                        child: MathText(_stemWithPoints(p),
+                            texStyle: p.texStyle,
+                            mathScale: p.texStyle ? texMathScale : 1.06,
                             style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w400)),
                       ),
                     ],
@@ -289,6 +293,48 @@ class ProblemSheet extends StatelessWidget {
                 ],
               ),
             );
+  }
+}
+
+/// The stem with its 배점; a stem that ends with a table or a block gets it on the next line.
+String _stemWithPoints(Problem p) {
+  final pts = problemPoints(p);
+  if (pts <= 0) return p.stem;
+  final last = p.stem.trimRight().split('\n').last.trim();
+  final block = last.startsWith('|') || last.startsWith(r'$$') || last.startsWith('[[');
+  return block ? '${p.stem}\n[$pts점]' : '${p.stem}  [$pts점]';
+}
+
+/// 원문 수식 글꼴 크기: 본문(Noto Serif KR, 원문 Scale 0.92)보다 조금 크게.
+const double texMathScale = 1.08;
+
+/// 교재 머리표: 검은(또는 주황) 상자에 흰 글씨 + 옅은 회색 출처 — TeX 원문의 \TagBox.
+class TexLabel extends StatelessWidget {
+  const TexLabel(this.problem, {super.key, this.fontSize = 13});
+  final Problem problem;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = problem;
+    final src = p.source ?? '';
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: fontSize * 0.6,
+      runSpacing: 4,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: fontSize * 0.42, vertical: fontSize * 0.14),
+          color: p.labelAccent ? AppTheme.texAccent : Colors.black,
+          child: Text(p.label ?? '',
+              style: TextStyle(
+                  fontFamily: AppTheme.font, fontSize: fontSize, height: 1.3, fontWeight: FontWeight.w600, color: Colors.white)),
+        ),
+        if (src.isNotEmpty)
+          Text(src,
+              style: TextStyle(fontFamily: AppTheme.font, fontSize: fontSize, height: 1.3, color: AppTheme.texFaint)),
+      ],
+    );
   }
 }
 

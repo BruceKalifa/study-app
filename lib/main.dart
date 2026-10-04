@@ -6,6 +6,7 @@ import 'app/storage.dart';
 import 'app/theme.dart';
 import 'core/problem_bank.dart';
 import 'screens/app_root.dart';
+import 'services/content_import.dart';
 import 'services/handwriting.dart';
 import 'services/updater.dart';
 import 'widgets/update_dialog.dart';
@@ -32,6 +33,7 @@ class PulinoteApp extends StatefulWidget {
 
 class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _nav = GlobalKey<NavigatorState>();
+  final GlobalKey<ScaffoldMessengerState> _messenger = GlobalKey<ScaffoldMessengerState>();
   DateTime? _lastUpdateCheck;
   bool _updateShown = false;
 
@@ -39,7 +41,27 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUpdate();
+      _checkOpenedFile();
+    });
+  }
+
+  /// 다른 앱(카카오톡, 내 파일…)에서 .pulinote 교재 파일을 이 앱으로 열었을 때.
+  Future<void> _checkOpenedFile() async {
+    if (!Updater.supported) return;
+    final bytes = await BookFiles.takeOpened();
+    if (bytes == null) return;
+    String msg;
+    try {
+      final book = await widget.state.importBook(bytes);
+      msg = '「${book.title}」 교재를 넣었어요 (${book.problemCount}문항)';
+    } on FormatException catch (e) {
+      msg = e.message;
+    } catch (e) {
+      msg = '교재 파일을 넣지 못했어요';
+    }
+    _messenger.currentState?.showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// 앱을 열 때(그리고 30분 넘게 지난 뒤 다시 열 때) 새 버전이 있으면 받아서 설치 화면을 띄운다.
@@ -70,6 +92,7 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
     } else if (s == AppLifecycleState.resumed) {
       widget.state.onResumed();
       _checkUpdate();
+      _checkOpenedFile();
     }
   }
 
@@ -80,6 +103,7 @@ class _PulinoteAppState extends State<PulinoteApp> with WidgetsBindingObserver {
       child: MaterialApp(
         title: kAppName,
         navigatorKey: _nav,
+        scaffoldMessengerKey: _messenger,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         home: const AppRoot(),

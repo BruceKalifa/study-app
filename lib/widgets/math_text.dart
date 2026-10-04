@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Text with inline LaTeX between `$...$` (Korean outside, math inside).
+///
+/// Block markup (full renders only; one marker per line — see docs/problem-schema.md):
+///   `$$…$$`                    가운데 수식 줄 (display)
+///   `[[box]]` … `[[/box]]`      조건 상자
+///   `[[center]]` … `[[/center]]` 가운데 정렬
+///   `[[svg]]<svg…>[[/svg]]`     그림 (TeX 원문의 TikZ 를 옮긴 것)
+///   `| a | b |`                표
 class MathText extends StatelessWidget {
   const MathText(
     this.source, {
@@ -10,6 +18,7 @@ class MathText extends StatelessWidget {
     this.textAlign = TextAlign.start,
     this.maxLines,
     this.mathScale = 1.06,
+    this.texStyle = false,
   });
 
   final String source;
@@ -17,6 +26,12 @@ class MathText extends StatelessWidget {
   final TextAlign textAlign;
   final int? maxLines;
   final double mathScale;
+
+  /// TeX 원문처럼: 글줄 안 수식은 text style (분수는 \dfrac 일 때만 크게).
+  final bool texStyle;
+
+  /// TeX 본문 글자 크기(pt) — 그림(pt 단위)을 글자 크기에 맞춰 키운다.
+  static const double texBodyPt = 9.2;
 
   static List<(bool, String)> split(String s) {
     final out = <(bool, String)>[];
@@ -44,13 +59,22 @@ class MathText extends StatelessWidget {
     return out;
   }
 
+  /// One-line form of block markup (previews): figures → [그림], boxes dropped, `$$x$$` → `$x$`.
+  static String compact(String s) {
+    if (!s.contains('[[') && !s.contains(r'$$')) return s;
+    var t = s.replaceAll(RegExp(r'\[\[svg\]\][\s\S]*?\[\[/svg\]\]'), '[그림]');
+    t = t.replaceAll(RegExp(r'\[\[/?(box|center)\]\]'), '');
+    t = t.replaceAllMapped(RegExp(r'\$\$([\s\S]*?)\$\$'), (m) => '\$${m[1]}\$');
+    return t.replaceAll(RegExp(r'\n{2,}'), '\n').trim();
+  }
+
   /// Plain-text rendering (for previews / lists): strips LaTeX commands and markup lightly.
   static String plain(String s) {
-    var t = s.replaceAll('**', '').replaceAll('__', '');
+    var t = compact(s).replaceAll('**', '').replaceAll('__', '');
     t = t.replaceAll(RegExp(r'^\s*\|[-:| ]+\|\s*$', multiLine: true), '');
     t = t.replaceAll(RegExp(r'\s*\|\s*'), ' ').replaceAll(RegExp(r'\n{2,}'), '\n');
     t = t.replaceAll(r'$', '');
-    t = t.replaceAllMapped(RegExp(r'\\frac\{([^{}]*)\}\{([^{}]*)\}'), (m) => '${m[1]}/${m[2]}');
+    t = t.replaceAllMapped(RegExp(r'\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}'), (m) => '${m[1]}/${m[2]}');
     t = t.replaceAllMapped(RegExp(r'\\text\{([^{}]*)\}'), (m) => m[1] ?? '');
     t = t.replaceAllMapped(RegExp(r'\\sqrt\{([^{}]*)\}'), (m) => '√${m[1]}');
     const map = {
@@ -68,15 +92,141 @@ class MathText extends StatelessWidget {
   static final RegExp _tableLine = RegExp(r'^\s*\|');
   static final RegExp _ruleLine = RegExp(r'^\s*\|?\s*:?-{2,}');
 
+  static final RegExp _blockLine = RegExp(r'^\s*(\$\$|\[\[)');
+
   @override
   Widget build(BuildContext context) {
     final base = DefaultTextStyle.of(context).style.merge(style);
-    // block layout (tables) only for full renders; previews flatten tables
-    if (maxLines == null && source.contains('|')) {
+    // block layout only for full renders; previews flatten blocks
+    if (maxLines != null) return _inline(compact(source), base);
+    if (source.contains('[[') || source.contains(r'$$')) {
+      final lines = source.split('\n');
+      if (lines.any((l) => _blockLine.hasMatch(l))) return _structured(lines, base, textAlign);
+    }
+    if (source.contains('|')) {
       final lines = source.split('\n');
       if (lines.any((l) => _tableLine.hasMatch(l))) return _blocks(context, lines, base);
     }
     return _inline(source, base);
+  }
+
+  /// Lines with block markers → column of text runs, display math, boxes, centred parts and figures.
+  Widget _structured(List<String> lines, TextStyle base, TextAlign align) {
+    final fs = base.fontSize ?? 16;
+    final children = <Widget>[];
+    final run = <String>[];
+    void flush() {
+      if (run.isEmpty) return;
+      final t = run.join('\n');
+      run.clear();
+      if (t.trim().isEmpty) return;
+      final hasTable = t.split('\n').any((l) => _tableLine.hasMatch(l));
+      children.add(hasTable
+          ? Builder(builder: (c) => _blocks(c, t.split('\n'), base))
+          : _inline(t, base, align: align));
+    }
+
+    var i = 0;
+    while (i < lines.length) {
+      final l = lines[i].trim();
+      final open = RegExp(r'^\[\[(box|center)\]\]$').firstMatch(l);
+      if (open != null) {
+        // find the matching close (blocks may nest)
+        final kind = open.group(1)!;
+        var depth = 1;
+        var j = i + 1;
+        while (j < lines.length) {
+          final t = lines[j].trim();
+          if (t == '[[$kind]]') depth++;
+          if (t == '[[/$kind]]' && --depth == 0) break;
+          j++;
+        }
+        flush();
+        final inner = lines.sublist(i + 1, j.clamp(i + 1, lines.length));
+        if (kind == 'box') {
+          children.add(Padding(
+            padding: EdgeInsets.symmetric(vertical: fs * 0.3),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(fs * 0.62, fs * 0.36, fs * 0.62, fs * 0.36),
+              decoration: BoxDecoration(border: Border.all(color: base.color ?? const Color(0xFF1B2A4A), width: 1.1)),
+              child: _structured(inner, base, align),
+            ),
+          ));
+        } else {
+          children.add(SizedBox(width: double.infinity, child: _structured(inner, base, TextAlign.center)));
+        }
+        i = j + 1;
+        continue;
+      }
+      if (l.startsWith('[[svg]]')) {
+        flush();
+        var svg = l.substring(7);
+        var j = i;
+        while (!svg.contains('[[/svg]]') && j + 1 < lines.length) {
+          svg += '\n${lines[++j]}';
+        }
+        svg = svg.replaceFirst(RegExp(r'\[\[/svg\]\]\s*$'), '');
+        children.add(_figure(svg, fs, align));
+        i = j + 1;
+        continue;
+      }
+      if (l.startsWith(r'$$') && l.endsWith(r'$$') && l.length > 4) {
+        flush();
+        children.add(_display(l.substring(2, l.length - 2), base));
+        i++;
+        continue;
+      }
+      if (l.startsWith('[[/')) {
+        i++; // stray close
+        continue;
+      }
+      run.add(lines[i]);
+      i++;
+    }
+    flush();
+    final cross = align == TextAlign.center ? CrossAxisAlignment.center : CrossAxisAlignment.start;
+    return Column(crossAxisAlignment: cross, mainAxisSize: MainAxisSize.min, children: children);
+  }
+
+  Widget _display(String tex, TextStyle base) {
+    final fs = base.fontSize ?? 16;
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: fs * 0.32),
+      child: SizedBox(
+        width: double.infinity,
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Math.tex(
+              tex,
+              mathStyle: MathStyle.display,
+              textStyle: TextStyle(fontSize: fs * mathScale, color: base.color),
+              onErrorFallback: (err) => Text(tex, style: base.copyWith(fontStyle: FontStyle.italic)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static final RegExp _svgSize = RegExp(r'<svg[^>]*?\swidth="([\d.]+)"[^>]*?\sheight="([\d.]+)"');
+
+  Widget _figure(String svg, double fs, TextAlign align) {
+    final m = _svgSize.firstMatch(svg);
+    final k = fs / texBodyPt;
+    final w = m == null ? null : double.parse(m.group(1)!) * k;
+    final h = m == null ? null : double.parse(m.group(2)!) * k;
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: fs * 0.3),
+      child: Align(
+        alignment: align == TextAlign.center ? Alignment.center : Alignment.centerLeft,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: SvgPicture.string(svg, width: w, height: h, fit: BoxFit.contain),
+        ),
+      ),
+    );
   }
 
   Widget _blocks(BuildContext context, List<String> lines, TextStyle base) {
@@ -190,8 +340,8 @@ class MathText extends StatelessWidget {
       }
       final formula = Math.tex(
         text,
-        // display-size fractions read better on a tablet; compact previews keep text size
-        mathStyle: maxLines == null ? MathStyle.display : MathStyle.text,
+        // display-size fractions read better on a tablet; compact previews and TeX 원문 keep text size
+        mathStyle: maxLines == null && !texStyle ? MathStyle.display : MathStyle.text,
         // only size + colour: weight/family from the surrounding text would switch KaTeX to upright glyphs
         textStyle: TextStyle(fontSize: (base.fontSize ?? 16) * mathScale, color: base.color),
         onErrorFallback: (err) => Text(text, style: base.copyWith(fontStyle: FontStyle.italic)),

@@ -12,6 +12,7 @@ import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
 import '../services/account_api.dart';
 import '../services/community_api.dart';
+import '../services/content_import.dart';
 import '../services/content_sync.dart';
 import '../services/live_sync.dart';
 import 'learner.dart';
@@ -35,8 +36,14 @@ class AppState extends ChangeNotifier {
   final Storage storage;
   final ProblemBank _baseBank;
 
-  /// Bundled content + packs downloaded from the content server.
+  /// Bundled content + packs downloaded from the content server + imported 교재 files.
   ProblemBank _contentBank;
+  List<Subject> _packs = const [];
+  List<Workbook>? _packWorkbooks;
+  List<BookBundle> _books = const [];
+
+  /// 교재 파일로 넣은 교재 (설정 → 교재 파일).
+  List<ImportedBook> importedBooks = [];
   final bool enableLive;
   ProblemBank bank;
 
@@ -103,7 +110,12 @@ class AppState extends ChangeNotifier {
     }
     profile = profiles.firstWhere((p) => p.id == currentId, orElse: () => profiles.first);
     final (packs, wbs) = await ContentSync(storage).loadCached();
-    if (packs.isNotEmpty || wbs != null) _contentBank = _baseBank.withPacks(packs, workbooks: wbs);
+    _packs = packs;
+    _packWorkbooks = wbs;
+    final imports = ContentImport(storage);
+    importedBooks = await imports.list();
+    _books = await imports.loadAll();
+    _composeContent();
     await _loadProfileData();
     ready = true;
     notifyListeners();
@@ -162,6 +174,41 @@ class AppState extends ChangeNotifier {
     _rebuildBank();
     _configureLive();
     _revision++;
+  }
+
+  void _composeContent() {
+    _contentBank = ContentImport.merge(_baseBank.withPacks(_packs, workbooks: _packWorkbooks), _books);
+  }
+
+  /// Adds a `.pulinote` 교재 file; a student also gets its 문제집 on the shelf. Throws [FormatException].
+  Future<BookBundle> importBook(List<int> bytes) async {
+    final imports = ContentImport(storage);
+    final book = await imports.add(bytes);
+    importedBooks = await imports.list();
+    _books = await imports.loadAll();
+    _composeContent();
+    _rebuildBank();
+    if (!isTeacher) {
+      for (final w in book.workbooks) {
+        if (!hasWorkbook(w.id)) addWorkbook(w.id);
+      }
+    }
+    _changed();
+    return book;
+  }
+
+  Future<void> removeImportedBook(String id) async {
+    final imports = ContentImport(storage);
+    final gone = _books.where((b) => b.id == id).expand((b) => b.workbooks).map((w) => w.id).toSet();
+    await imports.remove(id);
+    importedBooks = await imports.list();
+    _books = await imports.loadAll();
+    _composeContent();
+    _rebuildBank();
+    for (final w in gone) {
+      if (hasWorkbook(w)) removeWorkbook(w);
+    }
+    _changed();
   }
 
   void _rebuildBank() {
@@ -889,7 +936,9 @@ class AppState extends ChangeNotifier {
     final r = await sync.sync(settings.serverUrl);
     if (r.ok) {
       final (packs, wbs) = await sync.loadCached();
-      _contentBank = _baseBank.withPacks(packs, workbooks: wbs);
+      _packs = packs;
+      _packWorkbooks = wbs;
+      _composeContent();
       _rebuildBank();
     }
     syncing = false;
