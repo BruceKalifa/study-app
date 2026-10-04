@@ -1,7 +1,7 @@
 {
   "name": "pulinote-live-server",
   "version": "1.0.0",
-  "description": "풀이노트 실시간 필기 공유 서버 + 선생님 대시보드 + 문제 콘텐츠 API·출제 도구",
+  "description": "풀이노트 실시간 필기 공유 서버 + 선생님 대시보드 + 문제 콘텐츠 API·출제 도구 + 커뮤니티·공부시간 순위",
   "private": true,
   "main": "server.js",
   "engines": {
@@ -12,7 +12,8 @@
     "sim": "node tools/sim-student.js ws://localhost:8080/ws",
     "test": "node tools/test-live.js ws://localhost:8080/ws",
     "test:live": "node tools/test-live.js ws://localhost:8080/ws",
-    "test:content": "node tools/test-content.js"
+    "test:content": "node tools/test-content.js",
+    "test:community": "node tools/test-community.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

@@ -63,7 +63,7 @@ kbd { border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 
 .tabs { display: flex; gap: 4px; background: var(--paper-2); padding: 4px; border-radius: 12px; }
 .tab {
   border: 0; background: transparent; padding: 6px 18px; border-radius: 9px; cursor: pointer;
-  color: var(--muted); font-weight: 600;
+  color: var(--muted); font-weight: 600; white-space: nowrap;
 }
 .tab:hover { color: var(--ink); }
 .tab.is-active { background: #fff; color: var(--ink); box-shadow: var(--shadow); }
@@ -388,6 +388,42 @@ table.rt th { background: #F3F1EC; font-weight: 700; }
 .toast.good { background: #135E48; }
 @keyframes tin { from { transform: translateY(8px); opacity: 0; } }
 
+/* ───────── 커뮤니티 관리 ───────── */
+.community { height: calc(100vh - var(--top)); overflow: auto; padding: 24px 28px 60px; }
+.cm-head { display: flex; align-items: flex-start; gap: 16px; max-width: 1400px; margin: 0 auto 18px; }
+.cm-head > div { flex: 1; }
+.cm-head h1 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.3px; }
+.cm-head p { margin: 0; font-size: 13px; }
+.cm-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; max-width: 1400px; margin: 0 auto; align-items: start; }
+.cm-col-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.cm-col-head h2 { margin: 0; font-size: 13px; letter-spacing: .3px; color: var(--muted); font-weight: 700; }
+.cm-count { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.cm-search { width: 100%; height: 36px; border: 1px solid var(--line-2); border-radius: 10px; padding: 0 12px; background: #fff; margin-bottom: 10px; }
+.cm-search:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+.cm-list { display: flex; flex-direction: column; gap: 10px; }
+.cm-list .empty { background: #fff; border: 1px dashed var(--line-2); border-radius: var(--radius); padding: 28px 16px; }
+.cm-more { margin: 12px auto 0; display: block; }
+.cm-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px 12px; }
+.cm-card.is-hidden { border-left: 4px solid var(--bad); }
+.cm-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.cm-meta .who { margin-left: 2px; }
+.community .badge.bad { background: var(--bad-soft); color: var(--bad); }
+.community .badge.warn { background: var(--warn-soft); color: var(--warn); }
+.cm-card h3 { margin: 6px 0 4px; font-size: 15px; letter-spacing: -.2px; word-break: break-all; }
+.cm-body { margin: 0; color: var(--ink-2); font-size: 13.5px; white-space: pre-wrap; word-break: break-all; }
+.cm-body.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cm-reasons { list-style: none; margin: 10px 0 0; padding: 8px 10px; background: var(--bad-soft); border-radius: var(--radius-s); font-size: 12.5px; }
+.cm-reasons li { display: flex; gap: 8px; padding: 2px 0; }
+.cm-reasons li b { flex: 1; font-weight: 600; color: var(--ink); word-break: break-all; }
+.cm-reasons li span { color: var(--muted); white-space: nowrap; }
+.cm-comments { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.cm-comments li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.cm-comments li > div { flex: 1; min-width: 0; }
+.cm-comments .cm-meta { margin-bottom: 2px; }
+.cm-comments p { margin: 0; white-space: pre-wrap; word-break: break-all; }
+.cm-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.cm-stats { flex: 1; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 /* ───────── 좁은 화면 ───────── */
 @media (max-width: 1380px) {
   .work { grid-template-columns: 1fr; overflow: auto; }
@@ -398,6 +434,8 @@ table.rt th { background: #F3F1EC; font-weight: 700; }
 }
 @media (max-width: 1000px) {
   .app { grid-template-columns: 200px 280px minmax(0, 1fr); }
+  .cm-cols { grid-template-columns: minmax(0, 1fr); }
+  .community { padding: 18px 16px 60px; }
   .tabs .tab { padding: 6px 10px; }
   .brand-name { display: none; }
 }

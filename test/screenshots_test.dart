@@ -22,6 +22,7 @@ import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/result_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/screens/workbook_screen.dart';
+import 'package:study_app/services/community_api.dart';
 import 'package:study_app/app/learner.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 
@@ -140,6 +141,8 @@ List<Offset> _digit2() => [
 Future<void> _rest(WidgetTester tester) =>
     tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 600)));
 
+class _RealHttp extends HttpOverrides {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -153,13 +156,57 @@ void main() {
     await tester.pumpWidget(_wrap(app, const HomeShell()));
     await _shot(tester, '01_dashboard');
 
-    // 2..10 tabs
-    const tabs = ['문제집', '오답노트', '학습관리', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
+    // community: seed real posts + ranking on the CI server
+    final server = Platform.environment['COMMUNITY_SERVER'];
+    if (server != null) {
+      HttpOverrides.global = _RealHttp();
+      app.updateSettings((x) => x.serverUrl = server);
+      await tester.runAsync(() async {
+        final day = dayKey(DateTime.now());
+        final people = [
+          ('오예진', '고3', 9.2, 88), ('김민수', '고3', 8.1, 64), ('이서연', '고2', 7.4, 51), ('박지훈', 'N수', 10.6, 120),
+          ('최하은', '고1', 5.2, 30), ('정우진', '고2', 6.8, 47), ('강다은', '고3', 4.1, 22),
+        ];
+        for (final (i, (name, grade, h, solved)) in people.indexed) {
+          final api = CommunityApi(server, 'seed-$i');
+          await api.reportStudy(name: name, grade: grade, day: day, studyMs: (h * 3600000).round(), solved: solved);
+        }
+        await CommunityApi(server, app.profile.id)
+            .reportStudy(name: app.profile.name, grade: '고2', day: day, studyMs: 5400000, solved: 35);
+        final posts = [
+          ('qna', '물리학Ⅰ 운동량 보존 질문이요', r'충돌 전후로 $m_1v_1+m_2v_2$ 가 같다는 건 알겠는데, 탄성 충돌이 아니면 에너지는 어디로 가나요?', '물리왕'),
+          ('proof', '오늘 순공 9시간 인증합니다', '수학Ⅰ 지수·로그 40문제 + 오답 변형 세트 완료! 내일도 달린다', '수능가즈아'),
+          ('info', '9월 모평 등급컷 정리', '국어 언매 · 수학 미적 등급컷 예상 정리해 봤어요. 틀린 부분 있으면 댓글 주세요', '입시덕후'),
+          ('mind', '모의고사 망쳐서 멘탈이 나갔어요', '6월보다 두 등급이나 떨어졌어요… 다들 이럴 때 어떻게 버티나요', '익명고3'),
+          ('free', '공부할 때 듣는 노래 추천해 주세요', '가사 없는 걸로요!', '새벽공부'),
+        ];
+        for (final (i, (board, title, body, author)) in posts.indexed) {
+          final api = CommunityApi(server, 'poster-$i');
+          final p = await api.write(author: author, grade: i.isEven ? '고3' : '고2', board: board, title: title, body: body);
+          for (var k = 0; k < (5 - i); k++) {
+            await CommunityApi(server, 'liker-$i-$k').like(p.id);
+          }
+          if (i < 3) {
+            await CommunityApi(server, 'commenter-$i').comment(p.id, author: '응원단', grade: '고2', body: '저도 궁금했어요!');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+        }
+      });
+    }
+
+    // 2..11 tabs
+    const tabs = ['문제집', '오답노트', '학습관리', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
     for (var i = 0; i < tabs.length; i++) {
       await tester.tap(find.text(tabs[i]).last);
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
+      if (tabs[i] == '커뮤니티' || tabs[i] == '학습관리') {
+        for (var k = 0; k < 4; k++) {
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 700)));
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
       if (tabs[i] == '연습장') {
         final c = tester.getCenter(find.byType(HomeShell));
         await _write(tester, c + const Offset(-200, 50), _axisX());
@@ -168,8 +215,7 @@ void main() {
         await _write(tester, c + const Offset(150, 140), _wave());
       }
       await _shot(tester,
-          '0${i + 2}_${['library', 'wrongnote', 'planner', 'stats', 'history', 'scratch', 'editor', 'subscription', 'settings'][i]}'
-              .replaceFirst('010_', '10_'));
+          '${(i + 2).toString().padLeft(2, '0')}_${['library', 'wrongnote', 'planner', 'community', 'stats', 'history', 'scratch', 'editor', 'subscription', 'settings'][i]}');
     }
 
     // onboarding (fresh learner)

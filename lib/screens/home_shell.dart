@@ -6,6 +6,7 @@ import '../services/live_sync.dart';
 import 'dashboard_screen.dart';
 import 'editor_screen.dart';
 import 'history_screen.dart';
+import 'community_screen.dart';
 import 'library_screen.dart';
 import 'onboarding_screen.dart';
 import 'planner_screen.dart';
@@ -36,6 +37,7 @@ class HomeShellState extends State<HomeShell> {
     _Dest(Icons.menu_book_outlined, Icons.menu_book_rounded, '문제집'),
     _Dest(Icons.assignment_late_outlined, Icons.assignment_late_rounded, '오답노트'),
     _Dest(Icons.event_note_outlined, Icons.event_note_rounded, '학습관리'),
+    _Dest(Icons.forum_outlined, Icons.forum_rounded, '커뮤니티'),
     _Dest(Icons.insights_outlined, Icons.insights_rounded, '통계'),
     _Dest(Icons.history_rounded, Icons.history_rounded, '기록'),
     _Dest(Icons.draw_outlined, Icons.draw_rounded, '연습장'),
@@ -57,14 +59,16 @@ class HomeShellState extends State<HomeShell> {
       case 3:
         return const PlannerScreen();
       case 4:
-        return const StatsScreen();
+        return const CommunityScreen();
       case 5:
-        return const HistoryScreen();
+        return const StatsScreen();
       case 6:
-        return const ScratchScreen();
+        return const HistoryScreen();
       case 7:
-        return const EditorScreen();
+        return const ScratchScreen();
       case 8:
+        return const EditorScreen();
+      case 9:
         return const SubscriptionScreen();
       default:
         return const SettingsScreen();
@@ -181,7 +185,7 @@ class _Rail extends StatelessWidget {
               ),
             ),
           GestureDetector(
-            onTap: () => onTap(9),
+            onTap: () => onTap(10),
             child: Tooltip(
               message: profileName,
               child: CircleAvatar(

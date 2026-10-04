@@ -25,7 +25,7 @@ DateTime defaultSuneungDate(DateTime now) {
 class Learner {
   bool onboarded;
 
-  /// 중1 … 고3, N수
+  /// 고1 … 고3, N수
   String grade;
 
   /// 수능 | 내신 | 둘 다
@@ -43,6 +43,12 @@ class Learner {
   String plan; // '' | monthly | yearly
   int subscribedAt;
 
+  /// 커뮤니티 닉네임 ('' → 가린 이름 "오XX")
+  String nickname;
+
+  /// 공부시간 순위에 참여 (이름은 첫 글자만 공개)
+  bool rankingOptIn;
+
   Learner({
     this.onboarded = false,
     this.grade = '고2',
@@ -54,10 +60,11 @@ class Learner {
     this.trialStartedAt = 0,
     this.plan = '',
     this.subscribedAt = 0,
+    this.nickname = '',
+    this.rankingOptIn = true,
   })  : courses = courses ?? <String>[],
         workbooks = workbooks ?? <String>[];
 
-  bool get isMiddle => grade.startsWith('중');
 
   Map<String, dynamic> toJson() => {
         'onboarded': onboarded,
@@ -70,6 +77,8 @@ class Learner {
         'trial': trialStartedAt,
         'plan': plan,
         'subAt': subscribedAt,
+        'nick': nickname,
+        'rank': rankingOptIn,
       };
 
   static Learner fromJson(Map<String, dynamic> j) => Learner(
@@ -83,6 +92,8 @@ class Learner {
         trialStartedAt: _i(j['trial']),
         plan: _s(j['plan']),
         subscribedAt: _i(j['subAt']),
+        nickname: _s(j['nick']),
+        rankingOptIn: j['rank'] != false,
       );
 }
 

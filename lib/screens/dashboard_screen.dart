@@ -55,7 +55,7 @@ class DashboardScreen extends StatelessWidget {
             if (!app.subscribed)
               InkWell(
                 borderRadius: BorderRadius.circular(20),
-                onTap: () => onNavigate(8),
+                onTap: () => onNavigate(9),
                 child: Pill('무료 체험 ${app.trialDaysLeft}일 남음', icon: Icons.workspace_premium_rounded, color: AppColors.blue),
               ),
             if (l.examDate > 0) ...[

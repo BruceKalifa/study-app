@@ -429,9 +429,10 @@ class SubjectGroup {
 }
 
 /// 학년 값 (schema `grades`).
-const List<String> kGrades = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수'];
+/// 학년 값 (고등 전용 서비스).
+const List<String> kGrades = ['고1', '고2', '고3', 'N수'];
 
-/// A course (과목): 물리학Ⅰ, 중2 수학, 국어(독서)… — one JSON file.
+/// A course (과목): 물리학Ⅰ, 수학Ⅰ, 국어(독서)… — one JSON file.
 class Subject {
   final String id;
   final String name;

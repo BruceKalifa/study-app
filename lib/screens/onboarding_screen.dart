@@ -185,10 +185,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _courses.clear();
                     _workbooksTouched = false;
                     _workbooks.clear();
-                    _goal = g.startsWith('중') ? '내신' : _goal;
                   }
                 }),
-                width: 104,
+                width: 120,
               ),
           ]),
         ]);

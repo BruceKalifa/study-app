@@ -16,6 +16,8 @@ const crypto = require('crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const { ContentStore } = require('./content-store');
 const { createContentApi } = require('./content-api');
+const { createCommunityApi } = require('./community');
+const { createRankingApi } = require('./ranking');
 
 // ───────────────────────── 설정 ─────────────────────────
 const PORT = Number(process.env.PORT) || 8080;
@@ -483,6 +485,9 @@ function loadAdminKey() {
 const ADMIN = loadAdminKey();
 const contentStore = new ContentStore({ dir: CONTENT_DIR, seedDir: SEED_DIR }).init();
 const contentApi = createContentApi({ store: contentStore, adminKey: ADMIN.key });
+// 커뮤니티 게시판 + 공부시간 순위 (docs/community-api.md) — DATA_DIR/community.json, ranking.json
+const communityApi = createCommunityApi({ dataDir: DATA_DIR, checkKey: contentApi.checkKey });
+const rankingApi = createRankingApi({ dataDir: DATA_DIR });
 
 // ───────────────────────── HTTP (정적 파일) ─────────────────────────
 const MIME = {
@@ -519,6 +524,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 커뮤니티(/api/community/…, /api/admin/community/…)·순위(/api/ranking…) — /api/admin/ 전체를 받는 콘텐츠 API 보다 먼저
+  if (communityApi.handle(req, res, reqUrl)) return;
+  if (rankingApi.handle(req, res, reqUrl)) return;
   // 문제 콘텐츠 API (앱 다운로드용 /api/content/…, 출제 웹용 /api/admin/…)
   if (contentApi.handle(req, res, reqUrl)) return;
   if (urlPath === '/admin') {
@@ -693,6 +701,8 @@ function shutdown() {
   console.log('\n서버를 끄는 중… 기록을 저장합니다.');
   clearInterval(heartbeat);
   saveSync();
+  communityApi.saveSync();
+  rankingApi.saveSync();
   for (const ws of wss.clients) { try { ws.close(1001, 'server_shutdown'); } catch (_) { /* ignore */ } }
   server.close();
   setTimeout(() => process.exit(0), 300).unref();

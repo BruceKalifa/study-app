@@ -644,7 +644,8 @@ function createContentApi({ store, adminKey, log }) {
     return true;
   }
 
-  return { handle, index };
+  // checkKey: 커뮤니티 관리 API 도 같은 키·같은 실패 횟수 제한을 쓴다
+  return { handle, index, checkKey };
 }
 
 module.exports = { createContentApi, normalizeProblem, normalizeCourse };

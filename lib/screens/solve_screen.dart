@@ -16,6 +16,7 @@ import '../widgets/answer_panel.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/problem_card.dart';
+import 'community_screen.dart' show WritePostScreen;
 import 'result_screen.dart';
 
 /// One problem per page, printed like a 모의고사 시험지; the rest of the page is writing space.
@@ -757,6 +758,14 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             onPressed: _palmSafe(_addVariant),
             icon: const Icon(Icons.auto_awesome_rounded, size: 19),
             label: const Text('변형'),
+          ),
+        if (_app.community != null)
+          TextButton.icon(
+            key: const Key('ask'),
+            onPressed: _palmSafe(() => Navigator.of(context)
+                .push(MaterialPageRoute<bool>(builder: (_) => WritePostScreen(problem: p.isVariant ? (_app.problem(p.familyId) ?? p) : p)))),
+            icon: const Icon(Icons.forum_rounded, size: 19),
+            label: const Text('질문'),
           ),
         if (!graded.correct)
           TextButton.icon(

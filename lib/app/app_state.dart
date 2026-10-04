@@ -10,6 +10,7 @@ import '../core/problem_bank.dart';
 import '../core/variants.dart';
 import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
+import '../services/community_api.dart';
 import '../services/content_sync.dart';
 import '../services/live_sync.dart';
 import 'learner.dart';
@@ -144,7 +145,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// Called when the app comes back to the foreground.
-  void onResumed() => _live?.reconnect();
+  void onResumed() {
+    _live?.reconnect();
+    reportStudy();
+  }
 
   void _configureLive() {
     if (!enableLive) return;
@@ -373,6 +377,7 @@ class AppState extends ChangeNotifier {
       await storage.write(_pp('ink/$id.json'), jsonEncode(inkDoc!.toJson()));
     }
     _changed();
+    reportStudy(now: false);
     final l = _live;
     if (l != null) {
       l.sendAnswer(problemId: p.id, answer: answer, correct: correct, timeMs: timeMs);
@@ -581,7 +586,7 @@ class AppState extends ChangeNotifier {
     if (learner.examDate == 0) {
       final d = defaultSuneungDate(DateTime.now());
       learner.examDate = d.millisecondsSinceEpoch;
-      learner.examName = grade.startsWith('중') ? '기말고사' : '수능';
+      learner.examName = goal == '내신' ? '기말고사' : '수능';
     }
     if (learner.trialStartedAt == 0) learner.trialStartedAt = _now;
     _daily = null; // rebuild today's set for the new courses
@@ -741,6 +746,7 @@ class AppState extends ChangeNotifier {
     if (ms >= 30 * 1000) sessions = [...sessions, StudySession(s, ms)];
     studyStartedAt = null;
     _changed();
+    reportStudy();
   }
 
   int studyMsOn(String day) {
@@ -798,6 +804,41 @@ class AppState extends ChangeNotifier {
   }
 
   String newId() => _newId();
+
+  // ------------------------------------------------------------ 커뮤니티 · 순위
+  /// null when no server address is set.
+  CommunityApi? get community =>
+      settings.serverUrl.trim().isEmpty ? null : CommunityApi(settings.serverUrl, profile.id);
+
+  /// Name shown on posts: the nickname, or the masked real name (오XX).
+  String get communityName => learner.nickname.trim().isNotEmpty ? learner.nickname.trim() : maskName(profile.name);
+
+  /// 오늘 공부시간 = 순공 타이머 + 앱에서 문제 푼 시간.
+  int get todayTotalStudyMs => todayStudyMs + solveMsOn(dayKey(DateTime.now()));
+
+  Timer? _reportTimer;
+
+  /// Send today's study time to the ranking (masked name). Errors are ignored.
+  Future<void> reportStudy({bool now = true}) async {
+    final api = community;
+    if (api == null || !learner.rankingOptIn) return;
+    if (!now) {
+      _reportTimer?.cancel();
+      _reportTimer = Timer(const Duration(seconds: 8), () => reportStudy());
+      return;
+    }
+    try {
+      await api.reportStudy(
+        name: profile.name,
+        grade: learner.grade,
+        day: dayKey(DateTime.now()),
+        studyMs: todayTotalStudyMs,
+        solved: todayCount,
+      );
+    } catch (e) {
+      debugPrint('ranking report: $e');
+    }
+  }
 
   // ------------------------------------------------------------ content server
   Future<SyncResult> syncContent() async {
@@ -924,6 +965,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _saveTimer?.cancel();
+    _reportTimer?.cancel();
     _live?.dispose();
     super.dispose();
   }

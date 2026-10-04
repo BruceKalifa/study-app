@@ -8,6 +8,7 @@ import '../app/app_state.dart';
 import '../app/learner.dart';
 import '../app/theme.dart';
 import '../widgets/common.dart';
+import 'community_screen.dart' show RankingPanel;
 import 'dashboard_screen.dart' show fmtStudy;
 
 /// 학습관리: D-day · 순공 타이머 · 오늘 할 일 · 이번 주 · 모의고사 성적 · 주간 리포트.
@@ -66,6 +67,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
           _scoresCard(app, wide),
           const SizedBox(height: 18),
           _reportCard(app),
+          if (app.community != null) ...[
+            const SizedBox(height: 18),
+            const RankingPanel(compact: true),
+          ],
         ],
       );
     });

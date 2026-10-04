@@ -16,6 +16,7 @@ import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
+import 'package:study_app/services/community_api.dart';
 import 'package:study_app/services/content_sync.dart';
 
 Future<AppState> _state({bool onboard = true}) async {
@@ -119,7 +120,7 @@ void main() {
     await tester.pumpWidget(_app(s!));
     await tester.pump(const Duration(seconds: 1));
     expect(find.byKey(const Key('daily-start')), findsOneWidget);
-    for (final tab in ['문제집', '오답노트', '학습관리', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
+    for (final tab in ['문제집', '오답노트', '학습관리', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
       await tester.tap(find.text(tab).last);
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump(const Duration(milliseconds: 600));
@@ -345,27 +346,29 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('반가워요!'), findsOneWidget);
     await tester.enterText(find.byKey(const Key('onb-name')), '예진');
-    await tester.tap(find.byKey(const Key('grade-중2')));
+    await tester.tap(find.byKey(const Key('grade-고3')));
     await tester.pump();
     for (var i = 0; i < 2; i++) {
       await tester.tap(find.byKey(const Key('onb-next')));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
     }
-    expect(find.byKey(const Key('course-mid-math2')), findsOneWidget);
-    expect(find.byKey(const Key('course-phy1')), findsNothing);
+    expect(find.byKey(const Key('course-phy2')), findsOneWidget);
+    expect(find.byKey(const Key('course-integ')), findsNothing, reason: '통합과학 is 고1');
+    expect(find.byKey(const Key('grade-중2')), findsNothing, reason: '고등 전용');
     await tester.tap(find.byKey(const Key('onb-next')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('wb-wb-mid-math2')), findsOneWidget);
+    expect(find.byKey(const Key('wb-wb-phy2-deep')), findsOneWidget);
     await tester.tap(find.byKey(const Key('onb-start')));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byKey(const Key('daily-start')), findsOneWidget);
-    expect(s.learner.grade, '중2');
-    expect(s.learner.goal, '내신');
+    expect(s.learner.grade, '고3');
+    expect(s.learner.goal, '수능');
     expect(s.profile.name, '예진');
-    expect(s.myCourseIds, {'mid-math2', 'mid-sci'});
+    expect(s.myCourseIds, {'phy1', 'phy2', 'earth1', 'math', 'kor-read', 'eng'});
+    expect(s.bank.subjects.every((c) => c.level == 'high' || c.id == 'custom'), isTrue);
     expect(s.dailySet.problemIds, isNotEmpty);
     expect(s.dailyProblems.every((p) => s.myCourseIds.contains(p.subjectId)), isTrue);
     expect(s.trialDaysLeft, AppState.trialDays);
@@ -575,4 +578,76 @@ void main() {
       expect(again.bank.byId('tc-1'), isNotNull);
     }, _RealHttp());
   });
+
+  testWidgets('오답노트 shows only courses the student has solved', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    final p = app.bank.subject('phy1')!.problems.first;
+    await tester.runAsync(() => app.record(p, answer: 'x', expected: p.answer, correct: false, timeMs: 1000, mode: 'practice'));
+    await tester.pumpWidget(_app(app));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('오답노트').last);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('wn-subject-phy1')), findsOneWidget);
+    expect(find.byKey(const Key('wn-subject-eng')), findsNothing);
+    expect(find.byKey(const Key('wn-subject-kor-read')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('커뮤니티 without a server explains how to connect', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.pumpWidget(_app(app));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('커뮤니티').last);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('커뮤니티 서버에 연결되지 않았어요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('names are masked before they leave the tablet', () {
+    expect(maskName('오예진'), '오XX');
+    expect(maskName('김민'), '김XX');
+    expect(maskName(' Kim '), 'KXX');
+    expect(maskName(''), '익명');
+  });
+
+  // Runs in CI against the real Node server (server/), started on COMMUNITY_SERVER.
+  final server = Platform.environment['COMMUNITY_SERVER'];
+  test('community + ranking against the real server', () async {
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final a = CommunityApi(server!, 'user-a-${DateTime.now().microsecondsSinceEpoch}');
+      final b = CommunityApi(server, 'user-b-${DateTime.now().microsecondsSinceEpoch}');
+      final post = await a.write(author: '물리왕', grade: '고3', board: 'qna', title: '등가속도 질문', body: r'$v=v_0+at$ 에서 a가 음수면?', problemId: 'phy1-mech-001');
+      expect(post.mine, isTrue);
+      final listA = await a.posts(board: 'qna');
+      expect(listA.any((p) => p.id == post.id && p.mine), isTrue);
+      final listB = await b.posts(board: 'qna');
+      expect(listB.firstWhere((p) => p.id == post.id).mine, isFalse);
+      await b.comment(post.id, author: '지구과학러', grade: '고2', body: '감속 운동이에요');
+      final (likes, liked) = await b.like(post.id);
+      expect((likes, liked), (1, true));
+      final read = await a.post(post.id);
+      expect(read.body, contains('v_0'));
+      expect(read.comments.single.author, '지구과학러');
+      expect(read.comments.single.mine, isFalse);
+      expect(read.problemId, 'phy1-mech-001');
+      await expectLater(b.deletePost(post.id), throwsA(isA<CommunityError>()));
+      await a.deletePost(post.id);
+      await expectLater(a.post(post.id), throwsA(isA<CommunityError>()));
+
+      final day = dayKey(DateTime.now());
+      await a.reportStudy(name: '오예진', grade: '고3', day: day, studyMs: 3 * 3600000, solved: 40);
+      await b.reportStudy(name: '김민수', grade: '고2', day: day, studyMs: 2 * 3600000, solved: 20);
+      final r = await a.ranking(period: 'day', day: day);
+      expect(r.entries.map((e) => e.name), containsAll(['오XX', '김XX']));
+      expect(r.entries.any((e) => e.name.contains('예진') || e.name.contains('민수')), isFalse);
+      expect(r.myRank, isNotNull);
+      expect(r.entries.firstWhere((e) => e.me).name, '오XX');
+      final g2 = await b.ranking(period: 'week', grade: '고2', day: day);
+      expect(g2.entries.every((e) => e.grade == '고2'), isTrue);
+    }, _RealHttp());
+  }, skip: server == null ? 'COMMUNITY_SERVER not set' : false);
 }

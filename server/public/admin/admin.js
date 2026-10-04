@@ -15,7 +15,8 @@
 
   // ───────────────────────── 상태 ─────────────────────────
   const st = {
-    tab: 'problems',
+    tab: 'problems', // 편집 탭 (problems | passages | workbooks)
+    view: 'editor', // editor | community (커뮤니티 관리)
     courses: [],
     courseId: null,
     course: null,
@@ -50,8 +51,10 @@
     lastField: null,
   };
   try { Object.assign(st, JSON.parse(localStorage.getItem(UI_STORE) || '{}').ui || {}); } catch (_) { /* ignore */ }
+  if (!['problems', 'passages', 'workbooks'].includes(st.tab)) st.tab = 'problems';
+  if (st.view !== 'community') st.view = 'editor';
   function saveUi() {
-    try { localStorage.setItem(UI_STORE, JSON.stringify({ ui: { courseId: st.courseId, tab: st.tab, wbAllCourses: st.wbAllCourses } })); } catch (_) { /* ignore */ }
+    try { localStorage.setItem(UI_STORE, JSON.stringify({ ui: { courseId: st.courseId, tab: st.tab, view: st.view, wbAllCourses: st.wbAllCourses } })); } catch (_) { /* ignore */ }
   }
 
   // ───────────────────────── API ─────────────────────────
@@ -374,10 +377,25 @@
   // ───────────────────────── 탭 ─────────────────────────
   $$('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
   function switchTab(tab) {
+    if (tab === 'community') {
+      st.view = 'community';
+      showView();
+      saveUi();
+      loadCommunity();
+      return;
+    }
+    st.view = 'editor';
     st.tab = tab;
-    $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.tab === tab));
+    showView();
     saveUi();
     renderAll();
+  }
+  /** 편집 화면(3단) ↔ 커뮤니티 관리 화면 */
+  function showView() {
+    const cm = st.view === 'community';
+    $('#app').hidden = cm;
+    $('#communityPane').hidden = !cm;
+    $$('.tab').forEach((t) => t.classList.toggle('is-active', cm ? t.dataset.tab === 'community' : t.dataset.tab === st.tab));
   }
   function renderAll() {
     renderListHead();
@@ -1471,6 +1489,7 @@
     if (mod && (e.key === 's' || e.key === 'S')) {
       e.preventDefault();
       if ($('#courseDlg').open) { $('#courseForm').requestSubmit(); return; }
+      if (st.view === 'community') return;
       if (st.tab === 'problems' && st.draft) saveProblem();
       else if (st.tab === 'passages' && st.pDraft) savePassage();
       else if (st.tab === 'workbooks') saveWorkbooks();
@@ -1606,6 +1625,121 @@
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  // ───────────────────────── 커뮤니티 관리 ─────────────────────────
+  // API: docs/community-api.md (관리: /api/admin/community/…). 학생 userId 는 서버가 내보내지 않는다.
+  const BOARD_NAMES = { free: '자유', qna: '질문', proof: '공부인증', info: '입시정보', mind: '고민·멘탈' };
+  const CM_PAGE = 50;
+  const cm = { reports: [], posts: [], q: '', open: new Set(), more: false, loaded: false };
+
+  function fmtTime(ms) {
+    if (!ms) return '';
+    const diff = Date.now() - ms;
+    if (diff < 60000) return '방금';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}분 전`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}시간 전`;
+    const d = new Date(ms);
+    const p2 = (n) => String(n).padStart(2, '0');
+    const y = d.getFullYear() !== new Date().getFullYear() ? `${d.getFullYear()}년 ` : '';
+    return `${y}${d.getMonth() + 1}월 ${d.getDate()}일 ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  }
+  async function loadCommunity() {
+    try {
+      const [r, p] = await Promise.all([
+        api.get('/api/admin/community/reports'),
+        api.get(`/api/admin/community/posts?limit=${CM_PAGE}${cm.q ? '&q=' + encodeURIComponent(cm.q) : ''}`),
+      ]);
+      cm.reports = r.posts;
+      cm.posts = p.posts;
+      cm.total = p.total;
+      cm.more = p.posts.length >= CM_PAGE;
+      cm.loaded = true;
+      renderCommunity();
+    } catch (e) { toast(e.message, 'bad'); }
+  }
+  async function loadMorePosts() {
+    const last = cm.posts[cm.posts.length - 1];
+    if (!last) return;
+    try {
+      const p = await api.get(`/api/admin/community/posts?limit=${CM_PAGE}&before=${last.createdAt}${cm.q ? '&q=' + encodeURIComponent(cm.q) : ''}`);
+      cm.posts = cm.posts.concat(p.posts);
+      cm.more = p.posts.length >= CM_PAGE;
+      renderCommunity();
+    } catch (e) { toast(e.message, 'bad'); }
+  }
+  function cmCard(p, mode) {
+    const open = cm.open.has(p.id);
+    const who = `${esc(p.author)}${p.grade ? ' · ' + esc(p.grade) : ''} · ${fmtTime(p.createdAt)}`;
+    const badges = `<span class="badge">${esc(BOARD_NAMES[p.board] || p.board)}</span>`
+      + (p.hidden ? '<span class="badge bad">숨김</span>' : '')
+      + (p.reportCount ? `<span class="badge warn">신고 ${p.reportCount}</span>` : '')
+      + (p.problemId ? `<span class="badge lvl" title="연결된 문제">${esc(p.problemId)}</span>` : '');
+    const reasons = mode === 'report' && p.reports.length
+      ? `<ul class="cm-reasons">${p.reports.map((r) => `<li><b>${esc(r.reason)}</b><span>${fmtTime(r.at)}</span></li>`).join('')}</ul>` : '';
+    const comments = open
+      ? `<ul class="cm-comments">${p.comments.map((c) => `<li><div><div class="cm-meta">${esc(c.author)}${c.grade ? ' · ' + esc(c.grade) : ''} · ${fmtTime(c.createdAt)}</div><p>${esc(c.body)}</p></div>
+          <button class="btn small ghost danger" data-cm="cdel" data-cid="${esc(c.id)}">삭제</button></li>`).join('') || '<li class="muted">댓글이 없습니다.</li>'}</ul>` : '';
+    const actions = (mode === 'report'
+      ? `<button class="btn small" data-cm="restore" title="숨김을 풀고 신고 기록을 지웁니다">복구</button>` : '')
+      + `<button class="btn small" data-cm="toggle">${open ? '접기' : `댓글 ${p.comments.length}`}</button>`
+      + `<button class="btn small danger" data-cm="del">삭제</button>`;
+    return `<article class="cm-card ${p.hidden ? 'is-hidden' : ''}" data-pid="${esc(p.id)}">
+      <div class="cm-meta">${badges}<span class="who">${who}</span></div>
+      <h3>${esc(p.title)}</h3>
+      <p class="cm-body ${open ? '' : 'clamp'}">${esc(p.body)}</p>
+      ${reasons}${comments}
+      <div class="cm-foot"><span class="cm-stats">좋아요 ${p.likes} · 댓글 ${p.comments.length} · 조회 ${p.views}</span>${actions}</div>
+    </article>`;
+  }
+  function renderCommunity() {
+    const hiddenN = cm.reports.filter((p) => p.hidden).length;
+    $('#cmReportCount').textContent = cm.reports.length ? `${cm.reports.length}개 · 숨김 ${hiddenN}` : '';
+    $('#cmReports').innerHTML = cm.reports.map((p) => cmCard(p, 'report')).join('')
+      || '<div class="empty">신고된 글이 없습니다.</div>';
+    $('#cmPostCount').textContent = cm.loaded ? (cm.q ? `검색 결과 ${cm.posts.length}${cm.more ? '+' : ''}개` : `전체 ${cm.total || 0}개`) : '';
+    $('#cmPosts').innerHTML = cm.posts.map((p) => cmCard(p, 'post')).join('')
+      || `<div class="empty">${cm.q ? '검색 결과가 없습니다.' : '아직 글이 없습니다.'}</div>`;
+    $('#cmMore').hidden = !cm.more;
+  }
+  function cmFind(id) {
+    return cm.reports.find((p) => p.id === id) || cm.posts.find((p) => p.id === id);
+  }
+  $('#communityPane').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-cm]');
+    if (!b) return;
+    const card = b.closest('[data-pid]');
+    const id = card.dataset.pid;
+    const p = cmFind(id);
+    if (!p) return;
+    const act = b.dataset.cm;
+    try {
+      if (act === 'toggle') {
+        if (cm.open.has(id)) cm.open.delete(id); else cm.open.add(id);
+        renderCommunity();
+        return;
+      }
+      if (act === 'restore') {
+        await api.post(`/api/admin/community/posts/${encodeURIComponent(id)}/restore`, {});
+        toast(p.hidden ? '글을 다시 보이게 했습니다' : '신고 기록을 지웠습니다', 'good');
+      } else if (act === 'del') {
+        if (!confirm(`"${p.title}" 글을 삭제할까요?\n댓글도 함께 지워지고 되돌릴 수 없습니다.`)) return;
+        await api.del(`/api/admin/community/posts/${encodeURIComponent(id)}`);
+        toast('글을 삭제했습니다');
+      } else if (act === 'cdel') {
+        const c = p.comments.find((x) => x.id === b.dataset.cid);
+        if (!c || !confirm(`${c.author} 님의 댓글을 삭제할까요?\n\n${c.body.slice(0, 120)}`)) return;
+        await api.del(`/api/admin/community/posts/${encodeURIComponent(id)}/comments/${encodeURIComponent(c.id)}`);
+        toast('댓글을 삭제했습니다');
+      }
+      await loadCommunity();
+    } catch (err) {
+      toast(err.message, 'bad');
+      if (err.status === 404) loadCommunity();
+    }
+  });
+  $('#cmRefresh').addEventListener('click', () => loadCommunity().then(() => toast('새로 고쳤습니다')));
+  $('#cmMore').addEventListener('click', loadMorePosts);
+  $('#cmSearch').addEventListener('input', debounce((e) => { cm.q = e.target.value.trim(); loadCommunity(); }, 250));
+
   // ───────────────────────── 시작 ─────────────────────────
   async function start() {
     if (!api.key) await askKey();
@@ -1617,9 +1751,10 @@
     }
     await loadWorkbooks().catch((e) => toast(e.message, 'bad'));
     const want = st.courseId && st.courses.some((c) => c.id === st.courseId) ? st.courseId : st.courses[0] && st.courses[0].id;
-    $$('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.tab === st.tab));
+    showView();
     if (want) await selectCourse(want, { force: true });
     else renderAll();
+    if (st.view === 'community') loadCommunity();
   }
   // KaTeX 가 늦게 오면 다시 그린다
   window.addEventListener('load', () => { if (st.draft || st.pDraft || st.wbSel != null) renderPreview(); if (!$('#latexPanel').hidden) renderLatexPanel(); });

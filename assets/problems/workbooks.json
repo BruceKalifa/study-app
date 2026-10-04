@@ -211,40 +211,6 @@
         "soc-int-just-001",
         "soc-int-fut-001"
       ]
-    },
-    {
-      "id": "wb-mid-math2",
-      "title": "중2 수학 내신 대비",
-      "course": "mid-math2",
-      "level": "기본",
-      "desc": "유리수와 순환소수부터 일차함수까지 내신 필수 유형",
-      "problems": [
-        "mid-math2-rat-001",
-        "mid-math2-rat-002",
-        "mid-math2-expr-001",
-        "mid-math2-expr-002",
-        "mid-math2-expr-003",
-        "mid-math2-sys-001",
-        "mid-math2-sys-002",
-        "mid-math2-lin-001",
-        "mid-math2-lin-002",
-        "mid-math2-lin-003"
-      ]
-    },
-    {
-      "id": "wb-mid-sci",
-      "title": "중등 과학 내신 핵심",
-      "course": "mid-sci",
-      "level": "기본",
-      "desc": "전기, 운동과 에너지, 화학 반응, 날씨, 유전 핵심 문항",
-      "problems": [
-        "mid-sci-elec-001",
-        "mid-sci-elec-002",
-        "mid-sci-mot-001",
-        "mid-sci-chem-001",
-        "mid-sci-atm-001",
-        "mid-sci-gen-001"
-      ]
     }
   ]
 }

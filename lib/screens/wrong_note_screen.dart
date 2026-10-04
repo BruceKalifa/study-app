@@ -43,6 +43,12 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
       return app.problem(s.baseId)?.subjectId == _subject;
     }).toList();
     final due = app.wrongNote.where((s) => s.isDue(now)).toList();
+    // only the courses the student has actually solved problems in
+    final solvedIds = {for (final a in app.attempts) a.subjectId};
+    final solvedCourses = [
+      for (final s in app.bank.subjects)
+        if (solvedIds.contains(s.id)) s
+    ];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
@@ -76,10 +82,14 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
         Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           for (final (i, label) in [(0, '오늘 복습'), (1, '전체 오답'), (2, '졸업한 문제'), (3, '북마크')])
             ChoiceChip(label: Text(label), selected: _tab == i, onSelected: (_) => setState(() => _tab = i)),
-          Container(width: 1, height: 24, color: AppColors.line, margin: const EdgeInsets.symmetric(horizontal: 6)),
-          ChoiceChip(label: const Text('전체 과목'), selected: _subject == null, onSelected: (_) => setState(() => _subject = null)),
-          for (final s in app.bank.subjects)
+          if (solvedCourses.isNotEmpty) ...[
+            Container(width: 1, height: 24, color: AppColors.line, margin: const EdgeInsets.symmetric(horizontal: 6)),
             ChoiceChip(
+                label: const Text('전체 과목'), selected: _subject == null, onSelected: (_) => setState(() => _subject = null)),
+          ],
+          for (final s in solvedCourses)
+            ChoiceChip(
+              key: Key('wn-subject-${s.id}'),
               label: Text(s.name),
               selected: _subject == s.id,
               selectedColor: Color(s.color),

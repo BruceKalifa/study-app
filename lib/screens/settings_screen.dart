@@ -18,6 +18,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _url;
+  late TextEditingController _nick;
   bool _init = false;
 
   @override
@@ -26,12 +27,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!_init) {
       _init = true;
       _url = TextEditingController(text: AppScope.read(context).settings.serverUrl);
+      _nick = TextEditingController(text: AppScope.read(context).learner.nickname);
     }
   }
 
   @override
   void dispose() {
     _url.dispose();
+    _nick.dispose();
     super.dispose();
   }
 
@@ -123,6 +126,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ]),
+        _Section(
+          title: '커뮤니티 · 공부시간 순위',
+          subtitle: '글과 댓글에는 닉네임이, 순위에는 이름 첫 글자만(예: 오XX) 보여요',
+          children: [
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  key: const Key('nickname'),
+                  controller: _nick,
+                  maxLength: 20,
+                  decoration: InputDecoration(
+                    labelText: '커뮤니티 닉네임',
+                    hintText: '비워 두면 ${app.communityName}',
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                  ),
+                  onSubmitted: (v) => app.updateLearner((l) => l.nickname = v.trim()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonal(
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  app.updateLearner((l) => l.nickname = _nick.text.trim());
+                },
+                child: const Text('저장'),
+              ),
+            ]),
+            _switch('공부시간 순위에 참여', '켜면 오늘 공부시간이 가린 이름으로 순위에 올라가요', app.learner.rankingOptIn,
+                (v) => app.updateLearner((l) => l.rankingOptIn = v)),
+          ],
+        ),
         _Section(title: '학습', children: [
           ListTile(
             contentPadding: EdgeInsets.zero,

@@ -41,7 +41,7 @@ class SubscriptionScreen extends StatelessWidget {
                 const Text('고퀄리티 문항을\n한 달 구독으로 무제한',
                     style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -1.4, height: 1.2)),
                 const SizedBox(height: 12),
-                Text('국어·수학·영어·사회·과학, 중1부터 N수까지. 매일 오답으로 만든 변형 세트와 학습관리까지 한 번에.',
+                Text('국어·수학·영어·사회·과학, 고1부터 N수까지. 매일 오답으로 만든 변형 세트와 학습관리까지 한 번에.',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 16, height: 1.5)),
               ]),
             ),

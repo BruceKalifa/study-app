@@ -54,12 +54,24 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee ci-out/analyze.txt; exit ${PIPESTATUS[0]}
 
+      - name: Server tests (content, community, ranking)
+        run: |
+          cd server && npm install --no-audit --no-fund --silent
+          node tools/test-content.js 2>&1 | tail -3
+          node tools/test-community.js 2>&1 | tail -3
+
+      - name: Start server for app integration tests
+        run: |
+          cd server
+          DATA_DIR=$(mktemp -d) CONTENT_DIR=$(mktemp -d) PORT=8099 nohup node server.js > ../ci-out/server.txt 2>&1 &
+          sleep 3; curl -sf http://127.0.0.1:8099/api/community/boards | head -c 200
+
       - name: Unit tests
-        run: flutter test 2>&1 | tee ci-out/test.txt; exit ${PIPESTATUS[0]}
+        run: COMMUNITY_SERVER=127.0.0.1:8099 flutter test 2>&1 | tee ci-out/test.txt; exit ${PIPESTATUS[0]}
 
       - name: Screenshots (for design review)
         continue-on-error: true
-        run: SHOTS=1 flutter test test/screenshots_test.dart > ci-out/shots.txt 2>&1; ls ci-out/shots || true
+        run: COMMUNITY_SERVER=127.0.0.1:8099 SHOTS=1 flutter test test/screenshots_test.dart > ci-out/shots.txt 2>&1; ls ci-out/shots || true
 
       - name: Stable signing key (so updates install over the old app)
         run: mkdir -p ~/.android && cp tools/keys/debug.keystore ~/.android/debug.keystore
