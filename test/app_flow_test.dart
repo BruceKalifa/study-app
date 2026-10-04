@@ -299,7 +299,7 @@ void main() {
     }
     expect(app.attempts, isEmpty);
     expect(find.text('시험 종료 3/3'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('exam-finish')));
+    await tester.tap(find.byKey(const Key('exam-finish')).last); // the page-switch animation may still hold the old bar
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('exam-finish-ok')));
