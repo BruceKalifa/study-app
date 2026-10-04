@@ -122,9 +122,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Text('${s.dailyGoal}문제', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
           ),
           _switch('풀이 시간 표시', '문제마다 타이머를 보여줘요', s.showTimer, (v) => app.updateSettings((x) => x.showTimer = v)),
-          _switch('손글씨로 답 쓰기', '단답형 답을 손으로 쓰면 자동 인식해요 (끄면 키패드)', s.handwritingAnswer,
+          _switch('손글씨로 답 쓰기', '단답형은 문제 아래 답칸에 쓰면 자동 인식해요 (끄면 답칸을 눌러 키패드로)', s.handwritingAnswer,
               (v) => app.updateSettings((x) => x.handwritingAnswer = v)),
           _switch('정답이면 자동으로 다음 문제', null, s.autoAdvance, (v) => app.updateSettings((x) => x.autoAdvance = v)),
+          _switch('전체화면으로 풀기', '문제와 필기 공간만 남겨요 (풀이 화면에서 바로 켜고 끌 수 있어요)', s.fullscreenSolve,
+              (v) => app.updateSettings((x) => x.fullscreenSolve = v)),
+          _switch('시험지 글꼴 (명조)', '문제를 모의고사 시험지처럼 명조체로 보여줘요', s.examFont,
+              (v) => app.updateSettings((x) => x.examFont = v)),
           ValueListenableBuilder<HandwritingStatus>(
             valueListenable: Handwriting.instance.status,
             builder: (context, st, _) => ListTile(

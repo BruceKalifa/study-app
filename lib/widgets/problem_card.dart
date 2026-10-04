@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
@@ -5,93 +7,230 @@ import '../core/problem.dart';
 import 'common.dart';
 import 'math_text.dart';
 
-/// The printed part of the worksheet: rendered at page scale (width 1000) under the ink.
+/// Keys into the printed sheet so the solve screen can find, in page coordinates,
+/// where the choices and the answer box are (for pen/finger taps and answer handwriting).
+class ExamSheetKeys {
+  final GlobalKey root = GlobalKey(debugLabel: 'sheet');
+  final GlobalKey answerBox = GlobalKey(debugLabel: 'answer-box');
+  final List<GlobalKey> choices = List.generate(8, (i) => GlobalKey(debugLabel: 'choice-$i'));
+
+  /// Rect of [k] in page coordinates (the sheet is laid out at page scale at the page origin).
+  Rect? rectOf(GlobalKey k) {
+    final root = this.root.currentContext?.findRenderObject();
+    final box = k.currentContext?.findRenderObject();
+    if (root is! RenderBox || box is! RenderBox || !box.attached || !box.hasSize || !root.attached) return null;
+    final o = box.localToGlobal(Offset.zero, ancestor: root);
+    return o & box.size;
+  }
+
+  Rect? get answerRect => rectOf(answerBox);
+
+  /// 1-based choice under [pos], or null.
+  int? choiceAt(Offset pos, int count) {
+    for (var i = 0; i < count && i < choices.length; i++) {
+      final r = rectOf(choices[i]);
+      if (r != null && r.inflate(10).contains(pos)) return i + 1;
+    }
+    return null;
+  }
+}
+
+/// 배점 like a 모의고사 paper: easy 2점, normal 3점, hard 4점.
+int problemPoints(Problem p) => p.difficulty <= 2 ? 2 : (p.difficulty == 3 ? 3 : 4);
+
+/// The printed part of the page, laid out like a 모의고사 시험지 at page scale (width 1000)
+/// under the ink. Everything else on the page is writing space.
 class ProblemSheet extends StatelessWidget {
   const ProblemSheet({
     super.key,
     required this.problem,
     required this.number,
     required this.color,
+    required this.keys,
     this.selectedChoice,
     this.revealAnswer = false,
+    this.mark,
+    this.answerText,
+    this.answerNote,
+    this.answerBoxEmpty = true,
+    this.columnWidth = 872,
+    this.serif = true,
   });
 
   final Problem problem;
   final int number;
   final Color color;
+  final ExamSheetKeys keys;
   final int? selectedChoice;
+
+  /// Show the correct choice / answer (after grading).
   final bool revealAnswer;
+
+  /// Teacher-style red mark over the number: true = ○, false = ╱, null = none.
+  final bool? mark;
+
+  /// Short answer as recognised from the answer box (or typed).
+  final String? answerText;
+
+  /// Small status line under the answer box (e.g. "인식 중…").
+  final String? answerNote;
+  final bool answerBoxEmpty;
+
+  /// Width of the problem column (narrower in landscape so the right side is free for solving).
+  final double columnWidth;
+  final bool serif;
+
+  static const double _indent = 58;
 
   @override
   Widget build(BuildContext context) {
     final p = problem;
+    final face = serif ? AppTheme.serif : AppTheme.font;
     final correctChoice = int.tryParse(p.answer);
+    const sans = AppTheme.font;
     return DefaultTextStyle(
-      style: const TextStyle(fontFamily: AppTheme.font, fontSize: 25, height: 1.65, color: AppColors.ink),
+      style: TextStyle(fontFamily: face, fontSize: 25, height: 1.75, color: AppColors.ink),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(56, 118, 56, 24),
+        key: keys.root,
+        padding: const EdgeInsets.fromLTRB(64, 104, 64, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── header, like the top of a 시험지
             Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-                  child: Text('$number',
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white, height: 1.3)),
-                ),
+                Text('${p.subjectName} 영역',
+                    style: const TextStyle(
+                        fontFamily: sans, fontSize: 22, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.4)),
                 const SizedBox(width: 14),
                 Flexible(
                   child: Text(
-                    [p.subjectName, p.unit, if (p.topic.isNotEmpty) p.topic].join('  ·  '),
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: color, height: 1.2),
+                    [p.unit, if (p.topic.isNotEmpty) p.topic].join('  ·  '),
                     overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontFamily: sans, fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.inkMuted, height: 1.3),
                   ),
                 ),
-                const SizedBox(width: 14),
-                DifficultyDots(p.difficulty, color: color, size: 9),
+                const SizedBox(width: 12),
+                DifficultyDots(p.difficulty, color: color, size: 8),
                 if (p.isVariant) ...[
-                  const SizedBox(width: 12),
-                  const Pill('변형', color: AppColors.accent, icon: Icons.auto_awesome_rounded),
+                  const SizedBox(width: 10),
+                  const Pill('변형', color: AppColors.accent, icon: Icons.auto_awesome_rounded, dense: true),
                 ],
               ],
             ),
-            const SizedBox(height: 22),
-            MathText(p.stem, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w500)),
-            if (p.boxItems.isNotEmpty) ...[
-              const SizedBox(height: 22),
-              _BoxItems(items: p.boxItems),
-            ],
-            if (p.isChoice && p.choices.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _Choices(
-                choices: p.choices,
-                selected: selectedChoice,
-                correct: revealAnswer ? correctChoice : null,
-                color: color,
+            const SizedBox(height: 10),
+            Container(height: 3, color: AppColors.ink),
+            const SizedBox(height: 3),
+            Container(height: 1, color: AppColors.ink),
+            const SizedBox(height: 34),
+            // ── the problem column
+            SizedBox(
+              width: columnWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: _indent,
+                        child: Stack(clipBehavior: Clip.none, children: [
+                          Text('$number.',
+                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, height: 1.55)),
+                          if (mark != null)
+                            Positioned(
+                              left: -14,
+                              top: -12,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: 1),
+                                duration: const Duration(milliseconds: 420),
+                                curve: Curves.easeOutCubic,
+                                builder: (context, t, _) => CustomPaint(
+                                  size: const Size(80, 72),
+                                  painter: _MarkPainter(correct: mark!, progress: t),
+                                ),
+                              ),
+                            ),
+                        ]),
+                      ),
+                      Expanded(
+                        child: MathText('${p.stem}  [${problemPoints(p)}점]',
+                            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w400)),
+                      ),
+                    ],
+                  ),
+                  if (p.boxItems.isNotEmpty) ...[
+                    const SizedBox(height: 26),
+                    Padding(
+                      padding: const EdgeInsets.only(left: _indent),
+                      child: _BoxItems(items: p.boxItems),
+                    ),
+                  ],
+                  if (p.isChoice && p.choices.isNotEmpty) ...[
+                    const SizedBox(height: 26),
+                    Padding(
+                      padding: const EdgeInsets.only(left: _indent - 6),
+                      child: _Choices(
+                        choices: p.choices,
+                        keys: keys.choices,
+                        selected: selectedChoice,
+                        correct: revealAnswer ? correctChoice : null,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                  if (!p.isChoice) ...[
+                    const SizedBox(height: 30),
+                    Padding(
+                      padding: const EdgeInsets.only(left: _indent),
+                      child: _AnswerBox(
+                        boxKey: keys.answerBox,
+                        unit: p.answerUnit,
+                        empty: answerBoxEmpty,
+                        text: answerText,
+                        note: answerNote,
+                        reveal: revealAnswer ? p.answer : null,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-            if (!p.isChoice && p.answerUnit != null && p.answerUnit!.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text('답의 단위: ${p.answerUnit}',
-                  style: const TextStyle(fontSize: 18, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
-            ],
-            const SizedBox(height: 30),
-            Row(children: [
-              Expanded(child: Container(height: 1.5, color: AppColors.line)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text('풀이', style: TextStyle(fontSize: 16, color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
-              ),
-              Expanded(child: Container(height: 1.5, color: AppColors.line)),
-            ]),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+/// Teacher's red pen: ○ for correct, a slash for wrong.
+class _MarkPainter extends CustomPainter {
+  _MarkPainter({required this.correct, required this.progress});
+  final bool correct;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFE0353B).withValues(alpha: 0.88)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.5
+      ..strokeCap = StrokeCap.round;
+    if (correct) {
+      final rect = Rect.fromLTWH(4, 4, size.width - 8, size.height - 8);
+      canvas.drawArc(rect, -math.pi * 0.62, math.pi * 2.08 * progress, false, paint);
+    } else {
+      final a = Offset(size.width * 0.86, size.height * 0.06);
+      final b = Offset(size.width * 0.14, size.height * 0.96);
+      canvas.drawLine(a, Offset.lerp(a, b, progress)!, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MarkPainter old) => old.progress != progress || old.correct != correct;
 }
 
 class _BoxItems extends StatelessWidget {
@@ -105,11 +244,8 @@ class _BoxItems extends StatelessWidget {
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(26, 28, 26, 18),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.lineStrong, width: 1.6),
-            borderRadius: BorderRadius.circular(8),
-          ),
+          padding: const EdgeInsets.fromLTRB(26, 30, 26, 16),
+          decoration: BoxDecoration(border: Border.all(color: AppColors.ink, width: 1.4)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -122,14 +258,14 @@ class _BoxItems extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: -14,
+          top: -17,
           left: 0,
           right: 0,
           child: Center(
             child: Container(
               color: const Color(0xFFFFFDF8),
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: const Text('〈보기〉', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+              child: const Text('<보 기>', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
             ),
           ),
         ),
@@ -139,16 +275,23 @@ class _BoxItems extends StatelessWidget {
 }
 
 class _Choices extends StatelessWidget {
-  const _Choices({required this.choices, required this.selected, required this.correct, required this.color});
+  const _Choices({
+    required this.choices,
+    required this.keys,
+    required this.selected,
+    required this.correct,
+    required this.color,
+  });
   final List<String> choices;
+  final List<GlobalKey> keys;
   final int? selected;
   final int? correct;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final longest = choices.fold<int>(0, (m, c) => MathText.plain(c).length > m ? MathText.plain(c).length : m);
-    final perRow = longest <= 8 ? 5 : (longest <= 22 ? 2 : 1);
+    final longest = choices.fold<int>(0, (m, c) => math.max(m, MathText.plain(c).length));
+    final perRow = longest <= 6 ? 5 : (longest <= 16 ? 3 : (longest <= 26 ? 2 : 1));
     final rows = <List<int>>[];
     for (var i = 0; i < choices.length; i += perRow) {
       rows.add([for (var j = i; j < i + perRow && j < choices.length; j++) j]);
@@ -157,18 +300,24 @@ class _Choices extends StatelessWidget {
       children: [
         for (final row in rows)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final i in row)
                   Expanded(
-                    child: _ChoiceItem(
-                      n: i + 1,
-                      text: choices[i],
-                      selected: selected == i + 1,
-                      correct: correct == null ? null : correct == i + 1,
-                      color: color,
+                    child: Container(
+                      key: Key('choice-${i + 1}'),
+                      child: KeyedSubtree(
+                        key: i < keys.length ? keys[i] : null,
+                        child: _ChoiceItem(
+                          n: i + 1,
+                          text: choices[i],
+                          selected: selected == i + 1,
+                          correct: correct == null ? null : correct == i + 1,
+                          color: color,
+                        ),
+                      ),
                     ),
                   ),
                 for (var k = row.length; k < perRow; k++) const Expanded(child: SizedBox()),
@@ -190,24 +339,144 @@ class _ChoiceItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mark = correct == true ? AppColors.correct : (selected ? color : null);
-    return Row(
+    // tap target is the whole item; generous vertical padding makes it easy to hit with a finger
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      padding: const EdgeInsets.fromLTRB(6, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: selected ? color.withValues(alpha: 0.07) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 50,
+            height: 42,
+            child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? AppColors.ink : Colors.transparent,
+                  border: Border.all(color: AppColors.ink, width: 1.6),
+                ),
+                child: Text('$n',
+                    style: TextStyle(
+                        fontFamily: AppTheme.font,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        height: 1.0,
+                        color: selected ? Colors.white : AppColors.ink)),
+              ),
+              if (correct == true)
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFE0353B), width: 3.5),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(width: 6),
+          Expanded(child: MathText(text, style: const TextStyle(fontSize: 24))),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnswerBox extends StatelessWidget {
+  const _AnswerBox({
+    required this.boxKey,
+    required this.unit,
+    required this.empty,
+    required this.text,
+    required this.note,
+    required this.reveal,
+    required this.color,
+  });
+  final GlobalKey boxKey;
+  final String? unit;
+  final bool empty;
+  final String? text;
+  final String? note;
+  final String? reveal;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const sans = AppTheme.font;
+    final u = unit ?? '';
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 36,
-          height: 36,
-          margin: const EdgeInsets.only(right: 8, top: 2),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: mark?.withValues(alpha: 0.14),
-            border: Border.all(color: mark ?? AppColors.lineStrong, width: mark == null ? 1.4 : 2.2),
-          ),
-          child: Text('$n',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: mark ?? AppColors.inkSoft, height: 1.0)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              key: boxKey,
+              width: 470,
+              height: 150,
+              decoration: BoxDecoration(
+                color: const Color(0x08000000),
+                border: Border.all(color: AppColors.ink, width: 1.8),
+              ),
+              child: Stack(children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                    color: AppColors.ink,
+                    child: const Text('답',
+                        style: TextStyle(fontFamily: sans, fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white, height: 1.3)),
+                  ),
+                ),
+                if (empty)
+                  const Center(
+                    child: Text('여기에 답을 쓰세요',
+                        style: TextStyle(fontFamily: sans, fontSize: 19, color: AppColors.lineStrong, fontWeight: FontWeight.w700)),
+                  ),
+              ]),
+            ),
+            if (u.isNotEmpty) ...[
+              const SizedBox(width: 14),
+              Flexible(child: Text(u, style: const TextStyle(fontSize: 26))),
+            ],
+          ],
         ),
-        Expanded(child: MathText(text, style: const TextStyle(fontSize: 23))),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 34,
+          child: Row(children: [
+            if (text != null && text!.isNotEmpty) ...[
+              Icon(Icons.auto_awesome_rounded, size: 20, color: color),
+              const SizedBox(width: 6),
+              Text('인식된 답  ',
+                  style: TextStyle(fontFamily: sans, fontSize: 17, fontWeight: FontWeight.w700, color: color)),
+              Text(u.isEmpty ? text! : '${text!} $u',
+                  key: const Key('recognized-answer'),
+                  style: const TextStyle(fontFamily: sans, fontSize: 22, fontWeight: FontWeight.w800, height: 1.2)),
+              const SizedBox(width: 12),
+              if (reveal == null)
+                const Text('다르면 답칸을 손가락으로 톡',
+                    style: TextStyle(fontFamily: sans, fontSize: 14.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+            ] else if (note != null)
+              Text(note!,
+                  style: const TextStyle(fontFamily: sans, fontSize: 16, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+            if (reveal != null) ...[
+              const SizedBox(width: 14),
+              Text('정답  ${u.isEmpty ? reveal! : '${reveal!} $u'}',
+                  style: const TextStyle(fontFamily: sans, fontSize: 19, fontWeight: FontWeight.w800, color: Color(0xFFE0353B))),
+            ],
+          ]),
+        ),
       ],
     );
   }

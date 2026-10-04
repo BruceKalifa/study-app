@@ -117,6 +117,17 @@ List<Offset> _wave() => [for (var x = 0.0; x <= 260; x += 4) Offset(x, 18 * math
 List<Offset> _circle(double r) =>
     [for (var a = 0.0; a <= math.pi * 2.05; a += 0.15) Offset(r * math.cos(a), r * math.sin(a))];
 
+List<Offset> _digit1() => [for (var y = 0.0; y <= 70; y += 5) Offset(4 - y * 0.06, y - 35)];
+List<Offset> _digit2() => [
+      for (var a = math.pi; a <= math.pi * 2.2; a += 0.2) Offset(18 + 18 * math.cos(a), -18 + 18 * math.sin(a)),
+      for (var t = 0.0; t <= 1; t += 0.1) Offset(34 - 34 * t, -10 + 45 * t),
+      for (var x = 0.0; x <= 40; x += 5) Offset(x, 35),
+    ];
+
+/// Palm rejection uses the wall clock: let real time pass after pen strokes before finger taps.
+Future<void> _rest(WidgetTester tester) =>
+    tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 600)));
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -171,37 +182,63 @@ void main() {
     debugPrint('SolveScreen found: ${find.byType(SolveScreen).evaluate().length}; '
         'exception: ${tester.takeException()}');
     final c = tester.getCenter(find.byType(SolveScreen));
-    await _write(tester, c + const Offset(-380, 160), _axisX());
-    await _write(tester, c + const Offset(-380, 160), _axisY());
-    await _write(tester, c + const Offset(-200, 60), _parabola());
-    await _write(tester, c + const Offset(60, 200), _circle(30));
-    await _shot(tester, '09_solve_calc');
+    // solving work in the free space to the right of the problem column
+    await _write(tester, c + const Offset(300, 60), _axisX());
+    await _write(tester, c + const Offset(300, 60), _axisY());
+    await _write(tester, c + const Offset(470, -40), _parabola());
+    await _write(tester, c + const Offset(300, 230), _wave());
+    await _rest(tester);
+    await _shot(tester, '09_solve_full');
 
     await tester.tap(find.byKey(Key('choice-${(int.parse(calc.answer) % 5) + 1}')));
     await tester.pump();
+    await _shot(tester, '10_solve_choice_marked');
     await tester.tap(find.byKey(const Key('submit')));
-    await _shot(tester, '10_solve_wrong');
+    await _shot(tester, '11_solve_wrong');
 
     await tester.tap(find.byKey(const Key('next')));
     await tester.pump(const Duration(milliseconds: 600));
-    await _write(tester, c + const Offset(-300, 120), _wave());
+    await _write(tester, c + const Offset(320, 120), _wave());
+    await _rest(tester);
     await tester.tap(find.byKey(Key('choice-${choice.answer}')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('submit')));
-    await _shot(tester, '11_solve_correct');
+    await _shot(tester, '12_solve_correct');
 
     await tester.tap(find.byKey(const Key('next')));
     await tester.pump(const Duration(milliseconds: 600));
-    await _shot(tester, '12_solve_short_pad');
-    await tester.tap(find.byKey(const Key('mode-keypad')));
-    await tester.pump(const Duration(milliseconds: 300));
+    // handwriting in the 답 box (recognition needs the device; the keypad fixes it in tests)
+    final box = tester.getCenter(find.text('여기에 답을 쓰세요'));
+    await _write(tester, box + const Offset(-60, 0), _digit1());
+    await _write(tester, box + const Offset(-20, 0), _digit2());
+    await _rest(tester);
+    await _shot(tester, '13_solve_short_written');
+    await tester.tapAt(box + const Offset(120, 30));
+    await tester.pump(const Duration(milliseconds: 500));
     for (final k in short.answer.split('')) {
       final key = find.byKey(Key('key-$k'));
       if (key.evaluate().isNotEmpty) await tester.tap(key);
     }
-    await _shot(tester, '13_solve_short_keypad');
+    await tester.pump(const Duration(milliseconds: 200));
+    await _shot(tester, '14_solve_keypad');
+    await tester.tap(find.byKey(const Key('keypad-ok')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byKey(const Key('submit')));
+    await _shot(tester, '15_solve_short_graded');
 
-    // 14. results
+    // windowed (full screen off)
+    await tester.tap(find.byKey(const Key('fullscreen-toggle')));
+    await _shot(tester, '16_solve_windowed');
+    await tester.tap(find.byKey(const Key('fullscreen-toggle')));
+
+    // portrait tablet
+    tester.view.physicalSize = const Size(1848, 2960);
+    await tester.tap(find.byKey(const Key('prev')));
+    await tester.pump(const Duration(milliseconds: 600));
+    await _shot(tester, '17_solve_portrait');
+    tester.view.physicalSize = const Size(2960, 1848);
+
+    // 18. results
     await tester.pumpWidget(_wrap(
         app,
         ResultScreen(title: '물리학Ⅰ · 역학과 에너지', mode: 'practice', items: [
@@ -210,9 +247,9 @@ void main() {
           SessionItem(problem: short, graded: GradedAnswer(short.answer, true, expectedDisplay(short)), timeMs: 120000),
           SessionItem(problem: generateVariant(calc, 5), graded: null, timeMs: 0),
         ])));
-    await _shot(tester, '14_results');
+    await _shot(tester, '18_results');
 
-    // 15. history detail with replay
+    // 19. history detail with replay
     final ink = InkDocument(strokes: [
       for (final (i, path) in [_axisX(), _axisY(), _parabola(), _wave()].indexed)
         InkStroke(
@@ -231,6 +268,6 @@ void main() {
     final withInk = Attempt.fromJson({...att.toJson(), 'ink': true});
     await tester.pumpWidget(_wrap(app, AttemptDetailScreen(attempt: withInk)));
     await tester.pump(const Duration(seconds: 3));
-    await _shot(tester, '15_history_replay');
+    await _shot(tester, '19_history_replay');
   });
 }

@@ -201,6 +201,12 @@ class AppSettings {
   bool autoAdvance;
   bool shuffleChoicesInVariants;
 
+  /// Solve screen opens in full screen (only the paper and the pen tools).
+  bool fullscreenSolve;
+
+  /// Problems printed in a 명조 (exam paper) face instead of the UI font.
+  bool examFont;
+
   AppSettings({
     this.dailyGoal = 10,
     this.serverUrl = '',
@@ -209,6 +215,8 @@ class AppSettings {
     this.handwritingAnswer = true,
     this.autoAdvance = false,
     this.shuffleChoicesInVariants = true,
+    this.fullscreenSolve = true,
+    this.examFont = true,
   });
 
   Map<String, dynamic> toJson() => {
@@ -218,6 +226,8 @@ class AppSettings {
         'showTimer': showTimer,
         'handwritingAnswer': handwritingAnswer,
         'autoAdvance': autoAdvance,
+        'fullscreenSolve': fullscreenSolve,
+        'examFont': examFont,
       };
 
   static AppSettings fromJson(Map<String, dynamic> j) => AppSettings(
@@ -227,5 +237,7 @@ class AppSettings {
         showTimer: j['showTimer'] != false,
         handwritingAnswer: j['handwritingAnswer'] != false,
         autoAdvance: j['autoAdvance'] == true,
+        fullscreenSolve: j['fullscreenSolve'] != false,
+        examFont: j['examFont'] != false,
       );
 }

@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
 import '../ink/ink_canvas.dart';
 import '../ink/ink_controller.dart';
+import '../ink/ink_model.dart';
 import '../ink/ink_toolbar.dart';
+import '../services/handwriting.dart';
 import '../services/live_sync.dart';
 import '../widgets/answer_panel.dart';
 import '../widgets/common.dart';
@@ -15,6 +18,11 @@ import '../widgets/math_text.dart';
 import '../widgets/problem_card.dart';
 import 'result_screen.dart';
 
+/// One problem per page, printed like a 모의고사 시험지; the rest of the page is writing space.
+///
+/// * 객관식: tap a choice (pen or finger) to mark it.
+/// * 단답형: write the answer in the 답 box under the problem; it is recognised automatically.
+/// * Full screen (default) hides everything except the paper, the pen tools and the page buttons.
 class SolveScreen extends StatefulWidget {
   const SolveScreen({
     super.key,
@@ -62,28 +70,46 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   final Map<int, GradedAnswer> _graded = {};
   final Set<int> _retrying = {};
   final Map<int, int> _elapsed = {};
-  int? _choice;
   DateTime _since = DateTime.now();
   Timer? _draftTimer;
   InkController? _ink;
   final GlobalKey<InkCanvasState> _canvasKey = GlobalKey<InkCanvasState>();
+  final ExamSheetKeys _sheet = ExamSheetKeys();
   StreamSubscription<LiveMessage>? _msgSub;
   late AppState _app;
   bool _started = false;
+  bool _full = true;
+
+  // answers (choice number as text, or the short answer)
+  final Map<int, String> _answers = {};
+  final Map<int, List<String>> _cands = {};
+  final Set<int> _typed = {}; // answers typed on the keypad (kept even when the box is empty)
+  Timer? _recogTimer;
+  String _answerSig = '';
+  bool _boxEmpty = true;
+  bool _recognizing = false;
 
   // exam mode
-  final Map<int, String> _examAnswers = {};
   final DateTime _examStart = DateTime.now();
   bool _finishing = false;
   bool get _exam => widget.mode == 'exam';
 
   Problem get _p => _problems[_index];
+  bool get _locked => !_exam && _graded.containsKey(_index);
 
   @override
   void initState() {
     super.initState();
     _problems = List<Problem>.of(widget.problems);
     WidgetsBinding.instance.addObserver(this);
+    Handwriting.instance.status.addListener(_onHandwritingStatus);
+    Handwriting.instance.prepare();
+  }
+
+  void _onHandwritingStatus() {
+    if (!mounted) return;
+    setState(() {});
+    if (Handwriting.instance.status.value == HandwritingStatus.ready) _scheduleRecognize(force: true);
   }
 
   @override
@@ -95,6 +121,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     } else if (s == AppLifecycleState.resumed && _backgrounded) {
       _backgrounded = false;
       _since = DateTime.now();
+      if (_full) SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
   }
 
@@ -106,6 +133,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     if (!_started) {
       _started = true;
       _app = AppScope.read(context);
+      _full = _app.settings.fullscreenSolve;
+      if (_full) SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       _msgSub = _app.live?.messages.listen(_onTeacherMessage);
       _open(0);
     }
@@ -114,9 +143,12 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    Handwriting.instance.status.removeListener(_onHandwritingStatus);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pauseTimer();
     _saveDraftNow();
     _draftTimer?.cancel();
+    _recogTimer?.cancel();
     _msgSub?.cancel();
     _app.live?.leavePage();
     final ink = _ink;
@@ -126,6 +158,13 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) => ink.dispose());
     }
     super.dispose();
+  }
+
+  // ------------------------------------------------------------ full screen
+  void _setFull(bool v) {
+    setState(() => _full = v);
+    SystemChrome.setEnabledSystemUIMode(v ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge);
+    _app.updateSettings((s) => s.fullscreenSolve = v);
   }
 
   // ------------------------------------------------------------ timing
@@ -154,13 +193,16 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       old.committed.removeListener(_onInkChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
     }
+    _recogTimer?.cancel();
     final ink = InkController(settings: _app.ink);
     ink.committed.addListener(_onInkChanged);
     setState(() {
       _index = i;
       _ink = ink;
-      _choice = null;
       _since = DateTime.now();
+      _answerSig = '';
+      _boxEmpty = true;
+      _recognizing = false;
     });
     final p = _problems[i];
     final draft = await _app.loadDraft(p.id);
@@ -172,11 +214,16 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       live.sendPage(p, pageHeight: ink.pageHeight, strokes: () => ink.strokes);
     }
     _canvasKey.currentState?.scrollToTop();
+    // the answer box position is known after layout: re-read an answer written earlier
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _ink == ink) _scheduleRecognize(force: true);
+    });
   }
 
   void _onInkChanged() {
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(seconds: 2), _saveDraftNow);
+    _scheduleRecognize();
   }
 
   void _saveDraftNow() {
@@ -195,6 +242,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   void _next() {
     if (_index < _problems.length - 1) {
       _goTo(_index + 1);
+    } else if (_exam) {
+      _confirmFinish();
     } else {
       _finish();
     }
@@ -207,8 +256,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       _finishing = true;
       _saveDraftNow();
       for (var i = 0; i < _problems.length; i++) {
-        final ans = _examAnswers[i];
-        if (ans == null) continue;
+        final ans = _answers[i];
+        if (ans == null || ans.isEmpty) continue;
         final p = _problems[i];
         final g = gradeAnswer(p, ans);
         _graded[i] = g;
@@ -237,22 +286,126 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     ));
   }
 
-  // ------------------------------------------------------------ grading
-  Future<void> _submit(String answer) async {
-    if (_exam) {
-      setState(() => _examAnswers[_index] = answer);
-      if (_index < _problems.length - 1) {
-        _next();
-      } else {
-        _confirmFinish();
+  // ------------------------------------------------------------ answers on the page
+  bool _inBox(Rect b, Rect box) {
+    if (!box.contains(b.center)) return false;
+    final i = b.intersect(box);
+    if (i.width <= 0 || i.height <= 0) return false;
+    final area = b.width * b.height;
+    return area <= 0 || i.width * i.height >= 0.6 * area;
+  }
+
+  List<InkStroke> _answerStrokes() {
+    final ink = _ink;
+    final r = _sheet.answerRect;
+    if (ink == null || r == null) return const [];
+    final box = r.inflate(12);
+    return [
+      for (final s in ink.strokes)
+        if (s.tool == InkTool.pen && _inBox(s.bounds, box)) s
+    ];
+  }
+
+  void _scheduleRecognize({bool force = false}) {
+    if (!mounted || _ink == null || _p.isChoice || _locked) return;
+    final strokes = _answerStrokes();
+    final sig = strokes.map((s) => s.id).join(',');
+    final empty = strokes.isEmpty;
+    if (empty != _boxEmpty) setState(() => _boxEmpty = empty);
+    if (!force && sig == _answerSig) return;
+    _answerSig = sig;
+    _recogTimer?.cancel();
+    final i = _index;
+    if (empty) {
+      if (!_typed.contains(i) && (_answers.containsKey(i) || _cands.containsKey(i))) {
+        setState(() {
+          _answers.remove(i);
+          _cands.remove(i);
+        });
       }
       return;
     }
+    if (!_app.settings.handwritingAnswer) return;
+    _recogTimer = Timer(const Duration(milliseconds: 600), () => _recognize(i, sig, strokes));
+  }
+
+  Future<void> _recognize(int i, String sig, List<InkStroke> strokes) async {
+    final r = _sheet.answerRect;
+    if (r == null || !mounted) return;
+    setState(() => _recognizing = true);
+    await Handwriting.instance.prepare();
+    final local = [for (final s in strokes) s.translated(-r.left, -r.top)];
+    final cands = await Handwriting.instance.recognize(local, width: r.width, height: r.height);
+    if (!mounted) return;
+    setState(() {
+      _recognizing = false;
+      if (i != _index || sig != _answerSig || _locked) return;
+      _cands[i] = cands;
+      if (cands.isNotEmpty) {
+        _answers[i] = cands.first;
+        _typed.remove(i);
+      }
+    });
+  }
+
+  /// Pen or finger tap on the page. Returns true when it picked something (no dot is drawn).
+  bool _onTapPage(Offset pos, bool stylus) {
+    final p = _p;
+    if (p.isChoice) {
+      final n = _sheet.choiceAt(pos, p.choices.length);
+      if (n == null) return false;
+      if (!_locked) {
+        HapticFeedback.selectionClick();
+        setState(() {
+          if (_answers[_index] == '$n') {
+            _answers.remove(_index);
+          } else {
+            _answers[_index] = '$n';
+          }
+        });
+      }
+      return true;
+    }
+    final r = _sheet.answerRect;
+    if (!stylus && !_locked && r != null && r.contains(pos)) {
+      _editAnswer();
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _editAnswer() async {
+    final i = _index;
+    final p = _p;
+    final res = await showAnswerKeypad(
+      context,
+      problem: p,
+      initial: _answers[i] ?? '',
+      candidates: _cands[i] ?? const [],
+      color: _colorOf(p),
+    );
+    if (res == null || !mounted || i != _index) return;
+    setState(() {
+      if (res.isEmpty) {
+        _answers.remove(i);
+        _typed.remove(i);
+      } else {
+        _answers[i] = res;
+        _typed.add(i);
+      }
+    });
+  }
+
+  // ------------------------------------------------------------ grading
+  Future<void> _grade() async {
+    final answer = _answers[_index];
+    if (answer == null || answer.isEmpty || _exam || _locked) return;
     final p = _p;
     final i = _index;
     final time = _elapsedOf(i);
     _elapsed[i] = time;
     final g = gradeAnswer(p, answer);
+    HapticFeedback.mediumImpact();
     setState(() => _graded[i] = g);
     if (!_retrying.contains(i)) {
       await _app.record(
@@ -274,7 +427,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _confirmFinish() async {
-    final missing = _problems.length - _examAnswers.length;
+    final missing = _problems.length - _answers.length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -282,7 +435,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         content: Text(missing > 0 ? '아직 답하지 않은 문제가 $missing개 있어요. 마치면 바로 채점돼요.' : '모든 문제에 답했어요. 채점할까요?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('계속 풀기')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('채점하기')),
+          FilledButton(
+              key: const Key('exam-finish-ok'), onPressed: () => Navigator.pop(ctx, true), child: const Text('채점하기')),
         ],
       ),
     );
@@ -296,19 +450,27 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       return;
     }
     Map<int, T> shift<T>(Map<int, T> m) => {for (final e in m.entries) (e.key > _index ? e.key + 1 : e.key): e.value};
+    void reset<T>(Map<int, T> m) {
+      final s = shift(m);
+      m
+        ..clear()
+        ..addAll(s);
+    }
+
+    Set<int> shiftSet(Set<int> s) => {for (final k in s) k > _index ? k + 1 : k};
     setState(() {
       _problems.insert(_index + 1, v);
-      final g = shift(_graded), el = shift(_elapsed);
-      _graded
-        ..clear()
-        ..addAll(g);
-      _elapsed
-        ..clear()
-        ..addAll(el);
-      final r = {for (final k in _retrying) k > _index ? k + 1 : k};
+      reset(_graded);
+      reset(_elapsed);
+      reset(_answers);
+      reset(_cands);
+      final r = shiftSet(_retrying), t = shiftSet(_typed);
       _retrying
         ..clear()
         ..addAll(r);
+      _typed
+        ..clear()
+        ..addAll(t);
     });
     _goTo(_index + 1);
   }
@@ -318,7 +480,9 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       _graded.remove(_index);
       _retrying.add(_index);
       _since = DateTime.now();
+      if (_p.isChoice) _answers.remove(_index);
     });
+    _scheduleRecognize(force: true);
   }
 
   void _onTeacherMessage(LiveMessage m) {
@@ -353,30 +517,44 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     );
   }
 
+  Color _colorOf(Problem p) => Color(_app.bank.subject(p.subjectId)?.color ?? 0xFF2F6BFF);
+
+  String? _answerNote(AppState app) {
+    if (_p.isChoice) return null;
+    if (_recognizing) return '인식 중…';
+    if (!app.settings.handwritingAnswer) return '답칸을 손가락으로 톡 누르면 답을 입력할 수 있어요';
+    return switch (Handwriting.instance.status.value) {
+      HandwritingStatus.downloading => '필기 인식 준비 중… (처음 한 번만)',
+      HandwritingStatus.unavailable => '필기 인식을 쓸 수 없어요 · 답칸을 손가락으로 톡 눌러 입력하세요',
+      _ => _boxEmpty ? null : (_answers[_index] == null ? '인식하지 못했어요 · 조금 크게 써 보세요' : null),
+    };
+  }
+
   // ------------------------------------------------------------ UI
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final ink = _ink;
     final p = _p;
-    final color = Color(app.bank.subject(p.subjectId)?.color ?? 0xFF2F6BFF);
-    final graded = _graded[_index];
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final color = _colorOf(p);
+    final graded = _exam ? null : _graded[_index];
+    final mq = MediaQuery.of(context);
+    final landscape = mq.size.width > mq.size.height * 1.15;
+    final answer = _answers[_index];
 
-    final panel = AnswerPanel(
-      key: ValueKey('panel-${p.id}-$_index'),
+    final sheet = ProblemSheet(
       problem: p,
+      number: _index + 1,
       color: color,
-      graded: _exam ? null : graded,
-      examAnswer: _exam ? _examAnswers[_index] : null,
-      submitLabel: _exam ? '답 제출' : '채점하기',
-      handwritingEnabled: app.settings.handwritingAnswer,
-      onSubmit: _submit,
-      onChoiceChanged: (c) => setState(() => _choice = c),
-      onNext: _next,
-      onVariant: !_exam && (p.hasTemplate || p.isVariant) ? _addVariant : null,
-      onRetry: _retry,
-      isLast: _index == _problems.length - 1,
+      keys: _sheet,
+      selectedChoice: p.isChoice ? int.tryParse(graded?.given ?? answer ?? '') : null,
+      revealAnswer: graded != null,
+      mark: graded?.correct,
+      answerText: graded?.given ?? answer,
+      answerNote: _answerNote(app),
+      answerBoxEmpty: _boxEmpty,
+      columnWidth: landscape ? 600 : 872,
+      serif: app.settings.examFont,
     );
 
     final canvas = ink == null
@@ -386,70 +564,272 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
               child: InkCanvas(
                 key: _canvasKey,
                 controller: ink,
-                underlay: ProblemSheet(
-                  problem: p,
-                  number: _index + 1,
-                  color: color,
-                  selectedChoice: graded == null
-                      ? (_choice ?? (_exam ? int.tryParse(_examAnswers[_index] ?? '') : null))
-                      : int.tryParse(graded.given),
-                  revealAnswer: graded != null && !_exam,
-                ),
+                onTapPage: _onTapPage,
+                underlay: sheet,
               ),
             ),
             Positioned(
               left: 14,
               right: 14,
-              top: 12,
-              child: InkToolbar(
-                controller: ink,
-                onSettingsChanged: () => app.updateInk((_) {}),
-                onResetView: () => _canvasKey.currentState?.resetView(),
-              ),
+              top: 12 + (_full ? mq.padding.top : 0),
+              child: Row(children: [
+                Expanded(
+                  child: InkToolbar(
+                    controller: ink,
+                    onSettingsChanged: () => app.updateInk((_) {}),
+                    onResetView: () => _canvasKey.currentState?.resetView(),
+                  ),
+                ),
+                if (_full) ...[
+                  const SizedBox(width: 10),
+                  _fullCluster(app, color),
+                ],
+              ]),
             ),
           ]);
 
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      body: SafeArea(
-        child: Column(children: [
-          _topBar(app, color),
+      backgroundColor: _full ? const Color(0xFFE9E6DF) : AppColors.paper,
+      body: Stack(children: [
+        Column(children: [
+          if (!_full) SafeArea(bottom: false, child: _topBar(app, color)),
           Expanded(
-            child: wide
-                ? Row(children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 6, 12),
-                        child: ClipRRect(borderRadius: BorderRadius.circular(22), child: canvas),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 372,
-                      child: Padding(padding: const EdgeInsets.fromLTRB(8, 0, 16, 16), child: panel),
-                    ),
-                  ])
-                : Column(children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                        child: ClipRRect(borderRadius: BorderRadius.circular(18), child: canvas),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 360,
-                      child: Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: panel),
-                    ),
-                  ]),
+            child: _full
+                ? canvas
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(20), child: canvas),
+                  ),
           ),
         ]),
-      ),
+        Positioned(
+          left: 18,
+          right: 18,
+          bottom: 16 + mq.padding.bottom + (_full ? 0 : 10),
+          child: _bottomBar(app, color, graded),
+        ),
+      ]),
     );
+  }
+
+  // ---------- floating controls
+  /// Ignore taps that are really the palm resting while the pen writes.
+  VoidCallback? _palmSafe(VoidCallback? f) => f == null
+      ? null
+      : () {
+          if (InkCanvas.penBusy) return;
+          f();
+        };
+
+  Widget _bottomBar(AppState app, Color color, GradedAnswer? graded) {
+    final last = _index == _problems.length - 1;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _NavButton(
+          key: const Key('prev'),
+          icon: Icons.chevron_left_rounded,
+          label: '이전',
+          onTap: _palmSafe(_index > 0 ? () => _goTo(_index - 1) : null),
+        ),
+        Expanded(
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (c, a) => FadeTransition(
+                opacity: a,
+                child: ScaleTransition(scale: Tween(begin: 0.94, end: 1.0).animate(a), child: c),
+              ),
+              child: FittedBox(
+                key: ValueKey('bar-$_index-${graded != null}'),
+                fit: BoxFit.scaleDown,
+                child: _centerPill(app, color, graded),
+              ),
+            ),
+          ),
+        ),
+        _NavButton(
+          key: const Key('next'),
+          icon: last ? Icons.flag_rounded : Icons.chevron_right_rounded,
+          label: last ? (_exam ? '시험 종료' : '결과 보기') : '다음',
+          trailing: true,
+          filled: graded != null || (_exam && last),
+          color: color,
+          onTap: _palmSafe(_next),
+        ),
+      ],
+    );
+  }
+
+  Widget _pill({required List<Widget> children}) => Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: AppColors.line),
+          boxShadow: const [BoxShadow(color: Color(0x221B2A4A), blurRadius: 22, offset: Offset(0, 8))],
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: children),
+      );
+
+  Widget _centerPill(AppState app, Color color, GradedAnswer? graded) {
+    final p = _p;
+    final answer = _answers[_index];
+    final has = answer != null && answer.isNotEmpty;
+
+    if (graded != null) {
+      final c = graded.correct ? AppColors.correct : AppColors.wrong;
+      return _pill(children: [
+        const SizedBox(width: 6),
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+          child: Icon(graded.correct ? Icons.circle_outlined : Icons.close_rounded, color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 10),
+        Text(graded.correct ? '정답이에요!' : '오답 · 정답 ${graded.expectedDisplay}',
+            key: const Key('grade-result'),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c)),
+        const SizedBox(width: 8),
+        TextButton.icon(
+          key: const Key('solution'),
+          onPressed: _palmSafe(() => showSolutionSheet(context, p, graded)),
+          icon: const Icon(Icons.menu_book_rounded, size: 19),
+          label: const Text('해설'),
+        ),
+        if (!_exam && (p.hasTemplate || p.isVariant))
+          TextButton.icon(
+            onPressed: _palmSafe(_addVariant),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 19),
+            label: const Text('변형'),
+          ),
+        if (!graded.correct)
+          TextButton.icon(
+            onPressed: _palmSafe(_retry),
+            icon: const Icon(Icons.refresh_rounded, size: 19),
+            label: const Text('다시'),
+          ),
+      ]);
+    }
+
+    // answer chip: what will be handed in
+    final Widget chip;
+    if (p.isChoice) {
+      chip = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(
+          has ? '${circled(int.tryParse(answer ?? '') ?? 0)} 선택' : '선지를 눌러 고르세요',
+          style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800, color: has ? AppColors.ink : AppColors.inkMuted),
+        ),
+      );
+    } else {
+      chip = InkWell(
+        key: const Key('answer-edit'),
+        borderRadius: BorderRadius.circular(24),
+        onTap: _palmSafe(_editAnswer),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(has ? '답  ' : '답칸에 쓰면 자동 인식',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+            if (has)
+              Text(answerDisplay(p, answer ?? ''), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+            const SizedBox(width: 6),
+            const Icon(Icons.edit_rounded, size: 17, color: AppColors.inkMuted),
+          ]),
+        ),
+      );
+    }
+
+    if (_exam) {
+      return _pill(children: [
+        chip,
+        if (has)
+          const Padding(
+            padding: EdgeInsets.only(right: 10),
+            child: Icon(Icons.check_circle_rounded, color: AppColors.correct, size: 20),
+          ),
+        Container(width: 1, height: 30, color: AppColors.line),
+        TextButton(
+          key: const Key('exam-finish'),
+          onPressed: _palmSafe(_confirmFinish),
+          child: Text('시험 종료 ${_answers.length}/${_problems.length}'),
+        ),
+      ]);
+    }
+
+    return _pill(children: [
+      chip,
+      const SizedBox(width: 4),
+      FilledButton.icon(
+        key: const Key('submit'),
+        onPressed: has ? _palmSafe(_grade) : null,
+        icon: const Icon(Icons.check_rounded, size: 20),
+        label: const Text('채점하기'),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          backgroundColor: color,
+          disabledBackgroundColor: AppColors.line,
+        ),
+      ),
+    ]);
+  }
+
+  /// Top-right corner in full screen: where am I, time, hint, leave full screen.
+  Widget _fullCluster(AppState app, Color color) {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+        boxShadow: const [BoxShadow(color: Color(0x0F1B2A4A), blurRadius: 18, offset: Offset(0, 6))],
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(width: 8),
+        Text('${_index + 1}',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color, letterSpacing: -0.5)),
+        Text(' / ${_problems.length}',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+        const SizedBox(width: 8),
+        if (_exam && widget.timeLimitMs != null)
+          _Countdown(
+            endsAt: _examStart.add(Duration(milliseconds: widget.timeLimitMs!)),
+            onTimeout: _onExamTimeout,
+          )
+        else if (app.settings.showTimer)
+          _ElapsedPill(elapsed: () => _elapsedOf(_index)),
+        if (!_exam)
+          IconButton(
+            tooltip: '힌트',
+            onPressed: _showHint,
+            icon: const Icon(Icons.lightbulb_outline_rounded),
+          ),
+        IconButton(
+          key: const Key('fullscreen-toggle'),
+          tooltip: '전체화면 끄기',
+          onPressed: () => _setFull(false),
+          icon: const Icon(Icons.fullscreen_exit_rounded),
+        ),
+      ]),
+    );
+  }
+
+  void _onExamTimeout() {
+    if (mounted && !_finishing) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('시간이 끝났어요. 채점할게요.')));
+      _finish();
+    }
   }
 
   Widget _topBar(AppState app, Color color) {
     final st = app.stateOf(app.baseIdOf(_p));
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 10),
+      padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
       child: Row(children: [
         IconButton(
           tooltip: '나가기',
@@ -477,24 +857,10 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         if (_exam && widget.timeLimitMs != null)
           _Countdown(
             endsAt: _examStart.add(Duration(milliseconds: widget.timeLimitMs!)),
-            onTimeout: () {
-              if (mounted && !_finishing) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('시간이 끝났어요. 채점할게요.')));
-                _finish();
-              }
-            },
+            onTimeout: _onExamTimeout,
           )
         else if (app.settings.showTimer)
           _ElapsedPill(elapsed: () => _elapsedOf(_index)),
-        if (_exam) ...[
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 42), backgroundColor: AppColors.accent),
-            onPressed: _confirmFinish,
-            icon: const Icon(Icons.flag_rounded, size: 18),
-            label: Text('시험 종료 (${_examAnswers.length}/${_problems.length})'),
-          ),
-        ],
         const SizedBox(width: 6),
         _liveBadge(app),
         IconButton(
@@ -509,14 +875,10 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
               color: st.bookmarked ? AppColors.accent : null),
         ),
         IconButton(
-          tooltip: '이전 문제',
-          onPressed: _index > 0 ? () => _goTo(_index - 1) : null,
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
-        IconButton(
-          tooltip: '다음 문제',
-          onPressed: _index < _problems.length - 1 ? () => _goTo(_index + 1) : null,
-          icon: const Icon(Icons.chevron_right_rounded),
+          key: const Key('fullscreen-toggle'),
+          tooltip: '전체화면으로 풀기',
+          onPressed: () => _setFull(true),
+          icon: const Icon(Icons.fullscreen_rounded),
         ),
       ]),
     );
@@ -537,7 +899,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
                 color: _exam
-                    ? (i == _index ? color : (_examAnswers.containsKey(i) ? AppColors.ink : AppColors.lineStrong))
+                    ? (i == _index ? color : (_answers.containsKey(i) ? AppColors.ink : AppColors.lineStrong))
                     : _graded[i] == null
                         ? (i == _index ? color : AppColors.lineStrong)
                         : (_graded[i]!.correct ? AppColors.correct : AppColors.wrong),
@@ -565,6 +927,52 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
           child: Pill(label, color: c, icon: Icons.podcasts_rounded),
         );
       },
+    );
+  }
+}
+
+/// Big round page button (이전 / 다음) floating at the bottom corners.
+class _NavButton extends StatelessWidget {
+  const _NavButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.trailing = false,
+    this.filled = false,
+    this.color = AppColors.ink,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool trailing;
+  final bool filled;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final fg = filled ? Colors.white : (enabled ? AppColors.ink : AppColors.lineStrong);
+    final ic = Icon(icon, size: 30, color: fg);
+    final tx = Text(label, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: fg));
+    return Material(
+      color: filled ? color : AppColors.surface,
+      shape: StadiumBorder(side: BorderSide(color: filled ? color : AppColors.line)),
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Container(
+          height: 64,
+          padding: EdgeInsets.only(left: trailing ? 22 : 10, right: trailing ? 10 : 22),
+          decoration: const BoxDecoration(
+            borderRadius: BorderRadius.all(Radius.circular(32)),
+            boxShadow: [BoxShadow(color: Color(0x1A1B2A4A), blurRadius: 20, offset: Offset(0, 8))],
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: trailing ? [tx, ic] : [ic, tx]),
+        ),
+      ),
     );
   }
 }

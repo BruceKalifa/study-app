@@ -36,3 +36,9 @@ flutter:
           weight: 700
         - asset: assets/fonts/Pretendard-ExtraBold.otf
           weight: 800
+    - family: NanumMyeongjo
+      fonts:
+        - asset: assets/fonts/NanumMyeongjo-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NanumMyeongjo-Bold.ttf
+          weight: 700

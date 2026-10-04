@@ -26,6 +26,7 @@ class InkCanvas extends StatefulWidget {
     this.paper,
     this.paperColor,
     this.onStylusDown,
+    this.onTapPage,
     this.minZoom = 0.6,
     this.maxZoom = 4,
   });
@@ -41,7 +42,15 @@ class InkCanvas extends StatefulWidget {
   final PaperStyle? paper;
   final Color? paperColor;
   final VoidCallback? onStylusDown;
+
+  /// A quick tap (pen or finger) at a page position. Return true to consume it:
+  /// a pen tap then leaves no dot on the page (used to pick 객관식 choices).
+  final bool Function(Offset pagePos, bool stylus)? onTapPage;
   final double minZoom, maxZoom;
+
+  /// True while the pen is writing (or just lifted): touches elsewhere are probably the palm.
+  static bool get penBusy =>
+      DateTime.now().millisecondsSinceEpoch - InkCanvasState._lastStylusContact < 450;
 
   @override
   State<InkCanvas> createState() => InkCanvasState();
@@ -68,6 +77,9 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   bool _drawIsStylus = false;
   bool _drawIsEraser = false;
   Offset _drawLast = Offset.zero;
+  Offset _drawStart = Offset.zero;
+  int _drawDownAt = 0;
+  double _drawTravel = 0;
 
   // Palm-rejection state is shared by every canvas on screen (page + answer pad):
   // a palm resting on the answer pad must be rejected while the pen writes on the page.
@@ -262,6 +274,9 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     _drawPointer = e.pointer;
     _drawIsStylus = stylus;
     _drawLast = e.localPosition;
+    _drawStart = e.localPosition;
+    _drawDownAt = _now;
+    _drawTravel = 0;
     _drawIsEraser = _wantsEraser(e);
     c.pointerDown(toPage(e.localPosition), _pressure(e), forceEraser: _drawIsEraser);
   }
@@ -298,6 +313,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     if (_ignored.contains(e.pointer)) return;
     if (e.pointer == _drawPointer) {
       if (_isStylus(e.kind)) _markPen(e);
+      _drawTravel = math.max(_drawTravel, (e.localPosition - _drawStart).distance);
       _drawLast = e.localPosition;
       final wantEraser = _wantsEraser(e);
       final pos = toPage(e.localPosition);
@@ -341,6 +357,13 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
       _drawPointer = null;
       if (cancelled) {
         c.pointerCancel();
+      } else if (!_drawIsEraser &&
+          widget.onTapPage != null &&
+          (c.tool == InkTool.pen || c.tool == InkTool.highlighter) &&
+          _now - _drawDownAt < 280 &&
+          _drawTravel < 9 &&
+          widget.onTapPage!(toPage(_drawStart), _drawIsStylus)) {
+        c.pointerCancel(); // the tap selected something: no dot
       } else {
         c.pointerUp();
       }
@@ -352,17 +375,18 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
       final now = _now;
       final quick = now - _gestureStartedAt < 320;
       final penDuring = _lastStylusContact >= _gestureStartedAt;
-      if (!cancelled &&
-          quick &&
+      final cleanTap = !cancelled && quick && !penDuring && !_multiTouchMoved;
+      if (cleanTap && _maxTouchesInGesture == 1 && widget.onTapPage != null) {
+        widget.onTapPage!(toPage(t.start), false);
+      } else if (cleanTap &&
           _tapEligible &&
-          !penDuring &&
-          !_multiTouchMoved &&
+          (_maxTouchesInGesture == 2 || _maxTouchesInGesture == 3) &&
           c.settings.twoFingerUndo &&
           !widget.readOnly) {
         if (_maxTouchesInGesture == 2) {
           c.undo();
           _toast('실행 취소');
-        } else if (_maxTouchesInGesture == 3) {
+        } else {
           c.redo();
           _toast('다시 실행');
         }

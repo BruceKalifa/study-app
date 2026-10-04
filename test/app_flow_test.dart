@@ -11,6 +11,7 @@ import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/solve_screen.dart';
+import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
 
 Future<AppState> _state() async {
@@ -31,6 +32,10 @@ void _tabletSize(WidgetTester tester) {
   tester.view.devicePixelRatio = 2.0;
   addTearDown(tester.view.reset);
 }
+
+/// Palm rejection uses the wall clock: let real time pass after pen strokes before finger taps.
+Future<void> _penRest(WidgetTester tester) =>
+    tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 600)));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -132,6 +137,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
 
+    // opens in full screen (no title bar); can be switched off and on again
+    expect(find.text('테스트'), findsNothing);
+    await tester.tap(find.byKey(const Key('fullscreen-toggle')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('테스트'), findsOneWidget);
+    expect(app.settings.fullscreenSolve, isFalse);
+    await tester.tap(find.byKey(const Key('fullscreen-toggle')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('테스트'), findsNothing);
+    expect(app.settings.fullscreenSolve, isTrue);
+
     // write on the canvas with the S Pen
     final canvasCenter = tester.getCenter(find.byType(SolveScreen)) - const Offset(200, -100);
     final g = await tester.startGesture(canvasCenter, kind: PointerDeviceKind.stylus);
@@ -151,10 +167,21 @@ void main() {
     await f1.up();
     await tester.pump(const Duration(milliseconds: 600));
     expect(tester.takeException(), isNull);
+    await _penRest(tester);
 
-    // answer the choice problem correctly
+    // 객관식: a quick S Pen tap on a choice marks it (and draws no dot)
+    final other = (int.parse(choice.answer) % choice.choices.length) + 1;
+    final tapPen = await tester.startGesture(tester.getCenter(find.byKey(Key('choice-$other'))),
+        kind: PointerDeviceKind.stylus);
+    await tapPen.up();
+    await tester.pump();
+    expect(find.text('${other}번 선택'), findsOneWidget);
+    await _penRest(tester);
+
+    // a finger tap on the right choice changes the mark; then grade
     await tester.tap(find.byKey(Key('choice-${choice.answer}')));
     await tester.pump();
+    expect(find.text('${choice.answer}번 선택'), findsOneWidget);
     await tester.tap(find.byKey(const Key('submit')));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));
@@ -166,19 +193,31 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));
 
-    // short answer via keypad — deliberately wrong first
-    await tester.tap(find.byKey(const Key('mode-keypad')));
-    await tester.pump(const Duration(milliseconds: 300));
+    // 단답형: no answer yet → cannot grade; fix the answer on the keypad — deliberately wrong
+    expect(tester.widget<FilledButton>(find.byKey(const Key('submit'))).onPressed, isNull);
+    // a finger tap on the 답 box under the problem opens the keypad
+    await tester.tap(find.text('여기에 답을 쓰세요'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('keypad-ok')), findsOneWidget);
     await tester.tap(find.byKey(const Key('key-9')));
     await tester.tap(find.byKey(const Key('key-9')));
     await tester.tap(find.byKey(const Key('key-9')));
     await tester.tap(find.byKey(const Key('key-9')));
     await tester.pump();
+    await tester.tap(find.byKey(const Key('keypad-ok')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('recognized-answer')), findsOneWidget);
     await tester.tap(find.byKey(const Key('submit')));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));
     final wrong = short.answer == '9999';
-    expect(find.text(wrong ? '정답이에요!' : '아쉬워요, 오답이에요'), findsOneWidget);
+    expect(find.text(wrong ? '정답이에요!' : '오답 · 정답 ${expectedDisplay(short)}'), findsOneWidget);
+    // 해설 sheet opens
+    await tester.tap(find.byKey(const Key('solution')));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('해설'), findsWidgets);
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump(const Duration(milliseconds: 600));
     expect(app.attempts.length, 2);
     expect(app.wrongNote.length, wrong ? 0 : 1);
     expect(app.stateOf(short.id).inWrongNote, !wrong);
@@ -213,6 +252,7 @@ void main() {
     await tester.tap(find.text('go'));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
+    await _penRest(tester);
     await tester.tap(find.byKey(Key('choice-${v.answer}')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('submit')));
@@ -242,15 +282,22 @@ void main() {
     await tester.tap(find.text('go'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    for (final p in ps) {
+    await _penRest(tester);
+    for (var k = 0; k < ps.length; k++) {
+      final p = ps[k];
       await tester.tap(find.byKey(Key('choice-${p.answer}')));
       await tester.pump();
-      await tester.tap(find.byKey(const Key('submit')));
-      await tester.pump(const Duration(milliseconds: 600));
       expect(find.text('정답이에요!'), findsNothing);
+      if (k < ps.length - 1) {
+        await tester.tap(find.byKey(const Key('next')));
+        await tester.pump(const Duration(milliseconds: 600));
+      }
     }
     expect(app.attempts, isEmpty);
-    await tester.tap(find.text('채점하기').last);
+    expect(find.text('시험 종료 3/3'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('exam-finish')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('exam-finish-ok')));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));
     expect(app.attempts.length, 3);

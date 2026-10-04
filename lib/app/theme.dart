@@ -32,6 +32,9 @@ class AppColors {
 class AppTheme {
   static const String font = 'Pretendard';
 
+  /// Exam-paper body face (나눔명조, OFL).
+  static const String serif = 'NanumMyeongjo';
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.ink,
