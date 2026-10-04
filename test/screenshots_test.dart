@@ -344,6 +344,8 @@ void main() {
     // 2..11 tabs
     const tabs = ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
     for (var i = 0; i < tabs.length; i++) {
+      await tester.ensureVisible(find.text(tabs[i]).first);
+      await tester.pump();
       await tester.tap(find.text(tabs[i]).first);
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 100));
@@ -396,8 +398,10 @@ void main() {
     await tester.pumpWidget(_wrap(fresh2, const AppRoot()));
     await _shot(tester, '30_welcome');
     await tester.tap(find.byKey(const Key('welcome-student')));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('회원가입'));
+    await tester.pump();
     await _shot(tester, '31_welcome_signup');
 
     // catalog

@@ -126,7 +126,9 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.byKey(const Key('daily-start')), findsOneWidget);
     for (final tab in ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
-      await tester.tap(find.text(tab).first); // the rail comes first
+      await tester.ensureVisible(find.text(tab).first); // the rail comes first (and scrolls)
+      await tester.pump();
+      await tester.tap(find.text(tab).first);
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump(const Duration(milliseconds: 600));
       expect(tester.takeException(), isNull, reason: 'tab $tab');
@@ -458,15 +460,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byKey(const Key('welcome-student')), findsOneWidget);
     await tester.tap(find.byKey(const Key('welcome-teacher')));
+    await tester.pump(); // AnimatedSize starts resizing on the next frame
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('auth-submit')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('auth-error')), findsOneWidget);
     await tester.tap(find.text('회원가입'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('auth-name')), findsOneWidget);
     expect(find.byKey(const Key('auth-grade-고3')), findsNothing, reason: '선생님은 학년 없음');
     await tester.tap(find.byKey(const Key('welcome-back')));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('welcome-offline')));
     await tester.pump(const Duration(milliseconds: 400));
