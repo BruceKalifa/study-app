@@ -188,9 +188,9 @@ class AppState extends ChangeNotifier {
 
   /// Adds a `.pulinote` 교재 file (one book or a collection); a student also gets the 문제집 on the shelf.
   /// Throws [FormatException].
-  Future<List<BookBundle>> importBooks(List<int> bytes) async {
+  Future<List<BookBundle>> importBooks(List<int> bytes, {String sha = ''}) async {
     final imports = ContentImport(storage);
-    final added = await imports.add(bytes);
+    final added = await imports.add(bytes, sha: sha);
     importedBooks = await imports.list();
     _books = await imports.loadAll();
     _composeContent();
@@ -219,14 +219,14 @@ class AppState extends ChangeNotifier {
   /// 선생님: 이 기기에 있는 교재를 서버에 올린다. 학생: 선생님이 올린 교재를 받아서 넣는다.
   /// 로그인한 뒤·앱을 켤 때 저절로 돈다. 실패해도 앱은 그냥 쓰던 대로 쓴다.
   /// 여러 번 불러도 하나씩 차례로 돌고, 부른 쪽은 자기 차례의 결과를 받는다.
-  Future<String> syncBooks() {
+  Future<String> syncBooks({bool force = false}) {
     if (account == null) return Future.value('');
-    final next = _bookChain.then((_) => _runBookSync());
+    final next = _bookChain.then((_) => _runBookSync(force: force));
     _bookChain = next.catchError((Object _) => '');
     return next;
   }
 
-  Future<String> _runBookSync() async {
+  Future<String> _runBookSync({bool force = false}) async {
     final a = account;
     if (a == null) return '';
     bookSyncing = true;
@@ -236,21 +236,28 @@ class AppState extends ChangeNotifier {
     try {
       final api = AccountApi.of(a);
       final remote = await api.books();
-      // 서버에만 있는 교재 → 이 기기로
+      // 서버에만 있는 교재 → 이 기기로 (고친 교재를 올리는 중이면 받지 않는다 — 고친 내용이 덮이지 않게)
       var got = 0;
-      for (final r in remote) {
-        final have = {for (final b in importedBooks) b.id};
-        if (r.bookIds.isNotEmpty && r.bookIds.every(have.contains)) continue;
-        got += (await importBooks(await api.bookBytes(r.id))).length;
+      for (final r in force ? const <ServerBook>[] : remote) {
+        final have = {for (final b in importedBooks) b.id: b.sha};
+        // 다 있고 서버 파일도 그대로면 건너뛴다 (정답을 고치면 지문이 바뀌어 다시 받는다)
+        final same = r.bookIds.isNotEmpty &&
+            r.bookIds.every((id) => have.containsKey(id) && (r.sha.isEmpty || have[id] == r.sha));
+        if (same) continue;
+        got += (await importBooks(await api.bookBytes(r.id), sha: r.sha)).length;
       }
       if (got > 0) msg = isTeacher ? '서버에서 교재 $got권을 받았어요' : '선생님 교재 $got권을 받았어요';
-      // 이 기기에만 있는 교재 → 서버로 (선생님만)
+      // 이 기기에만 있는 교재 → 서버로 (선생님만). force 면 고친 내용을 다시 올린다.
       if (isTeacher) {
         final onServer = {for (final r in remote) ...r.bookIds};
-        final missing = [for (final b in importedBooks) if (!onServer.contains(b.id)) b.id];
+        final missing = force
+            ? [for (final b in importedBooks) b.id]
+            : [for (final b in importedBooks) if (!onServer.contains(b.id)) b.id];
         final file = missing.isEmpty ? null : await ContentImport(storage).fileFor(missing);
         if (file != null) {
           final up = await api.uploadBook(file);
+          await ContentImport(storage).markSha(missing, up.sha);
+          importedBooks = await ContentImport(storage).list();
           msg = '「${up.title}」을 서버에 올렸어요 · 학생이 받을 수 있어요';
         }
       }
@@ -268,9 +275,30 @@ class AppState extends ChangeNotifier {
   }
 
   /// 로그인 직후·앱 시작 때 (결과를 기다리지 않는다).
-  void syncBooksSoon() {
+  void syncBooksSoon({bool force = false}) {
     if (!autoSyncBooks || account == null) return;
-    unawaited(syncBooks());
+    unawaited(syncBooks(force: force));
+  }
+
+  /// 이 문제집이 들어 있는 교재 파일의 id (교재 파일로 넣은 것이 아니면 null).
+  String? bookIdOfWorkbook(String workbookId) {
+    for (final b in _books) {
+      if (b.workbooks.any((w) => w.id == workbookId)) return b.id;
+    }
+    return null;
+  }
+
+  /// 답안표 고치기 — 기기에 저장한 교재의 정답을 바꾸고, 선생님이면 서버에도 다시 올린다.
+  Future<int> updateAnswers(String bookId, Map<String, String> answers) async {
+    final imports = ContentImport(storage);
+    final n = await imports.setAnswers(bookId, answers);
+    if (n == 0) return 0;
+    _books = await imports.loadAll();
+    _composeContent();
+    _rebuildBank();
+    _changed();
+    if (isTeacher) syncBooksSoon(force: true);
+    return n;
   }
 
   Future<void> removeImportedBook(String id) async {

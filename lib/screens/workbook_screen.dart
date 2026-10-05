@@ -6,6 +6,7 @@ import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
+import 'answer_key_screen.dart';
 import 'solve_screen.dart';
 
 /// One 문제집: problems in order, progress, 이어 풀기 / 틀린 것만.
@@ -105,6 +106,13 @@ class WorkbookScreen extends StatelessWidget {
               icon: const Icon(Icons.timer_outlined),
               label: const Text('시험처럼 풀기'),
             ),
+            if (app.isTeacher)
+              OutlinedButton.icon(
+                key: const Key('wb-answers'),
+                onPressed: () => AnswerKeyScreen.open(context, w.id),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('답안표'),
+              ),
             TextButton.icon(
               key: const Key('wb-toggle'),
               onPressed: () {
@@ -122,8 +130,8 @@ class WorkbookScreen extends StatelessWidget {
           ]),
           const SizedBox(height: 24),
           // 단원이 여럿인 교재(FLOW·BRIDGE TYPE 처럼)는 단원별로 묶어서 — 번호는 교재 전체 번호 그대로
-          for (final (unit, idx) in _byUnit(ps)) ...[
-            if (unit.isNotEmpty) _UnitHeader(unit: unit, color: color, count: idx.length, onSolve: () {
+          for (final (unit, idx) in byTableOfContents(ps)) ...[
+            if (unit.isNotEmpty) _SectionHeader(name: unit, color: color, count: idx.length, onSolve: () {
               solve(() => SolveScreen.open(context, title: '${w.title} · $unit', problems: [for (final i in idx) ps[i]]));
             }),
             Card(
@@ -146,25 +154,27 @@ class WorkbookScreen extends StatelessWidget {
   }
 }
 
-/// 교재의 문항을 단원별로 (단원이 하나뿐이면 묶지 않고 통째로). 값은 [ps] 안의 자리번호.
-List<(String, List<int>)> _byUnit(List<Problem> ps) {
+/// 교재의 문항을 목차별로 — 교재에 목차(section)가 있으면 그것, 없으면 단원으로.
+/// 묶을 거리가 하나뿐이면 묶지 않는다. 값은 [ps] 안의 자리번호.
+List<(String, List<int>)> byTableOfContents(List<Problem> ps) {
+  final useSection = ps.any((p) => p.section.trim().isNotEmpty);
   final order = <String>[];
   final by = <String, List<int>>{};
   for (var i = 0; i < ps.length; i++) {
-    final u = ps[i].unit.trim();
-    if (!by.containsKey(u)) {
-      order.add(u);
-      by[u] = [];
+    final k = (useSection ? ps[i].section : ps[i].unit).trim();
+    if (!by.containsKey(k)) {
+      order.add(k);
+      by[k] = [];
     }
-    by[u]!.add(i);
+    by[k]!.add(i);
   }
   if (order.length < 2) return [('', [for (var i = 0; i < ps.length; i++) i])];
-  return [for (final u in order) (u, by[u]!)];
+  return [for (final k in order) (k, by[k]!)];
 }
 
-class _UnitHeader extends StatelessWidget {
-  const _UnitHeader({required this.unit, required this.color, required this.count, required this.onSolve});
-  final String unit;
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.name, required this.color, required this.count, required this.onSolve});
+  final String name;
   final Color color;
   final int count;
   final VoidCallback onSolve;
@@ -176,15 +186,15 @@ class _UnitHeader extends StatelessWidget {
       child: Row(children: [
         Container(width: 5, height: 20, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
         const SizedBox(width: 10),
-        Text(unit, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+        Text(name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
         const SizedBox(width: 8),
         Text('$count문항', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 13)),
         const Spacer(),
         TextButton.icon(
-          key: Key('wb-unit-$unit'),
+          key: Key('wb-unit-$name'),
           onPressed: onSolve,
           icon: const Icon(Icons.play_arrow_rounded, size: 18),
-          label: const Text('이 단원 풀기'),
+          label: const Text('이 목차 풀기'),
         ),
       ]),
     );

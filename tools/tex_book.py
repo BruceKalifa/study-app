@@ -649,12 +649,15 @@ def build(folder, outdir, preview=False):
             diff = 3
         topic = re.split(r'[:：]', r.get('유형', ''))[0].strip()
         day = re.search(r'DAY\s*(\d+)', r.get('문항번호', ''))
+        # 목차: 교재가 나뉜 큰 덩어리 (수업 / DAY 1 …) — 앱이 목차별로 묶어 보여 준다
+        section = f'DAY {day.group(1)}' if day else '수업'
         if day:
             topic = f'DAY {day.group(1)} · {topic}'
         p = {
             'id': ids[r['문항번호']],
             'unit': unit,
             'topic': topic,
+            'section': section,
             'difficulty': diff,
             'type': 'short',
             'stem': stem,

@@ -17,6 +17,7 @@ import 'package:study_app/screens/app_root.dart';
 import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/library_screen.dart';
 import 'package:study_app/screens/workbook_screen.dart';
+import 'package:study_app/screens/answer_key_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
@@ -924,6 +925,60 @@ void main() {
     expect(find.byKey(const Key('wb-unit-수열')), findsOneWidget);
     expect(find.byKey(const Key('wb-unit-확률')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  test('교재 목차: section 이 있으면 목차로, 없으면 단원으로 묶는다', () {
+    Problem p(String id, {String unit = '', String section = ''}) =>
+        Problem(id: id, subjectId: 's', subjectName: '수학', unit: unit, section: section, stem: '본문', answer: '1');
+    // 목차가 있으면 목차 (단원은 섞여 있어도 된다)
+    final withSection = [
+      p('a', unit: '수열', section: '수업'),
+      p('b', unit: '미분', section: '수업'),
+      p('c', unit: '수열', section: 'DAY 1'),
+    ];
+    expect(byTableOfContents(withSection).map((e) => e.$1).toList(), ['수업', 'DAY 1']);
+    expect(byTableOfContents(withSection).first.$2, [0, 1]);
+    // 목차가 없으면 단원
+    final noSection = [p('a', unit: '수열'), p('b', unit: '미분'), p('c', unit: '수열')];
+    expect(byTableOfContents(noSection).map((e) => e.$1).toList(), ['수열', '미분']);
+    // 하나뿐이면 묶지 않는다
+    final one = byTableOfContents([p('a', unit: '수열'), p('b', unit: '수열')]);
+    expect(one, hasLength(1));
+    expect(one.single.$1, '');
+    expect(one.single.$2, [0, 1]);
+  });
+
+  testWidgets('답안표: 선생님이 목차별로 정답을 고치면 교재에 저장된다', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    app.profile.account = Account(
+        server: 'https://example.test', token: 't', userId: 'u_t', loginId: 'une.teacher', role: 'teacher', name: '선생님');
+    await tester.runAsync(() => app.importBooks(sampleBookFile()));
+    final pid = app.bank.workbook('sample-type-01')!.problemIds.first;
+    expect(app.bank.byId(pid)!.answer, isNot('7'));
+
+    await tester.pumpWidget(_app(app, home: const AnswerKeyScreen(workbookId: 'sample-type-01')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('답안표'), findsWidgets);
+    await tester.enterText(find.byKey(Key('answer-$pid')), '7');
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('저장 (1)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('answers-save')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(app.bank.byId(pid)!.answer, '7', reason: '문제은행에 바로 반영');
+    expect(find.byKey(const Key('answers-msg')), findsOneWidget);
+
+    // 앱을 다시 켜도 고친 정답이 남는다
+    final again = (await tester.runAsync(() async {
+      final bank = await ProblemBank.load(rootBundle);
+      final a = AppState(storage: app.storage, baseBank: bank, enableLive: false, autoSyncBooks: false);
+      await a.init();
+      return a;
+    }))!;
+    expect(again.bank.byId(pid)!.answer, '7');
+    again.dispose();
   });
 
   testWidgets('TeX 교재에서 쓰는 수식 어휘가 flutter_math 로 그려진다', (tester) async {

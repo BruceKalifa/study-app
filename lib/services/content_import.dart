@@ -15,16 +15,21 @@ class ImportedBook {
   final String title;
   final int problems;
   final int at;
-  const ImportedBook(this.id, this.title, this.problems, this.at);
+
+  /// 서버에서 받은 교재면 그 파일의 지문 — 서버 것이 바뀌면 다시 받는다 (파일로 넣었으면 빈 값).
+  final String sha;
+  const ImportedBook(this.id, this.title, this.problems, this.at, [this.sha = '']);
 
   factory ImportedBook.fromJson(Map<String, dynamic> j) => ImportedBook(
         '${j['id']}',
         '${j['title'] ?? j['id']}',
         (j['problems'] as num?)?.toInt() ?? 0,
         (j['at'] as num?)?.toInt() ?? 0,
+        '${j['sha'] ?? ''}',
       );
 
-  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'problems': problems, 'at': at};
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'title': title, 'problems': problems, 'at': at, if (sha.isNotEmpty) 'sha': sha};
 }
 
 /// The parsed contents of one bundle.
@@ -116,7 +121,7 @@ class ContentImport {
       storage.write(_indexPath, jsonEncode({'books': [for (final b in books) b.toJson()]}));
 
   /// Validates and stores the book(s) in [bytes]; a book with the same id is replaced.
-  Future<List<BookBundle>> add(List<int> bytes) async {
+  Future<List<BookBundle>> add(List<int> bytes, {String sha = ''}) async {
     final all = decodeAll(bytes);
     final parsed = [for (final j in all) parse(j)];
     if (parsed.any((b) => b.problemCount == 0)) throw const FormatException('문항이 없어요');
@@ -125,7 +130,7 @@ class ContentImport {
       final bundle = parsed[k];
       await storage.write('imports/${bundle.id}.json', jsonEncode(all[k]));
       books = books.where((b) => b.id != bundle.id).toList()
-        ..add(ImportedBook(bundle.id, bundle.title, bundle.problemCount, DateTime.now().millisecondsSinceEpoch));
+        ..add(ImportedBook(bundle.id, bundle.title, bundle.problemCount, DateTime.now().millisecondsSinceEpoch, sha));
     }
     await _saveIndex(books);
     return parsed;
@@ -152,6 +157,38 @@ class ContentImport {
     if (books.isEmpty) return null;
     final j = books.length == 1 ? books.first : {'format': collection, 'version': 1, 'books': books};
     return Uint8List.fromList(gzip.encode(utf8.encode(jsonEncode(j))));
+  }
+
+  /// 서버에 올린 뒤, 그 교재들이 지금 서버 파일과 같다고 표시한다 (다시 받지 않게).
+  Future<void> markSha(Iterable<String> ids, String sha) async {
+    final set = ids.toSet();
+    final books = await list();
+    if (!books.any((b) => set.contains(b.id) && b.sha != sha)) return;
+    await _saveIndex([
+      for (final b in books) set.contains(b.id) ? ImportedBook(b.id, b.title, b.problems, b.at, sha) : b,
+    ]);
+  }
+
+  /// 저장해 둔 교재의 정답을 고친다 (`{문항 id: 정답}`). 고친 문항 수를 돌려준다.
+  Future<int> setAnswers(String bookId, Map<String, String> answers) async {
+    final raw = await storage.read('imports/$bookId.json');
+    if (raw == null) return 0;
+    final j = (jsonDecode(raw) as Map).cast<String, dynamic>();
+    var n = 0;
+    for (final c in (j['courses'] as List? ?? const [])) {
+      if (c is! Map) continue;
+      for (final key in ['problems', 'twins']) {
+        for (final p in (c[key] as List? ?? const [])) {
+          if (p is! Map) continue;
+          final a = answers['${p['id']}'];
+          if (a == null || '${p['answer'] ?? ''}' == a) continue;
+          p['answer'] = a;
+          n++;
+        }
+      }
+    }
+    if (n > 0) await storage.write('imports/$bookId.json', jsonEncode(j));
+    return n;
   }
 
   Future<List<BookBundle>> loadAll() async {

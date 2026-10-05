@@ -348,6 +348,9 @@ class ServerBook {
   final int problems;
   final int bytes;
   final int at;
+
+  /// 서버에 있는 파일의 지문 — 바뀌면 다시 받는다.
+  final String sha;
   final String teacherName;
   final bool mine;
   final bool open;
@@ -360,6 +363,7 @@ class ServerBook {
     this.problems = 0,
     this.bytes = 0,
     this.at = 0,
+    this.sha = '',
     this.teacherName = '',
     this.mine = false,
     this.open = true,
@@ -380,6 +384,7 @@ class ServerBook {
       problems: _i(j['problems']),
       bytes: _i(j['bytes']),
       at: _i(j['at']),
+      sha: _s(j['sha']),
       teacherName: _s(_m(j['teacher'])['name']),
       mine: j['mine'] == true,
       open: j['open'] != false,

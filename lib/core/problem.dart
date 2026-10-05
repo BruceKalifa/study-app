@@ -186,6 +186,9 @@ class Problem {
   final String subjectName;
   final String unit;
   final String topic;
+
+  /// 교재 목차 (예: 수업, DAY 1) — 교재를 목차별로 묶어 풀 때 쓴다. 없으면 단원으로 묶는다.
+  final String section;
   final String stem;
   final String answer;
   final String solution;
@@ -232,6 +235,7 @@ class Problem {
     required this.subjectName,
     this.unit = '',
     this.topic = '',
+    this.section = '',
     required this.stem,
     required this.answer,
     this.solution = '',
@@ -298,6 +302,7 @@ class Problem {
           : subjectName,
       unit: _str(j['unit']),
       topic: _str(j['topic']),
+      section: _str(j['section']),
       stem: _str(j['stem']),
       answer: _str(j['answer']).trim(),
       solution: _str(j['solution']),
@@ -331,6 +336,7 @@ class Problem {
       'subjectName': subjectName,
       'unit': unit,
       'topic': topic,
+      if (section.isNotEmpty) 'section': section,
       'difficulty': difficulty,
       'type': type == ProblemType.choice ? 'choice' : 'short',
       'stem': stem,
@@ -366,6 +372,7 @@ class Problem {
     String? subjectName,
     String? unit,
     String? topic,
+    String? section,
     String? stem,
     String? answer,
     String? solution,
@@ -392,6 +399,7 @@ class Problem {
       subjectName: subjectName ?? this.subjectName,
       unit: unit ?? this.unit,
       topic: topic ?? this.topic,
+      section: section ?? this.section,
       stem: stem ?? this.stem,
       answer: answer ?? this.answer,
       solution: solution ?? this.solution,

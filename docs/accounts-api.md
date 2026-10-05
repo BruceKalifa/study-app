@@ -129,7 +129,8 @@
   같은 교재(안에 든 교재 id 묶음이 같은 것)를 다시 올리면 새로 만들지 않고 바꿔 끼운다(`replaced: true`).
 - 누가 받을 수 있나: 올린 선생님 본인, 그리고 그 선생님과 **연결된 학생** 중 `open: true` 이거나 `students` 에 지정된 학생.
   그 밖에는 목록에서 빠지고 파일도 404(있는지조차 알려주지 않는다).
-- 요약: `{ id, title, titles: [묶음 안 교재 제목], bookIds, problems, bytes, at, teacher: { id, name } }`.
+- 요약: `{ id, title, titles: [묶음 안 교재 제목], bookIds, problems, bytes, sha, at, teacher: { id, name } }`.
+  `sha` 는 올린 파일의 지문 — 앱은 받아 둔 지문과 다를 때만 다시 받는다(선생님이 답안표를 고치면 바뀐다).
   올린 선생님에게만 `open`, `students`, `mine: true` 가 함께 온다.
 - `students` 는 나와 연결된 학생만 남는다(남의 학생 id 는 조용히 버린다).
 - 앱: **저절로 돈다**(`AppState.syncBooks`). 로그인한 뒤·앱을 켤 때 서버에만 있는 교재는 그 기기로 받고,

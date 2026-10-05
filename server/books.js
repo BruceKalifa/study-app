@@ -131,6 +131,7 @@ function createBooksApi({ dataDir, accounts, log }) {
       bookIds: b.bookIds || [],
       problems: b.problems || 0,
       bytes: b.bytes || 0,
+      sha: b.sha || '',
       at: b.at || 0,
       teacher: owner ? { id: owner.id, name: owner.name } : null,
       ...(u && u.id === b.ownerId ? { open: b.open === true, students: b.students || [], mine: true } : {}),
