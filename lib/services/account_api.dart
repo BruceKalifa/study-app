@@ -339,6 +339,54 @@ class Question {
   }
 }
 
+/// A textbook the teacher put on the server (`/api/books`).
+class ServerBook {
+  final String id;
+  final String title;
+  final List<String> titles;
+  final List<String> bookIds;
+  final int problems;
+  final int bytes;
+  final int at;
+  final String teacherName;
+  final bool mine;
+  final bool open;
+
+  const ServerBook({
+    required this.id,
+    required this.title,
+    this.titles = const [],
+    this.bookIds = const [],
+    this.problems = 0,
+    this.bytes = 0,
+    this.at = 0,
+    this.teacherName = '',
+    this.mine = false,
+    this.open = true,
+  });
+
+  /// "1.2MB" — rough size for the download button.
+  String get sizeLabel => bytes >= 1024 * 1024
+      ? '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB'
+      : '${(bytes / 1024).ceil()}KB';
+
+  factory ServerBook.fromJson(Object? o) {
+    final j = _m(o);
+    return ServerBook(
+      id: _s(j['id']),
+      title: _s(j['title']),
+      titles: [for (final t in (j['titles'] as List? ?? const [])) _s(t)],
+      bookIds: [for (final t in (j['bookIds'] as List? ?? const [])) _s(t)],
+      problems: _i(j['problems']),
+      bytes: _i(j['bytes']),
+      at: _i(j['at']),
+      teacherName: _s(_m(j['teacher'])['name']),
+      mine: j['mine'] == true,
+      open: j['open'] != false,
+    );
+  }
+}
+
 /// Server records of a student (for restoring on a new tablet).
 class ServerRecords {
   final List<Attempt> attempts;
@@ -366,13 +414,20 @@ class AccountApi {
   Map<String, String> get authHeaders => token.isEmpty ? const {} : {'Authorization': 'Bearer $token'};
 
   Future<Map<String, dynamic>> _req(String method, String path,
-      {Map<String, Object?>? body, Map<String, String>? query, Duration timeout = const Duration(seconds: 20)}) async {
+      {Map<String, Object?>? body,
+      Uint8List? rawBody,
+      Map<String, String>? query,
+      Duration timeout = const Duration(seconds: 20)}) async {
     final uri = Uri.parse('$base$path').replace(queryParameters: query == null || query.isEmpty ? null : query);
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
     try {
       final req = await client.openUrl(method, uri).timeout(const Duration(seconds: 8));
       if (token.isNotEmpty) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      if (body != null) {
+      if (rawBody != null) {
+        req.headers.contentType = ContentType('application', 'octet-stream');
+        req.headers.contentLength = rawBody.length;
+        req.add(rawBody);
+      } else if (body != null) {
         req.headers.contentType = ContentType.json;
         req.add(utf8.encode(jsonEncode(body)));
       }
@@ -503,18 +558,60 @@ class AccountApi {
 
   Future<void> resolve(String id) => _req('POST', '/api/questions/${Uri.encodeComponent(id)}/resolve', body: const {});
 
+  // ── 교재 창고 (선생님이 올린 .pulinote) ──
+
+  /// 내가 받을 수 있는 교재들 (학생: 연결된 선생님이 올린 것, 선생님: 내가 올린 것).
+  Future<List<ServerBook>> books() async =>
+      [for (final b in _lm((await _req('GET', '/api/books'))['books'])) ServerBook.fromJson(b)];
+
+  /// 교재 파일 그대로 (`ContentImport.decodeAll` 로 읽는다).
+  Future<Uint8List> bookBytes(String id) =>
+      _bytes('/api/books/${Uri.encodeComponent(id)}/file', '교재를 받지 못했어요');
+
+  /// (선생님) 교재 올리기 — 같은 교재를 다시 올리면 서버에서 바꿔 끼운다.
+  Future<ServerBook> uploadBook(Uint8List file, {String title = '', bool open = true}) async {
+    final d = await _req('POST', '/api/books',
+        rawBody: file,
+        query: {if (title.trim().isNotEmpty) 'title': title.trim(), 'open': open ? '1' : '0'},
+        timeout: const Duration(minutes: 3));
+    return ServerBook.fromJson(d['book']);
+  }
+
+  /// (선생님) 제목·공개 여부 바꾸기.
+  Future<ServerBook> updateBook(String id, {String? title, bool? open}) async {
+    final d = await _req('POST', '/api/books/${Uri.encodeComponent(id)}',
+        body: {if (title != null) 'title': title, if (open != null) 'open': open});
+    return ServerBook.fromJson(d['book']);
+  }
+
+  /// (선생님) 서버에서 교재 빼기.
+  Future<void> deleteBook(String id) => _req('DELETE', '/api/books/${Uri.encodeComponent(id)}');
+
   /// A question picture (needs the login token).
-  Future<Uint8List> imageBytes(String path) async {
+  Future<Uint8List> imageBytes(String path) => _bytes(path, '그림을 불러오지 못했어요');
+
+  /// GET → bytes, with the login token.
+  Future<Uint8List> _bytes(String path, String failed) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
     try {
       final req = await client.getUrl(Uri.parse(url(path))).timeout(const Duration(seconds: 8));
       if (token.isNotEmpty) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      final res = await req.close().timeout(const Duration(seconds: 30));
+      final res = await req.close().timeout(const Duration(minutes: 3));
       final bb = BytesBuilder(copy: false);
       await for (final chunk in res) {
         bb.add(chunk);
       }
-      if (res.statusCode >= 400) throw ApiError('그림을 불러오지 못했어요 (${res.statusCode})', res.statusCode);
+      if (res.statusCode >= 400) {
+        final j = () {
+          try {
+            return jsonDecode(utf8.decode(bb.toBytes()));
+          } catch (_) {
+            return null;
+          }
+        }();
+        final msg = j is Map && j['error'] != null ? '${j['error']}' : '$failed (${res.statusCode})';
+        throw ApiError(msg, res.statusCode);
+      }
       return bb.takeBytes();
     } on SocketException {
       throw const ApiError('서버에 연결할 수 없어요');

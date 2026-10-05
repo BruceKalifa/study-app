@@ -14,7 +14,8 @@
     "test:live": "node tools/test-live.js ws://localhost:8080/ws",
     "test:content": "node tools/test-content.js",
     "test:community": "node tools/test-community.js",
-    "test:accounts": "node tools/test-accounts.js"
+    "test:accounts": "node tools/test-accounts.js",
+    "test:books": "node tools/test-books.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

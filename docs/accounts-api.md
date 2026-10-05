@@ -110,13 +110,38 @@
 - 요약: `{ id, student: { id, name, grade }, teacher: { id, name }, problemId, title, preview, hasImage, status, createdAt, updatedAt, messageCount, lastFrom, unread }`
 - `question` = 요약 + `messages: [ { id, from: "student"|"teacher", name, body, image: "/api/questions/…/images/…"|null, at, mine } ]`
 
+## 교재 창고
+
+선생님이 올린 교재(`.pulinote`, `tools/tex_book.py` 로 만든 파일)를 **연결된 학생만** 앱에서 받아 간다.
+교재 내용은 공개 저장소에 두지 않고 서버의 `DATA_DIR/books/` 에만 둔다. 로그인 없이는 목록도 파일도 받을 수 없다.
+
+| 요청 | 누가 | 응답 |
+|---|---|---|
+| `POST /api/books?title=&open=1` (본문 = 파일 그대로) | 선생님 | `{ book, replaced }` |
+| `GET /api/books` | 둘 다 | `{ books: [요약] }` (최근 올린 순) |
+| `GET /api/books/:id` | 받을 수 있는 사람 | `{ book }` |
+| `GET /api/books/:id/file` | 받을 수 있는 사람 | 올린 파일 그대로 (`application/gzip`) |
+| `POST /api/books/:id` `{ title?, open?, students?[] }` | 올린 선생님 | `{ book }` |
+| `DELETE /api/books/:id` | 올린 선생님 | `{ ok }` |
+
+- 본문은 `.pulinote` 파일 그대로(`Content-Type: application/octet-stream`). 한 파일 40MB, 선생님 한 명당 400MB·200권까지.
+- 올릴 때 서버가 파일을 풀어 `pulinote-bundle`/`pulinote-collection` 인지, 문항이 있는지 확인한다(아니면 400).
+  같은 교재(안에 든 교재 id 묶음이 같은 것)를 다시 올리면 새로 만들지 않고 바꿔 끼운다(`replaced: true`).
+- 누가 받을 수 있나: 올린 선생님 본인, 그리고 그 선생님과 **연결된 학생** 중 `open: true` 이거나 `students` 에 지정된 학생.
+  그 밖에는 목록에서 빠지고 파일도 404(있는지조차 알려주지 않는다).
+- 요약: `{ id, title, titles: [묶음 안 교재 제목], bookIds, problems, bytes, at, teacher: { id, name } }`.
+  올린 선생님에게만 `open`, `students`, `mine: true` 가 함께 온다.
+- `students` 는 나와 연결된 학생만 남는다(남의 학생 id 는 조용히 버린다).
+- 앱: 설정 → "선생님 교재"(학생) · "서버 교재"(선생님). 받은 파일은 `.pulinote` 가져오기와 똑같이 기기에 저장된다.
+
 ## 저장
 
 `DATA_DIR/accounts.json`(계정·세션), `study.json`(학생별 기록), `questions.json`, `question-images/`.
-모두 임시 파일에 쓴 뒤 이름 바꾸기(원자적). 점검: `npm run test:accounts`.
+`books.json` + `books/<id>.pulinote`(올린 교재 파일).
+모두 임시 파일에 쓴 뒤 이름 바꾸기(원자적). 점검: `npm run test:accounts`, `npm run test:books`.
 
 ## 나중에 (실서비스)
 
-- 클라우드 서버 + HTTPS (지금은 같은 와이파이의 선생님 컴퓨터).
+- 클라우드 서버 + HTTPS (Render, `render.yaml`).
 - 소셜 로그인(카카오·구글·애플), 비밀번호 찾기(휴대폰·이메일 인증), 선생님 계정 인증.
 - 구독 결제 상태를 계정에 저장.

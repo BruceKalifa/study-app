@@ -54,7 +54,7 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee ci-out/analyze.txt; exit ${PIPESTATUS[0]}
 
-      - name: Server tests (content, community, ranking, accounts, questions)
+      - name: Server tests (content, community, ranking, accounts, questions, books)
         run: |
           set -o pipefail
           cd server && npm install --no-audit --no-fund --silent
@@ -62,6 +62,7 @@ jobs:
           node tools/test-community.js 2>&1 | tail -3
           node tools/test-accounts.js 2>&1 | grep -v '  ✔' | tail -30
           node tools/test-seed.js
+          node tools/test-books.js 2>&1 | grep -v '  ✔' | tail -20
 
       - name: Start server for app integration tests
         run: |

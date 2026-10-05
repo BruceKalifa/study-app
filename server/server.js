@@ -20,6 +20,7 @@ const { createCommunityApi } = require('./community');
 const { createRankingApi } = require('./ranking');
 const { createAccountsApi } = require('./accounts');
 const { createQuestionsApi } = require('./questions');
+const { createBooksApi } = require('./books');
 
 // ───────────────────────── 설정 ─────────────────────────
 const PORT = Number(process.env.PORT) || 8080;
@@ -495,6 +496,7 @@ const rankingApi = createRankingApi({ dataDir: DATA_DIR });
 const SEED_ACCOUNTS = process.env.SEED_ACCOUNTS ?? path.join(__dirname, 'seed', 'accounts.json');
 const accountsApi = createAccountsApi({ dataDir: DATA_DIR, seedFile: SEED_ACCOUNTS || null });
 const questionsApi = createQuestionsApi({ dataDir: DATA_DIR, accounts: accountsApi });
+const booksApi = createBooksApi({ dataDir: DATA_DIR, accounts: accountsApi });
 
 // ───────────────────────── HTTP (정적 파일) ─────────────────────────
 const MIME = {
@@ -536,6 +538,8 @@ const server = http.createServer((req, res) => {
   if (rankingApi.handle(req, res, reqUrl)) return;
   if (accountsApi.handle(req, res, reqUrl)) return;
   if (questionsApi.handle(req, res, reqUrl)) return;
+  // 선생님이 올린 교재 받기 (로그인한 학생만)
+  if (booksApi.handle(req, res, reqUrl)) return;
   // 문제 콘텐츠 API (앱 다운로드용 /api/content/…, 출제 웹용 /api/admin/…)
   if (contentApi.handle(req, res, reqUrl)) return;
   if (urlPath === '/admin') {
@@ -714,6 +718,7 @@ function shutdown() {
   rankingApi.saveSync();
   accountsApi.saveSync();
   questionsApi.saveSync();
+  booksApi.saveSync();
   for (const ws of wss.clients) { try { ws.close(1001, 'server_shutdown'); } catch (_) { /* ignore */ } }
   server.close();
   setTimeout(() => process.exit(0), 300).unref();
