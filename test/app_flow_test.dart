@@ -927,17 +927,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('교재 목차: section 이 있으면 목차로, 없으면 단원으로 묶는다', () {
-    Problem p(String id, {String unit = '', String section = ''}) =>
-        Problem(id: id, subjectId: 's', subjectName: '수학', unit: unit, section: section, stem: '본문', answer: '1');
-    // 목차가 있으면 목차 (단원은 섞여 있어도 된다)
+  test('교재 목차: 수업문항·숙제문항 DAY 로 묶고, 목차가 없으면 단원으로', () {
+    Problem p(String id, {String unit = '', String section = '', String topic = ''}) => Problem(
+        id: id, subjectId: 's', subjectName: '수학', unit: unit, section: section, topic: topic, stem: '본문', answer: '1');
+    // 목차가 적혀 있으면 그대로 (단원은 섞여 있어도 된다)
     final withSection = [
-      p('a', unit: '수열', section: '수업'),
-      p('b', unit: '미분', section: '수업'),
-      p('c', unit: '수열', section: 'DAY 1'),
+      p('a', unit: '수열', section: '수업문항'),
+      p('b', unit: '미분', section: '수업문항'),
+      p('c', unit: '수열', section: '숙제문항 DAY 1'),
     ];
-    expect(byTableOfContents(withSection).map((e) => e.$1).toList(), ['수업', 'DAY 1']);
+    expect(byTableOfContents(withSection).map((e) => e.$1).toList(), ['수업문항', '숙제문항 DAY 1']);
     expect(byTableOfContents(withSection).first.$2, [0, 1]);
+    // 목차가 안 적힌 옛 교재도 유형의 DAY 표시로 알아서 묶는다
+    final fromTopic = [
+      p('a', unit: '수열', topic: '기출 원문'),
+      p('b', unit: '미분', topic: '심화'),
+      p('c', unit: '수열', topic: 'DAY 1 · 숙제 1(중)'),
+      p('d', unit: '확률', topic: 'DAY 2 · 숙제 2(상)'),
+    ];
+    expect(byTableOfContents(fromTopic).map((e) => e.$1).toList(), ['수업문항', '숙제문항 DAY 1', '숙제문항 DAY 2']);
+    expect(byTableOfContents(fromTopic).first.$2, [0, 1]);
+    // 줄 이름: 목차로 묶었으면 단원을 앞에 붙이고 DAY 표시는 뗀다
+    expect(tocRowLabel(fromTopic[2], withUnit: true), '수열 · 숙제 1(중)');
+    expect(tocRowLabel(fromTopic[0], withUnit: false), '기출 원문');
     // 목차가 없으면 단원
     final noSection = [p('a', unit: '수열'), p('b', unit: '미분'), p('c', unit: '수열')];
     expect(byTableOfContents(noSection).map((e) => e.$1).toList(), ['수열', '미분']);

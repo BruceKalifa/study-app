@@ -6,7 +6,7 @@ import '../app/theme.dart';
 import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
-import 'workbook_screen.dart' show byTableOfContents;
+import 'workbook_screen.dart' show byTableOfContents, tocRowLabel, usesTableOfContents;
 
 /// 답안표 — 교재의 정답을 목차별로 보고 고친다 (선생님).
 /// 고친 정답은 이 태블릿의 교재 파일에 저장되고, 서버에도 다시 올라가 학생 태블릿에 반영된다.
@@ -135,6 +135,7 @@ class _AnswerKeyScreenState extends State<AnswerKeyScreen> {
                     color: color,
                     controller: _controllerFor(ps[idx[k]]),
                     editable: bookId != null,
+                    withUnit: usesTableOfContents(ps),
                     changed: _edited.containsKey(ps[idx[k]].id),
                     onChanged: (v) {
                       final p = ps[idx[k]];
@@ -165,6 +166,7 @@ class _AnswerRow extends StatelessWidget {
     required this.color,
     required this.controller,
     required this.editable,
+    required this.withUnit,
     required this.changed,
     required this.onChanged,
   });
@@ -173,6 +175,7 @@ class _AnswerRow extends StatelessWidget {
   final Color color;
   final TextEditingController controller;
   final bool editable;
+  final bool withUnit;
   final bool changed;
   final ValueChanged<String> onChanged;
 
@@ -188,8 +191,8 @@ class _AnswerRow extends StatelessWidget {
           child: Text('$n', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.inkSoft)),
         ),
         SizedBox(
-          width: 150,
-          child: Text(problem.label ?? (problem.topic.isEmpty ? problem.unit : problem.topic),
+          width: 230,
+          child: Text(tocRowLabel(problem, withUnit: withUnit),
               maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         Expanded(

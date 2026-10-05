@@ -139,7 +139,7 @@ class WorkbookScreen extends StatelessWidget {
               child: Column(children: [
                 for (var k = 0; k < idx.length; k++) ...[
                   if (k > 0) const Divider(height: 1),
-                  _Row(n: idx[k] + 1, problem: ps[idx[k]], color: color, onTap: () {
+                  _Row(n: idx[k] + 1, problem: ps[idx[k]], color: color, withUnit: usesTableOfContents(ps), onTap: () {
                     final i = idx[k];
                     solve(() => SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]));
                   }),
@@ -154,14 +154,38 @@ class WorkbookScreen extends StatelessWidget {
   }
 }
 
-/// 교재의 문항을 목차별로 — 교재에 목차(section)가 있으면 그것, 없으면 단원으로.
+final _dayRe = RegExp(r'DAY\s*(\d+)');
+
+/// 이 교재에 목차가 있나 — 문항에 목차(section)가 적혀 있거나, 유형에 DAY 표시가 있으면.
+bool usesTableOfContents(List<Problem> ps) =>
+    ps.any((p) => p.section.trim().isNotEmpty || _dayRe.hasMatch(p.topic));
+
+/// 한 문항이 들어갈 목차 이름 (목차가 없는 교재면 단원).
+String sectionOf(Problem p, {required bool toc}) {
+  if (!toc) return p.unit.trim();
+  final s = p.section.trim();
+  if (s.isNotEmpty) return s;
+  final m = _dayRe.firstMatch(p.topic);
+  return m == null ? '수업문항' : '숙제문항 DAY ${m.group(1)}';
+}
+
+/// 목록 한 줄에 쓸 이름 — 목차로 묶었으면 단원을 앞에 붙이고, DAY 표시는 (머리글에 있으니) 뗀다.
+String tocRowLabel(Problem p, {required bool withUnit}) {
+  final topic = p.topic.replaceFirst(RegExp(r'^\s*DAY\s*\d+\s*·\s*'), '').trim();
+  final unit = p.unit.trim();
+  if (!withUnit) return topic.isEmpty ? unit : topic;
+  if (topic.isEmpty) return unit;
+  return unit.isEmpty ? topic : '$unit · $topic';
+}
+
+/// 교재의 문항을 목차별로 (수업문항 · 숙제문항 DAY 1 …), 목차가 없으면 단원으로.
 /// 묶을 거리가 하나뿐이면 묶지 않는다. 값은 [ps] 안의 자리번호.
 List<(String, List<int>)> byTableOfContents(List<Problem> ps) {
-  final useSection = ps.any((p) => p.section.trim().isNotEmpty);
+  final toc = usesTableOfContents(ps);
   final order = <String>[];
   final by = <String, List<int>>{};
   for (var i = 0; i < ps.length; i++) {
-    final k = (useSection ? ps[i].section : ps[i].unit).trim();
+    final k = sectionOf(ps[i], toc: toc);
     if (!by.containsKey(k)) {
       order.add(k);
       by[k] = [];
@@ -202,10 +226,11 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.n, required this.problem, required this.color, required this.onTap});
+  const _Row({required this.n, required this.problem, required this.color, required this.onTap, this.withUnit = false});
   final int n;
   final Problem problem;
   final Color color;
+  final bool withUnit;
   final VoidCallback onTap;
 
   @override
@@ -224,8 +249,8 @@ class _Row extends StatelessWidget {
           ResultMark(correct: st.attempts == 0 ? null : st.lastCorrect, size: 26),
           const SizedBox(width: 14),
           SizedBox(
-            width: 180,
-            child: Text(problem.topic.isEmpty ? problem.unit : problem.topic,
+            width: 230,
+            child: Text(tocRowLabel(problem, withUnit: withUnit),
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
           Expanded(
