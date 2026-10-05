@@ -840,9 +840,10 @@ void main() {
     // 이미 받은 교재는 '다시 받기' 로 바뀐다
     expect(find.byKey(const Key('server-book-again-srv-1')), findsOneWidget);
 
-    // 서버가 죽어 있으면 조용히 비어 있고, 로그아웃 상태면 카드가 아예 안 보인다
+    // 로그아웃 상태면 카드가 아예 안 보인다 (기록 보내기 예약도 여기서 흘려보낸다)
     await tester.pumpWidget(const SizedBox());
     app.profile.account = null;
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: ServerBooksCard()))));
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('선생님 교재'), findsNothing);
