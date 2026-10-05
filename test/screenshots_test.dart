@@ -696,7 +696,7 @@ void main() {
     ]) {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = name == '50_phone' ? 3.0 : 2.6;
-      await tester.pumpWidget(_wrap(app, const AppRoot()));
+      await tester.pumpWidget(_wrap(app, const HomeShell()));
       await tester.pump(const Duration(milliseconds: 600));
       await _shot(tester, '${name}_home');
       // 더보기 (아래 막대에 없는 화면들)
