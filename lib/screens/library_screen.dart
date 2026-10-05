@@ -10,6 +10,7 @@ import '../widgets/math_text.dart';
 import 'dashboard_screen.dart' show subjectIcon, courseIcon;
 import '../widgets/workbook_card.dart';
 import 'exam_setup.dart';
+import 'series_screen.dart';
 import 'solve_screen.dart';
 import 'workbook_screen.dart';
 import 'workbook_store_screen.dart';
@@ -543,13 +544,100 @@ class LibraryScreen extends StatelessWidget {
                 childAspectRatio: 1.75,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                children: [for (final w in e.value) WorkbookCard(workbook: w)],
+                // 같은 시리즈(FLOW TYPE…)는 한 칸으로 묶고, 누르면 회차를 고른다
+                children: [
+                  for (final g in _bySeries(e.value))
+                    g.length == 1 ? WorkbookCard(workbook: g.first) : _SeriesCard(books: g),
+                ],
               ),
               const SizedBox(height: 26),
             ],
         ],
       );
     });
+  }
+}
+
+/// 같은 시리즈끼리 (회차가 둘 이상인 것만 묶는다). 담은 순서를 지킨다.
+List<List<Workbook>> _bySeries(List<Workbook> books) {
+  final order = <String>[];
+  final by = <String, List<Workbook>>{};
+  for (final w in books) {
+    final k = w.series.trim().isEmpty ? 'id:${w.id}' : 'series:${w.series.trim()}';
+    if (!by.containsKey(k)) {
+      order.add(k);
+      by[k] = [];
+    }
+    by[k]!.add(w);
+  }
+  return [for (final k in order) by[k]!];
+}
+
+/// 시리즈 한 칸 — "FLOW TYPE · 11회차". 누르면 회차 고르기로.
+class _SeriesCard extends StatelessWidget {
+  const _SeriesCard({required this.books});
+  final List<Workbook> books;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final first = books.first;
+    final series = first.series.trim();
+    final course = app.bank.subject(first.course);
+    final color = Color(course?.color ?? 0xFF5B6475);
+    var done = 0, total = 0;
+    for (final w in books) {
+      final (d, t) = app.workbookProgress(w);
+      done += d;
+      total += t;
+    }
+    final doneBooks = books.where((w) {
+      final (d, t) = app.workbookProgress(w);
+      return t > 0 && d == t;
+    }).length;
+    return Card(
+      key: Key('seriescard-$series'),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => SeriesScreen.open(context, series),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(width: 10, color: color),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Pill(first.stage, color: stageColor(first.stage), dense: true),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text('${books.length}회차',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted, size: 20),
+                ]),
+                const SizedBox(height: 10),
+                Text(series,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 17.5, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.25)),
+                const SizedBox(height: 4),
+                Text(doneBooks == 0 ? '회차를 골라 푸세요' : '$doneBooks회차 완주',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
+                const Spacer(),
+                AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 6),
+                const SizedBox(height: 6),
+                Text('$done / $total 문항',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 }
 

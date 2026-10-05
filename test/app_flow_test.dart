@@ -18,6 +18,7 @@ import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/library_screen.dart';
 import 'package:study_app/screens/workbook_screen.dart';
 import 'package:study_app/screens/answer_key_screen.dart';
+import 'package:study_app/screens/series_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
@@ -959,6 +960,34 @@ void main() {
     expect(one, hasLength(1));
     expect(one.single.$1, '');
     expect(one.single.$2, [0, 1]);
+  });
+
+  testWidgets('내 교재: 시리즈로 묶고 → 회차 고르기 → 교재 목차', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.runAsync(() => app.importBooks(sampleCollectionFile()));
+    expect(app.hasWorkbook('sample-type-01'), isTrue);
+    expect(app.hasWorkbook('sample-type-02'), isTrue);
+
+    await tester.pumpWidget(_app(app, home: const Scaffold(body: LibraryScreen())));
+    await tester.pump(const Duration(milliseconds: 400));
+    // 회차가 여럿인 시리즈는 한 칸으로
+    expect(find.byKey(const Key('seriescard-SAMPLE TYPE')), findsOneWidget);
+    expect(find.byKey(const Key('wbcard-sample-type-01')), findsNothing);
+    expect(find.text('2회차'), findsWidgets);
+
+    // 누르면 회차 목록
+    await tester.tap(find.byKey(const Key('seriescard-SAMPLE TYPE')));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('round-sample-type-01')), findsOneWidget);
+    expect(find.byKey(const Key('round-sample-type-02')), findsOneWidget);
+    expect(find.text('1회차'), findsOneWidget, reason: '시리즈 이름은 떼고 회차만');
+
+    // 회차를 누르면 교재 화면 (목차별)
+    await tester.tap(find.byKey(const Key('round-sample-type-01')));
+    await tester.pumpAndSettle(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('wb-unit-수업문항')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('답안표: 학생이 자기 답을 적고 한 번에 채점한다 (채점된 건 못 고침)', (tester) async {
