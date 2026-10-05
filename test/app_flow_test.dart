@@ -918,12 +918,13 @@ void main() {
     expect(find.byKey(const Key('book-row-wb-phy1-concept')), findsNothing);
     expect(find.textContaining('문제 풀기'), findsWidgets);
 
-    // 교재를 열면 단원(수열·확률·통계)으로 나뉘고 단원별로 풀 수 있다
+    // 교재를 열면 목차(수업문항 · 숙제문항 DAY 1)로 나뉘고 목차별로 풀 수 있다
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(_app(app, home: const WorkbookScreen(workbookId: 'sample-type-01')));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byKey(const Key('wb-unit-수열')), findsOneWidget);
-    expect(find.byKey(const Key('wb-unit-확률')), findsOneWidget);
+    expect(find.byKey(const Key('wb-unit-수업문항')), findsOneWidget);
+    expect(find.byKey(const Key('wb-unit-숙제문항 DAY 1')), findsOneWidget);
+    expect(find.text('수열 · 예제'), findsOneWidget, reason: '목차로 묶으면 줄에 단원을 붙인다');
     expect(tester.takeException(), isNull);
   });
 
