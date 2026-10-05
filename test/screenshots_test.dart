@@ -703,7 +703,9 @@ void main() {
       await tester.tap(find.byKey(const Key('phone-more')));
       await tester.pump(const Duration(milliseconds: 600));
       await _shot(tester, '${name}_more');
-      await tester.tap(find.text('설정'));
+      await tester.scrollUntilVisible(find.byKey(const Key('more-설정')), 200,
+          scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
+      await tester.tap(find.byKey(const Key('more-설정')));
       await tester.pump(const Duration(milliseconds: 700));
       await _shot(tester, '${name}_settings');
       await tester.tap(find.byIcon(Icons.collections_bookmark_outlined));

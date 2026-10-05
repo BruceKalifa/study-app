@@ -33,46 +33,53 @@ class DashboardScreen extends StatelessWidget {
 
     return LayoutBuilder(builder: (context, box) {
       final wide = box.maxWidth >= 1000;
+      // 폰 세로: 인사말 아래로 배지를 내려 접는다 (한 줄에 다 넣으면 글자가 잘린다)
+      final narrow = box.maxWidth < 620;
+      final hello = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${_greeting()}, ${app.profile.name}님',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: narrow ? 23 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+        const SizedBox(height: 6),
+        Text(
+          '${l.grade} · ${l.goal} 목표 · ${books.isEmpty ? '내 교재 없음' : '내 교재 ${books.length}권'}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: narrow ? 14 : 15.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
+        ),
+      ]);
+      final badges = <Widget>[
+        if (app.unreadAnswers > 0)
+          InkWell(
+            key: const Key('home-answers'),
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => onNavigate(4),
+            child: Pill('선생님 답변 ${app.unreadAnswers}개', icon: Icons.mark_chat_unread_rounded, color: AppColors.correct),
+          ),
+        if (app.streak > 0) Pill('${app.streak}일 연속', icon: Icons.local_fire_department_rounded, color: AppColors.accent),
+        if (!app.subscribed)
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => onNavigate(10),
+            child: Pill('무료 체험 ${app.trialDaysLeft}일 남음', icon: Icons.workspace_premium_rounded, color: AppColors.blue),
+          ),
+        if (l.examDate > 0) _DdayBadge(name: l.examName, dday: dday, onTap: () => onNavigate(3)),
+      ];
       return ListView(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+        padding: EdgeInsets.fromLTRB(narrow ? 16 : 32, narrow ? 18 : 28, narrow ? 16 : 32, 40),
         children: [
           // ---------- header
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${_greeting()}, ${app.profile.name}님',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-                const SizedBox(height: 6),
-                Text(
-                  '${l.grade} · ${l.goal} 목표 · ${books.isEmpty ? '내 교재 없음' : '내 교재 ${books.length}권'}',
-                  style: const TextStyle(fontSize: 15.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
-                ),
-              ]),
-            ),
-            if (app.unreadAnswers > 0) ...[
-              InkWell(
-                key: const Key('home-answers'),
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => onNavigate(4),
-                child: Pill('선생님 답변 ${app.unreadAnswers}개', icon: Icons.mark_chat_unread_rounded, color: AppColors.correct),
-              ),
-              const SizedBox(width: 10),
+          if (narrow) ...[
+            hello,
+            if (badges.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: badges),
             ],
-            if (app.streak > 0) ...[
-              Pill('${app.streak}일 연속', icon: Icons.local_fire_department_rounded, color: AppColors.accent),
-              const SizedBox(width: 10),
-            ],
-            if (!app.subscribed)
-              InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => onNavigate(10),
-                child: Pill('무료 체험 ${app.trialDaysLeft}일 남음', icon: Icons.workspace_premium_rounded, color: AppColors.blue),
-              ),
-            if (l.examDate > 0) ...[
-              const SizedBox(width: 10),
-              _DdayBadge(name: l.examName, dday: dday, onTap: () => onNavigate(3)),
-            ],
-          ]),
+          ] else
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              Expanded(child: hello),
+              for (final b in badges) ...[const SizedBox(width: 10), b],
+            ]),
           const SizedBox(height: 24),
 
           // ---------- hero: daily set + study time

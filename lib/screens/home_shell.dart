@@ -89,6 +89,8 @@ class HomeShellState extends State<HomeShell> {
     final rest = [for (var i = 0; i < _dests.length; i++) if (!_phoneTabs.contains(i)) i];
     final picked = await showModalBottomSheet<int>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.82),
       backgroundColor: AppColors.paper,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
