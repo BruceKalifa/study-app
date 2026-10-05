@@ -1,0 +1,24 @@
+# Render 클라우드 서버 (Blueprint): Render → New → Blueprint → 이 저장소 선택 → Apply
+# 계정·풀이 기록·질문·문항은 디스크(/var/data)에 저장돼 재시작·재배포해도 남는다.
+services:
+  - type: web
+    runtime: node
+    name: pulinote-server
+    rootDir: server
+    buildCommand: npm install --omit=dev --no-audit --no-fund
+    startCommand: node server.js
+    plan: 0.5c-512mb        # 월 $7 (+ 디스크 1GB $0.25) — 무료 요금제는 디스크가 없어 데이터가 사라짐
+    region: singapore       # 한국에서 가장 가까운 지역
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    disk:
+      name: pulinote-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data/data
+      - key: CONTENT_DIR
+        value: /var/data/content
+      - key: TZ_OFFSET_MIN
+        value: "540"

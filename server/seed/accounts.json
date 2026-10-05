@@ -1,0 +1,26 @@
+{
+ "note": "처음 켤 때 넣는 계정 (비밀번호는 해시만 — 앱 설정에서 바꿀 수 있음)",
+ "users": [
+  {
+   "id": "u_muutma9v53334b08b8",
+   "role": "teacher",
+   "loginId": "une.teacher",
+   "name": "Une 선생님",
+   "salt": "3b0d9037d46ca7d0ed44e2f2cd775046",
+   "passHash": "d01738dd953da9fdc83ab88c6d7b79a64dd20d8a0850f5665446806dc9224176",
+   "inviteCode": "UNE7TQ"
+  },
+  {
+   "id": "u_muutmab8132b22f697",
+   "role": "student",
+   "loginId": "une.student",
+   "name": "테스트 학생",
+   "grade": "고3",
+   "salt": "a2e9171d0d6d8481f04792648dd1f101",
+   "passHash": "0f5a3c12e12832089c83a20944b6fdec8b6cab4bdd75726ca50c1f163d7ebe1a",
+   "teachers": [
+    "u_muutma9v53334b08b8"
+   ]
+  }
+ ]
+}

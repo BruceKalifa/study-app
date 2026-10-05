@@ -28,6 +28,7 @@
  * 저장: DATA_DIR/accounts.json (계정·세션), DATA_DIR/study.json (학생별 기록)
  */
 
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { JsonStore } = require('./json-store');
@@ -108,7 +109,7 @@ function cleanAttempt(a) {
   };
 }
 
-function createAccountsApi({ dataDir, log }) {
+function createAccountsApi({ dataDir, log, seedFile }) {
   log = log || ((m) => console.warn(m));
   const accounts = new JsonStore({
     file: path.join(dataDir, 'accounts.json'),
@@ -133,6 +134,25 @@ function createAccountsApi({ dataDir, log }) {
     byId = new Map(users().map((u) => [u.id, u]));
     byLogin = new Map(users().map((u) => [u.loginId, u]));
     byInvite = new Map(users().filter((u) => u.role === 'teacher' && u.inviteCode).map((u) => [u.inviteCode, u]));
+  }
+  // 처음 켤 때(계정이 하나도 없을 때)만 미리 만들어 둔 계정을 넣는다.
+  // seed 파일에는 비밀번호가 없고 scrypt 해시와 salt 만 있다 (공개 저장소에 있어도 비밀번호는 알 수 없음).
+  if (users().length === 0 && seedFile && fs.existsSync(seedFile)) {
+    try {
+      const seed = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
+      for (const u of Array.isArray(seed.users) ? seed.users : []) {
+        if (!u || !ROLES.includes(u.role) || !LOGIN_RE.test(String(u.loginId)) || !u.id || !u.salt || !u.passHash) continue;
+        const nu = { id: u.id, role: u.role, loginId: u.loginId, name: lineText(u.name) || u.loginId, salt: u.salt,
+          passHash: u.passHash, createdAt: Date.now() };
+        if (u.role === 'teacher') nu.inviteCode = typeof u.inviteCode === 'string' ? u.inviteCode : randomCode();
+        if (u.role === 'student') { nu.grade = u.grade || '고3'; nu.teachers = Array.isArray(u.teachers) ? u.teachers : []; }
+        users().push(nu);
+      }
+      accounts.save().catch((e) => log(`seed accounts: ${e.message}`));
+      log(`seed accounts: ${users().length}`);
+    } catch (e) {
+      log(`seed accounts: ${e.message}`);
+    }
   }
   for (const u of users()) {
     if (u.role === 'student' && !Array.isArray(u.teachers)) u.teachers = [];
