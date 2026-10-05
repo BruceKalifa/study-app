@@ -7,7 +7,7 @@ services:
     rootDir: server
     buildCommand: npm install --omit=dev --no-audit --no-fund
     startCommand: node server.js
-    plan: 0.5c-512mb        # 월 $7 (+ 디스크 1GB $0.25) — 무료 요금제는 디스크가 없어 데이터가 사라짐
+    plan: starter           # 월 $7 (+ 디스크 1GB $0.25) — 무료 요금제는 디스크가 없어 데이터가 사라짐
     region: singapore       # 한국에서 가장 가까운 지역
     healthCheckPath: /healthz
     autoDeployTrigger: commit
