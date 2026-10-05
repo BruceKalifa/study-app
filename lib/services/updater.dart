@@ -5,6 +5,30 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+/// Result of an install session (Android PackageInstaller).
+class InstallStatus {
+  final int code;
+  final String message;
+  const InstallStatus(this.code, this.message);
+
+  bool get success => code == 0;
+
+  /// The user pressed 취소 in the system dialog.
+  bool get cancelled => code == 3;
+
+  /// What to tell the user.
+  String get text => switch (code) {
+        0 => '설치했어요',
+        2 => '기기 설정이 설치를 막았어요 (자동 차단기 · 보안 설정을 확인해 주세요)',
+        3 => '설치를 취소했어요',
+        4 => '내려받은 파일이 깨졌어요 · 다시 받아 볼게요',
+        5 => '지금 앱과 서명이 달라 덮어쓸 수 없어요 · 앱을 한 번 지우고 새로 설치해야 해요',
+        6 => '저장 공간이 부족해요',
+        7 => '이 기기와 맞지 않는 설치 파일이에요',
+        _ => '설치하지 못했어요${message.isEmpty ? '' : ' ($message)'}',
+      };
+}
+
 /// A newer build published by CI (version.json next to the APK in the "latest" release).
 class AppUpdate {
   final int build;
@@ -26,6 +50,24 @@ class Updater {
   static const MethodChannel _ch = MethodChannel('pulinote/update');
 
   static bool get supported => Platform.isAndroid;
+
+  static final StreamController<InstallStatus> _status = StreamController<InstallStatus>.broadcast();
+  static bool _listening = false;
+
+  /// Outcome of [install] (success arrives only if the app survives, i.e. rarely: the update restarts it).
+  static Stream<InstallStatus> get statuses {
+    if (!_listening) {
+      _listening = true;
+      _ch.setMethodCallHandler((call) async {
+        if (call.method == 'installStatus') {
+          final m = (call.arguments as Map?) ?? const {};
+          _status.add(InstallStatus((m['status'] as num?)?.toInt() ?? 1, '${m['message'] ?? ''}'));
+        }
+        return null;
+      });
+    }
+    return _status.stream;
+  }
 
   static int? _installed;
 
@@ -118,10 +160,21 @@ class Updater {
     } catch (_) {}
   }
 
-  /// Opens the system installer for [apk] (the user taps 업데이트).
+  /// Installs [apk] through a PackageInstaller session; the system asks the user to confirm and the
+  /// outcome arrives on [statuses].
   static Future<bool> install(File apk) async {
+    statuses; // start listening before the result can arrive
     try {
       return await _ch.invokeMethod<bool>('install', {'path': apk.path}) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fallback: hand the file to the system installer screen (the old way).
+  static Future<bool> installWithInstallerScreen(File apk) async {
+    try {
+      return await _ch.invokeMethod<bool>('installView', {'path': apk.path}) ?? false;
     } catch (_) {
       return false;
     }

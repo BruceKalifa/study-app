@@ -12,6 +12,9 @@ grep -q 'usesCleartextTraffic' "$M" || \
 # In-app updates: download the new APK and hand it to the system installer (FileProvider → cache/updates/)
 grep -q 'REQUEST_INSTALL_PACKAGES' "$M" || \
   sed -i 's#<application#<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application#' "$M"
+# once the app has installed itself, later updates may go through without the extra confirm (Android 12+)
+grep -q 'UPDATE_PACKAGES_WITHOUT_USER_ACTION' "$M" || \
+  sed -i 's#<application#<uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>\n    <application#' "$M"
 grep -q 'pulinote_update_paths' "$M" || \
   sed -i 's#</application>#    <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true">\n            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/pulinote_update_paths"/>\n        </provider>\n    </application>#' "$M"
 mkdir -p android/app/src/main/res/xml
@@ -74,12 +77,18 @@ if [ -n "$MA" ]; then
 $PKG
 
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.MotionEvent
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -93,9 +102,63 @@ class MainActivity : FlutterActivity() {
     private var pickResult: MethodChannel.Result? = null
     private var opened: ByteArray? = null
 
+    // In-app updates: install through a PackageInstaller session so the result (and the reason
+    // when it fails) comes back to the app instead of a bare "앱이 설치되지 않음" screen.
+    private val installAction get() = packageName + ".INSTALL_STATUS"
+    private var updateChannel: MethodChannel? = null
+    private val installReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, i: Intent) {
+            val status = i.getIntExtra(PackageInstaller.EXTRA_STATUS, -999)
+            if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                @Suppress("DEPRECATION")
+                val confirm: Intent? = if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) else i.getParcelableExtra(Intent.EXTRA_INTENT)
+                if (confirm != null) {
+                    confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(confirm)
+                }
+                return
+            }
+            updateChannel?.invokeMethod("installStatus", mapOf(
+                "status" to status,
+                "message" to (i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "")
+            ))
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ContextCompat.registerReceiver(this, installReceiver, IntentFilter(installAction), ContextCompat.RECEIVER_NOT_EXPORTED)
         takeViewIntent(intent)
+    }
+
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(installReceiver)
+        } catch (e: Exception) {
+        }
+        super.onDestroy()
+    }
+
+    private fun installWithSession(apk: File) {
+        val installer = packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        params.setAppPackageName(packageName)
+        params.setSize(apk.length())
+        if (Build.VERSION.SDK_INT >= 31) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        }
+        val id = installer.createSession(params)
+        installer.openSession(id).use { session ->
+            apk.inputStream().use { input ->
+                session.openWrite("base.apk", 0, apk.length()).use { out ->
+                    input.copyTo(out)
+                    session.fsync(out)
+                }
+            }
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
+            val sender = PendingIntent.getBroadcast(this, id, Intent(installAction).setPackage(packageName), flags)
+            session.commit(sender.intentSender)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -173,7 +236,9 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pulinote/update").setMethodCallHandler { call, result ->
+        val upd = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "pulinote/update")
+        updateChannel = upd
+        upd.setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
                     "versionCode" -> {
@@ -192,6 +257,15 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                     "install" -> {
+                        val path = call.argument<String>("path")
+                        if (path == null) {
+                            result.success(false)
+                        } else {
+                            installWithSession(File(path))
+                            result.success(true)
+                        }
+                    }
+                    "installView" -> {
                         val path = call.argument<String>("path")
                         if (path == null) {
                             result.success(false)

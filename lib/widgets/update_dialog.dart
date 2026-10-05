@@ -21,7 +21,7 @@ class UpdateDialog extends StatefulWidget {
   State<UpdateDialog> createState() => _UpdateDialogState();
 }
 
-enum _Phase { downloading, needPermission, installing, failed }
+enum _Phase { downloading, needPermission, installing, failed, conflict }
 
 class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver {
   _Phase _phase = _Phase.downloading;
@@ -29,18 +29,49 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
   String _error = '';
   File? _apk;
   bool _waitingSettings = false;
+  bool _offerOtherWay = false;
+  StreamSubscription<InstallStatus>? _sub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _sub = Updater.statuses.listen(_onStatus);
     _download();
   }
 
   @override
   void dispose() {
+    _sub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// What the system installer reported (on success the app restarts and this is never seen).
+  void _onStatus(InstallStatus st) {
+    if (!mounted || st.success) return;
+    if (st.code == 4) {
+      _download(); // broken download → fetch again
+      return;
+    }
+    setState(() {
+      _phase = st.code == 5 ? _Phase.conflict : _Phase.failed;
+      _error = st.text;
+      _offerOtherWay = !st.cancelled && st.code != 5;
+    });
+  }
+
+  Future<void> _otherWay() async {
+    final f = _apk;
+    if (f == null) return;
+    setState(() => _phase = _Phase.installing);
+    if (!await Updater.installWithInstallerScreen(f) && mounted) {
+      setState(() {
+        _phase = _Phase.failed;
+        _error = '설치 화면을 열지 못했어요';
+        _offerOtherWay = false;
+      });
+    }
   }
 
   @override
@@ -56,6 +87,7 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
     setState(() {
       _phase = _Phase.downloading;
       _progress = 0;
+      _offerOtherWay = false;
     });
     try {
       final f = await Updater.download(widget.update, onProgress: (p) {
@@ -128,8 +160,21 @@ class _UpdateDialogState extends State<UpdateDialog> with WidgetsBindingObserver
         body = Text(_error, style: const TextStyle(color: AppColors.wrong, fontWeight: FontWeight.w700));
         actions = [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('나중에')),
-          FilledButton(onPressed: _download, child: const Text('다시 시도')),
+          if (_offerOtherWay) TextButton(onPressed: _otherWay, child: const Text('다른 방법으로 설치')),
+          FilledButton(onPressed: _apk != null ? _install : _download, child: const Text('다시 시도')),
         ];
+      case _Phase.conflict:
+        body = Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_error, style: const TextStyle(color: AppColors.wrong, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          const Text(
+            '태블릿에 있는 앱이 다른 곳에서 만든 설치 파일이라 그래요. 앱을 길게 눌러 삭제한 뒤, 브라우저에서 '
+            '최신 설치 파일을 받아 설치해 주세요. 한 번만 하면 그다음부터는 자동 업데이트가 돼요.\n'
+            '로그인해서 쓰던 기록은 다시 로그인하면 돌아와요. 로그인 없이 쓴 기록은 삭제하면 사라져요.',
+            style: TextStyle(height: 1.5),
+          ),
+        ]);
+        actions = [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('확인'))];
     }
     return AlertDialog(
       title: Row(children: [
