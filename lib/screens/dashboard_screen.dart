@@ -86,7 +86,7 @@ class DashboardScreen extends StatelessWidget {
           _flex(
             wide,
             [
-              (6, const _DailySetCard()),
+              (6, _DailySetCard(narrow: narrow)),
               (
                 4,
                 Column(children: [
@@ -278,7 +278,10 @@ class _DdayBadge extends StatelessWidget {
 }
 
 class _DailySetCard extends StatelessWidget {
-  const _DailySetCard();
+  const _DailySetCard({required this.narrow});
+
+  /// 폰 세로 — 고리를 위로 올리고 글을 아래로 (IntrinsicHeight 안이라 LayoutBuilder 를 못 쓴다).
+  final bool narrow;
 
   @override
   Widget build(BuildContext context) {
@@ -308,10 +311,7 @@ class _DailySetCard extends StatelessWidget {
           ]),
         );
 
-    return LayoutBuilder(builder: (context, box) {
-      // 폰 세로: 고리를 위로 올리고 글을 아래로 (나란히 두면 글이 잘린다)
-      final narrow = box.maxWidth < 560;
-      final ring = ProgressRing(
+    final ring = ProgressRing(
           value: total == 0 ? 0 : done / total,
           size: narrow ? 120 : 150,
           stroke: 14,
@@ -382,7 +382,7 @@ class _DailySetCard extends StatelessWidget {
                       : '이어 풀기 · ${remaining.length}문제 남음'),
             ),
           ]);
-      return Container(
+    return Container(
         padding: EdgeInsets.all(narrow ? 18 : 28),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
@@ -400,7 +400,6 @@ class _DailySetCard extends StatelessWidget {
               ])
             : Row(children: [ring, const SizedBox(width: 28), Expanded(child: body)]),
       );
-    });
   }
 }
 
