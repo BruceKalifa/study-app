@@ -106,13 +106,12 @@ class WorkbookScreen extends StatelessWidget {
               icon: const Icon(Icons.timer_outlined),
               label: const Text('시험처럼 풀기'),
             ),
-            if (app.isTeacher)
-              OutlinedButton.icon(
-                key: const Key('wb-answers'),
-                onPressed: () => AnswerKeyScreen.open(context, w.id),
-                icon: const Icon(Icons.fact_check_outlined),
-                label: const Text('답안표'),
-              ),
+            OutlinedButton.icon(
+              key: const Key('wb-answers'),
+              onPressed: () => AnswerKeyScreen.open(context, w.id),
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('답안표'),
+            ),
             TextButton.icon(
               key: const Key('wb-toggle'),
               onPressed: () {

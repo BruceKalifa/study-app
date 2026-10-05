@@ -961,6 +961,41 @@ void main() {
     expect(one.single.$2, [0, 1]);
   });
 
+  testWidgets('답안표: 학생이 자기 답을 적고 한 번에 채점한다 (채점된 건 못 고침)', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.runAsync(() => app.importBooks(sampleBookFile()));
+    final ids = app.bank.workbook('sample-type-01')!.problemIds;
+    final right = app.bank.byId(ids[0])!;
+    final wrong = app.bank.byId(ids[1])!;
+
+    await tester.pumpWidget(_app(app, home: const AnswerKeyScreen(workbookId: 'sample-type-01')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('채점하기'), findsOneWidget);
+    expect(find.byKey(Key('answer-${right.id}')), findsOneWidget, reason: '안 푼 문항은 입력칸');
+
+    await tester.enterText(find.byKey(Key('answer-${right.id}')), right.answer);
+    await tester.enterText(find.byKey(Key('answer-${wrong.id}')), '99999');
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('채점하기 (2)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('answers-grade')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(app.stateOf(right.id).lastCorrect, isTrue);
+    expect(app.stateOf(wrong.id).lastCorrect, isFalse);
+    expect(app.stateOf(wrong.id).inWrongNote, isTrue, reason: '틀린 문항은 오답노트로');
+    expect(find.textContaining('맞은 개수 1'), findsOneWidget);
+
+    // 채점된 문항은 입력칸이 사라지고 내 답·O/X 가 보인다
+    expect(find.byKey(Key('answer-${right.id}')), findsNothing);
+    expect(find.byKey(Key('answer-done-${right.id}')), findsOneWidget);
+    expect(find.byKey(Key('answer-done-${wrong.id}')), findsOneWidget);
+    // 예약된 기록 보내기 타이머를 흘려보낸다
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('답안표: 선생님이 목차별로 정답을 고치면 교재에 저장된다', (tester) async {
     _tabletSize(tester);
     final app = (await tester.runAsync(_state))!;
