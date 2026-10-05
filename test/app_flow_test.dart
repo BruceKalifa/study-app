@@ -964,8 +964,11 @@ void main() {
 
   testWidgets('내 교재: 시리즈로 묶고 → 회차 고르기 → 교재 목차', (tester) async {
     _tabletSize(tester);
-    final app = (await tester.runAsync(_state))!;
+    // 내 교재를 비우고 시작 (담은 교재가 이 시리즈뿐이게)
+    final app = (await tester.runAsync(() => _state(onboard: false)))!;
+    app.completeOnboarding(name: '학생', grade: '고2', goal: '수능', courses: const [], workbooks: const []);
     await tester.runAsync(() => app.importBooks(sampleCollectionFile()));
+    expect(app.myWorkbooks, hasLength(2));
     expect(app.hasWorkbook('sample-type-01'), isTrue);
     expect(app.hasWorkbook('sample-type-02'), isTrue);
 
