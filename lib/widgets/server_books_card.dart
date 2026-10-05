@@ -73,6 +73,18 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
     });
   }
 
+  /// 자동으로 도는 주고받기를 지금 한 번 돌린다.
+  Future<void> _syncNow(AppState app) async {
+    setState(() {
+      _loading = true;
+      _msg = '';
+    });
+    final msg = await app.syncBooks();
+    if (!mounted) return;
+    if (msg.isNotEmpty) _say(msg);
+    await _load();
+  }
+
   Future<void> _get(AppState app, ServerBook b) async {
     final api = _api;
     if (api == null) return;
@@ -151,6 +163,8 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
     final teacher = app.isTeacher;
     final books = _books ?? const <ServerBook>[];
     final have = {for (final b in app.importedBooks) b.id};
+    final msg = _msg.isNotEmpty ? _msg : app.bookSyncMessage;
+    final busy = _uploading || app.bookSyncing || (_loading && _books == null);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
@@ -165,13 +179,13 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
                 const SizedBox(height: 2),
                 Text(
                     teacher
-                        ? '여기에 올린 교재는 나와 연결된 학생만 받을 수 있어요'
-                        : '선생님이 올려 둔 교재를 받아서 바로 풀 수 있어요',
+                        ? '이 태블릿에 넣은 교재는 저절로 올라가요 · 연결된 학생만 받을 수 있어요'
+                        : '선생님이 올린 교재는 로그인하면 저절로 들어와요',
                     style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
               ]),
             ),
             const SizedBox(width: 12),
-            if (_uploading || (_loading && _books == null))
+            if (busy)
               const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
             else if (teacher)
               FilledButton.icon(
@@ -183,14 +197,14 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
             else
               IconButton(
                 key: const Key('server-books-refresh'),
-                tooltip: '새로 고침',
-                onPressed: () => _load(quiet: false),
+                tooltip: '지금 받기',
+                onPressed: () => _syncNow(app),
                 icon: const Icon(Icons.refresh_rounded),
               ),
           ]),
-          if (_msg.isNotEmpty) ...[
+          if (msg.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(_msg,
+            Text(msg,
                 key: const Key('server-books-msg'),
                 style: TextStyle(fontWeight: FontWeight.w700, color: _error ? AppColors.wrong : AppColors.correct)),
           ],

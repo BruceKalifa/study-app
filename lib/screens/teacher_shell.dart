@@ -842,7 +842,7 @@ class TeacherSettingsScreen extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.dns_outlined),
               title: const Text('서버'),
-              subtitle: Text(a?.server ?? '-'),
+              subtitle: Text(a?.server.isNotEmpty == true ? a!.server : app.serverAddress),
             ),
             ListTile(
               leading: const Icon(Icons.cloud_download_outlined),
@@ -851,12 +851,7 @@ class TeacherSettingsScreen extends StatelessWidget {
               trailing: app.syncing ? const CircularProgressIndicator() : null,
               onTap: app.syncing
                   ? null
-                  : () {
-                      if (app.settings.serverUrl.trim().isEmpty && a != null) {
-                        app.updateSettings((s) => s.serverUrl = a.server);
-                      }
-                      app.syncContent();
-                    },
+                  : app.syncContent,
             ),
           ]),
         ),

@@ -18,25 +18,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _signup = false;
   bool _busy = false;
   String? _error;
-  bool _showServer = false;
   String _grade = '고2';
   final _id = TextEditingController();
   final _pw = TextEditingController();
   final _pw2 = TextEditingController();
   final _name = TextEditingController();
-  late final TextEditingController _server;
-
-  @override
-  void initState() {
-    super.initState();
-    final app = AppScope.read(context);
-    _server = TextEditingController(text: app.lastServer.isNotEmpty ? app.lastServer : app.settings.serverUrl);
-    _showServer = _server.text.trim().isEmpty;
-  }
 
   @override
   void dispose() {
-    for (final c in [_id, _pw, _pw2, _name, _server]) {
+    for (final c in [_id, _pw, _pw2, _name]) {
       c.dispose();
     }
     super.dispose();
@@ -44,11 +34,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> _submit() async {
     final app = AppScope.read(context);
-    final server = _server.text.trim();
+    const server = kDefaultServer; // 주소를 물어보지 않는다 (lib/app/theme.dart)
     String? err;
-    if (server.isEmpty) {
-      err = '서버 주소를 입력하세요 (선생님 컴퓨터 화면에 나온 주소)';
-    } else if (_id.text.trim().isEmpty || _pw.text.isEmpty) {
+    if (_id.text.trim().isEmpty || _pw.text.isEmpty) {
       err = '아이디와 비밀번호를 입력하세요';
     } else if (_signup && _name.text.trim().isEmpty) {
       err = '이름을 입력하세요';
@@ -56,10 +44,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       err = '비밀번호 확인이 맞지 않아요';
     }
     if (err != null) {
-      setState(() {
-        _error = err;
-        if (server.isEmpty) _showServer = true;
-      });
+      setState(() => _error = err);
       return;
     }
     setState(() {
@@ -267,27 +252,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ],
       ],
       const SizedBox(height: 10),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => setState(() => _showServer = !_showServer),
-          icon: Icon(_showServer ? Icons.expand_less_rounded : Icons.dns_outlined, size: 18),
-          label: Text(_showServer ? '서버 주소 접기' : '서버: ${_server.text.trim().isEmpty ? '없음' : _server.text.trim()}'),
-        ),
-      ),
-      if (_showServer)
-        TextField(
-          key: const Key('auth-server'),
-          controller: _server,
-          autocorrect: false,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: '서버 주소',
-            hintText: '예: 192.168.0.12:8080',
-            helperText: '선생님 컴퓨터에서 켠 서버 화면에 나온 주소',
-            prefixIcon: Icon(Icons.dns_outlined),
-          ),
-        ),
       if (_error != null) ...[
         const SizedBox(height: 12),
         Container(

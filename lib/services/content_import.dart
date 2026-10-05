@@ -136,6 +136,24 @@ class ContentImport {
     await _saveIndex((await list()).where((b) => b.id != id).toList());
   }
 
+  /// 기기에 저장해 둔 교재들을 다시 `.pulinote` 파일(gzip)로 묶는다 — 서버에 올릴 때 쓴다.
+  /// [ids] 가 한 권이면 그 교재 하나, 여러 권이면 `pulinote-collection`.
+  Future<Uint8List?> fileFor(List<String> ids) async {
+    final books = <Map<String, dynamic>>[];
+    for (final id in ids) {
+      final raw = await storage.read('imports/$id.json');
+      if (raw == null) continue;
+      try {
+        books.add((jsonDecode(raw) as Map).cast<String, dynamic>());
+      } catch (e) {
+        debugPrint('imported $id broken: $e');
+      }
+    }
+    if (books.isEmpty) return null;
+    final j = books.length == 1 ? books.first : {'format': collection, 'version': 1, 'books': books};
+    return Uint8List.fromList(gzip.encode(utf8.encode(jsonEncode(j))));
+  }
+
   Future<List<BookBundle>> loadAll() async {
     final out = <BookBundle>[];
     for (final b in await list()) {

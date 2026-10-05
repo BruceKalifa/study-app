@@ -28,12 +28,15 @@ class Tally {
 }
 
 class AppState extends ChangeNotifier {
-  AppState({required this.storage, required ProblemBank baseBank, this.enableLive = true})
+  AppState({required this.storage, required ProblemBank baseBank, this.enableLive = true, this.autoSyncBooks = true})
       : _baseBank = baseBank,
         _contentBank = baseBank,
         bank = baseBank;
 
   final Storage storage;
+
+  /// 로그인한 뒤·앱을 켤 때 교재를 저절로 주고받는다 (테스트에서는 끈다).
+  final bool autoSyncBooks;
   final ProblemBank _baseBank;
 
   /// Bundled content + packs downloaded from the content server + imported 교재 files.
@@ -198,10 +201,77 @@ class AppState extends ChangeNotifier {
       }
     }
     _changed();
+    // 선생님이 파일로 넣은 교재는 곧바로 서버에도 올라간다 (학생이 받을 수 있게)
+    if (isTeacher) syncBooksSoon();
     return added;
   }
 
   Future<BookBundle> importBook(List<int> bytes) async => (await importBooks(bytes)).first;
+
+  // ── 교재 자동 주고받기 (server/books.js) ──
+  bool bookSyncing = false;
+
+  /// 마지막 교재 동기화 결과 (설정 화면에 보여 준다).
+  String bookSyncMessage = '';
+
+  Future<String> _bookChain = Future.value('');
+
+  /// 선생님: 이 기기에 있는 교재를 서버에 올린다. 학생: 선생님이 올린 교재를 받아서 넣는다.
+  /// 로그인한 뒤·앱을 켤 때 저절로 돈다. 실패해도 앱은 그냥 쓰던 대로 쓴다.
+  /// 여러 번 불러도 하나씩 차례로 돌고, 부른 쪽은 자기 차례의 결과를 받는다.
+  Future<String> syncBooks() {
+    if (account == null) return Future.value('');
+    final next = _bookChain.then((_) => _runBookSync());
+    _bookChain = next.catchError((Object _) => '');
+    return next;
+  }
+
+  Future<String> _runBookSync() async {
+    final a = account;
+    if (a == null) return '';
+    bookSyncing = true;
+    bookSyncMessage = isTeacher ? '교재를 서버에 올리는 중…' : '선생님 교재를 받는 중…';
+    _changed(save: false);
+    var msg = '';
+    try {
+      final api = AccountApi.of(a);
+      final remote = await api.books();
+      // 서버에만 있는 교재 → 이 기기로
+      var got = 0;
+      for (final r in remote) {
+        final have = {for (final b in importedBooks) b.id};
+        if (r.bookIds.isNotEmpty && r.bookIds.every(have.contains)) continue;
+        got += (await importBooks(await api.bookBytes(r.id))).length;
+      }
+      if (got > 0) msg = isTeacher ? '서버에서 교재 $got권을 받았어요' : '선생님 교재 $got권을 받았어요';
+      // 이 기기에만 있는 교재 → 서버로 (선생님만)
+      if (isTeacher) {
+        final onServer = {for (final r in remote) ...r.bookIds};
+        final missing = [for (final b in importedBooks) if (!onServer.contains(b.id)) b.id];
+        final file = missing.isEmpty ? null : await ContentImport(storage).fileFor(missing);
+        if (file != null) {
+          final up = await api.uploadBook(file);
+          msg = '「${up.title}」을 서버에 올렸어요 · 학생이 받을 수 있어요';
+        }
+      }
+    } on ApiError catch (e) {
+      msg = e.message;
+      debugPrint('book sync: ${e.message}');
+    } catch (e) {
+      msg = '교재를 주고받지 못했어요';
+      debugPrint('book sync: $e');
+    }
+    bookSyncing = false;
+    bookSyncMessage = msg;
+    _changed(save: false);
+    return msg;
+  }
+
+  /// 로그인 직후·앱 시작 때 (결과를 기다리지 않는다).
+  void syncBooksSoon() {
+    if (!autoSyncBooks || account == null) return;
+    unawaited(syncBooks());
+  }
 
   Future<void> removeImportedBook(String id) async {
     final imports = ContentImport(storage);
@@ -234,7 +304,7 @@ class AppState extends ChangeNotifier {
   void _configureLive() {
     if (!enableLive) return;
     final l = _live ??= LiveSync(studentId: profile.id, name: profile.name);
-    l.configure(enabled: settings.liveEnabled, url: settings.serverUrl, name: profile.name, studentId: profile.id);
+    l.configure(enabled: settings.liveEnabled, url: serverAddress, name: profile.name, studentId: profile.id);
   }
 
   void _changed({bool save = true}) {
@@ -939,7 +1009,7 @@ class AppState extends ChangeNotifier {
     syncMessage = '문항을 받는 중…';
     notifyListeners();
     final sync = ContentSync(storage);
-    final r = await sync.sync(settings.serverUrl);
+    final r = await sync.sync(serverAddress);
     if (r.ok) {
       final (packs, wbs) = await sync.loadCached();
       _packs = packs;
@@ -993,6 +1063,14 @@ class AppState extends ChangeNotifier {
 
   // ------------------------------------------------------------ 계정 (학생 / 선생님)
   Account? get account => profile.account;
+
+  /// 앱이 쓰는 서버 주소. 보통 [kDefaultServer] 이고, 설정에 직접 넣은 주소가 있으면 그것(개발·테스트용).
+  String get serverAddress {
+    final set = settings.serverUrl.trim();
+    if (set.isNotEmpty) return set;
+    final last = lastServer.trim();
+    return last.isNotEmpty ? last : kDefaultServer;
+  }
   bool get signedIn => account != null;
   bool get isTeacher => account?.isTeacher == true;
 
@@ -1070,6 +1148,8 @@ class AppState extends ChangeNotifier {
     _meTimer?.cancel();
     if (a == null) return;
     _meTimer = Timer.periodic(const Duration(seconds: 90), (_) => refreshMe());
+    // 선생님 기기의 교재는 서버로, 학생 기기에는 선생님 교재를 — 주소를 묻지 않고 저절로
+    syncBooksSoon();
     if (a.isTeacher) return;
     if (restore && attempts.isEmpty) {
       try {

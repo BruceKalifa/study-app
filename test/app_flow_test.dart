@@ -67,7 +67,7 @@ class _FakeBooksApi extends AccountApi {
 
 Future<AppState> _state({bool onboard = true}) async {
   final bank = await ProblemBank.load(rootBundle);
-  final s = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+  final s = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
   await s.init();
   if (onboard) {
     s.completeOnboarding(
@@ -1083,7 +1083,7 @@ void main() {
       expect(tMe.inviteCode, hasLength(6));
 
       // 학생 앱: 회원가입 → 온보딩 → 선생님 연결
-      final st = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+      final st = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
       await st.init();
       expect(st.needsWelcome, isTrue);
       await st.signup(server: server, role: 'student', loginId: 's$stamp', password: 'stud-pass', name: '오예진', grade: '고3');
@@ -1137,8 +1137,25 @@ void main() {
       await st.refreshMe();
       expect(st.unreadAnswers, 0);
 
+      // 교재: 선생님 태블릿에 넣으면 저절로 서버에 올라가고, 학생은 저절로 받는다
+      final tApp = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
+      await tApp.init();
+      await tApp.login(server: server, loginId: 't$stamp', password: 'teach-pass');
+      expect(tApp.isTeacher, isTrue);
+      await tApp.importBooks(sampleBookFile()); // 설정 → 교재 파일 가져오기
+      expect(await tApp.syncBooks(), contains('올렸어요'));
+      expect((await tApp.api!.books()).single.bookIds, ['sample-type-01']);
+      expect(await tApp.syncBooks(), isNot(contains('올렸어요')), reason: '이미 올린 교재는 다시 안 올린다');
+
+      expect(st.importedBooks, isEmpty);
+      expect(await st.syncBooks(), '선생님 교재 1권을 받았어요');
+      expect(st.importedBooks.single.id, 'sample-type-01');
+      expect(st.bank.workbook('sample-type-01'), isNotNull, reason: '학생 내 교재에 담긴다');
+      expect(await st.syncBooks(), '', reason: '이미 받은 교재는 다시 안 받는다');
+      tApp.dispose();
+
       // 다른 태블릿에서 로그인 → 기록 · 내 교재 되살리기
-      final other = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+      final other = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
       await other.init();
       await other.login(server: server, loginId: 'S$stamp', password: 'stud-pass');
       expect(other.attempts.length, 2);

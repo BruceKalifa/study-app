@@ -21,7 +21,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late TextEditingController _url;
   late TextEditingController _nick;
   bool _init = false;
 
@@ -30,14 +29,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.didChangeDependencies();
     if (!_init) {
       _init = true;
-      _url = TextEditingController(text: AppScope.read(context).settings.serverUrl);
       _nick = TextEditingController(text: AppScope.read(context).learner.nickname);
     }
   }
 
   @override
   void dispose() {
-    _url.dispose();
     _nick.dispose();
     super.dispose();
   }
@@ -261,33 +258,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // ---------------- live
         _Section(
           title: '선생님과 실시간 공유',
-          subtitle: '선생님 PC에서 풀이노트 서버를 켜고, 화면에 나온 주소를 아래에 입력하세요',
+          subtitle: '켜 두면 문제를 풀 때 필기가 선생님 화면에 바로 보여요',
           children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _url,
-                  decoration: const InputDecoration(
-                    labelText: '서버 주소',
-                    hintText: 'ws://192.168.0.12:8080/ws',
-                    prefixIcon: Icon(Icons.dns_outlined),
-                  ),
-                  onSubmitted: (v) => app.updateSettings((x) => x.serverUrl = v.trim()),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton(
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  app.updateSettings((x) {
-                    x.serverUrl = _url.text.trim();
-                    x.liveEnabled = _url.text.trim().isNotEmpty;
-                  });
-                },
-                child: const Text('연결'),
-              ),
-            ]),
-            const SizedBox(height: 8),
+            ListTile(
+              key: const Key('server-address'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.dns_outlined, color: AppColors.inkSoft),
+              title: const Text('서버', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(app.serverAddress, style: const TextStyle(color: AppColors.inkSoft)),
+            ),
             _switch('실시간 공유 켜기', '켜 두면 문제를 풀 때 필기가 선생님 화면에 바로 보여요', s.liveEnabled,
                 (v) => app.updateSettings((x) => x.liveEnabled = v)),
             if (app.live != null)
@@ -312,7 +291,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // ---------------- content
         _Section(
           title: '문항 받기',
-          subtitle: '선생님 서버(출제 도구)에서 새로 만든 문항과 문제집을 받아요. 위의 서버 주소를 써요.',
+          subtitle: '서버(출제 도구)에서 새로 만든 문항과 문제집을 받아요',
           children: [
             Row(children: [
               FilledButton.icon(
@@ -320,9 +299,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: app.syncing
                     ? null
                     : () async {
-                        if (_url.text.trim().isNotEmpty && _url.text.trim() != s.serverUrl) {
-                          app.updateSettings((x) => x.serverUrl = _url.text.trim());
-                        }
                         final r = await app.syncContent();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.message)));

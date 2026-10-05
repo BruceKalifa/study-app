@@ -225,7 +225,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
   final (teacherLogin, _) = setup!;
 
   final tApp = (await tester.runAsync(() async {
-    final a = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+    final a = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
     await a.init();
     await a.login(server: server, loginId: teacherLogin, password: 'teach-pass');
     return a;
@@ -287,7 +287,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
 
   // 학생: 질문 탭 (답변 온 질문 포함)
   final sApp = (await tester.runAsync(() async {
-    final a = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
+    final a = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
     await a.init();
     await a.login(server: server, loginId: 'st0$stamp', password: 'stud-pass');
     return a;
