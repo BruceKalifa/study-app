@@ -936,7 +936,7 @@ void main() {
     await HttpOverrides.runWithHttpOverrides(() async {
       final storage = MemoryStorage();
       final bank = await ProblemBank.load(rootBundle);
-      final app = AppState(storage: storage, baseBank: bank, enableLive: false);
+      final app = AppState(storage: storage, baseBank: bank, enableLive: false, autoSyncBooks: false);
       await app.init();
       final pack = {
         'subject': '테스트 과목',
@@ -976,7 +976,8 @@ void main() {
         req.response.write(body == null ? '{}' : jsonEncode(body));
         req.response.close();
       });
-      app.updateSettings((x) => x.serverUrl = '127.0.0.1:${server.port}');
+      final port = server.port;
+      app.updateSettings((x) => x.serverUrl = '127.0.0.1:$port');
       final r = await app.syncContent();
       expect(r.ok, isTrue, reason: r.message);
       expect(r.updated, 2);
@@ -990,10 +991,11 @@ void main() {
       expect((await app.syncContent()).updated, 1);
       await server.close(force: true);
       // offline: a fresh start uses the cached copy
-      final again = AppState(storage: storage, baseBank: bank, enableLive: false);
+      final again = AppState(storage: storage, baseBank: bank, enableLive: false, autoSyncBooks: false);
       await again.init();
       expect(again.bank.byId('tc-1'), isNotNull);
       expect(again.bank.workbook('wb-test'), isNotNull);
+      again.updateSettings((x) => x.serverUrl = '127.0.0.1:$port'); // 꺼진 서버 (실제 서버로 나가지 않게)
       final failed = await again.syncContent();
       expect(failed.ok, isFalse);
       expect(again.bank.byId('tc-1'), isNotNull);
