@@ -303,3 +303,34 @@ Color accuracyColor(double v) {
 }
 
 String pct(double v) => '${(v * 100).round()}%';
+
+/// 글 + 버튼 한 줄. 좁은 화면(폰 세로)에서는 버튼을 글 아래로 내려 글자가 잘리지 않게 한다.
+class ActionRow extends StatelessWidget {
+  const ActionRow({super.key, this.leading, required this.child, required this.actions, this.breakAt = 620, this.gap = 10});
+  final Widget? leading;
+  final Widget child;
+  final List<Widget> actions;
+  final double breakAt;
+  final double gap;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      final narrow = box.maxWidth < breakAt;
+      final head = Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        if (leading != null) ...[leading!, SizedBox(width: gap + 2)],
+        Expanded(child: child),
+        if (!narrow)
+          for (final a in actions) ...[SizedBox(width: gap), a],
+      ]);
+      if (!narrow) return head;
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        head,
+        if (actions.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(spacing: gap, runSpacing: 8, children: actions),
+        ],
+      ]);
+    });
+  }
+}

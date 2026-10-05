@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
 import '../app/theme.dart';
+import 'common.dart';
 import '../services/content_import.dart';
 
 /// 설정: 교재 파일(.pulinote) 가져오기 · 넣은 교재 목록 · 빼기 (학생·선생님 공통).
@@ -73,27 +74,25 @@ class _BookFilesCardState extends State<BookFilesCard> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.auto_stories_rounded, color: AppColors.inkSoft),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('교재 파일', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                SizedBox(height: 2),
-                Text('선생님께 받은 .pulinote 파일을 넣으면 그 교재를 앱에서 풀 수 있어요',
-                    style: TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
-              ]),
-            ),
-            const SizedBox(width: 12),
-            _busy
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-                : FilledButton.icon(
-                    key: const Key('books-import'),
-                    onPressed: () => _import(app),
-                    icon: const Icon(Icons.file_open_rounded, size: 18),
-                    label: const Text('파일 가져오기'),
-                  ),
-          ]),
+          ActionRow(
+            leading: const Icon(Icons.auto_stories_rounded, color: AppColors.inkSoft),
+            actions: [
+              _busy
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : FilledButton.icon(
+                      key: const Key('books-import'),
+                      onPressed: () => _import(app),
+                      icon: const Icon(Icons.file_open_rounded, size: 18),
+                      label: const Text('파일 가져오기'),
+                    ),
+            ],
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('교재 파일', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              SizedBox(height: 2),
+              Text('선생님께 받은 .pulinote 파일을 넣으면 그 교재를 앱에서 풀 수 있어요',
+                  style: TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
+            ]),
+          ),
           if (_msg.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(_msg,

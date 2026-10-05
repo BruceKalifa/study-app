@@ -917,14 +917,23 @@ class AccountCard extends StatelessWidget {
     final a = app.account;
     if (a == null) {
       return Card(
-        child: ListTile(
-          leading: const Icon(Icons.person_off_outlined),
-          title: const Text('로그인하지 않고 쓰는 중', style: TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: const Text('기록이 이 기기에만 저장돼요. 로그인하면 선생님과 연결하고 다른 기기에서도 이어서 풀 수 있어요.'),
-          trailing: FilledButton(
-            key: const Key('settings-login'),
-            onPressed: app.showWelcome,
-            child: const Text('로그인 · 회원가입'),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: ActionRow(
+            leading: const Icon(Icons.person_off_outlined, color: AppColors.inkSoft),
+            actions: [
+              FilledButton(
+                key: const Key('settings-login'),
+                onPressed: app.showWelcome,
+                child: const Text('로그인 · 회원가입'),
+              ),
+            ],
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('로그인하지 않고 쓰는 중', style: TextStyle(fontWeight: FontWeight.w800)),
+              SizedBox(height: 2),
+              Text('기록이 이 기기에만 저장돼요. 로그인하면 선생님과 연결하고 다른 기기에서도 이어서 풀 수 있어요.',
+                  style: TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
+            ]),
           ),
         ),
       );
@@ -933,28 +942,26 @@ class AccountCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            CircleAvatar(
+          ActionRow(
+            leading: CircleAvatar(
               radius: 24,
               backgroundColor: a.isTeacher ? AppColors.correct : AppColors.blue,
               child: Icon(a.isTeacher ? Icons.co_present_rounded : Icons.school_rounded, color: Colors.white),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${a.name} (${a.roleLabel})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                Text('아이디 ${a.loginId}', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
-              ]),
-            ),
-            TextButton(onPressed: () => _password(context), child: const Text('비밀번호 바꾸기')),
-            const SizedBox(width: 6),
-            OutlinedButton.icon(
-              key: const Key('logout'),
-              onPressed: () => _logout(context),
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('로그아웃'),
-            ),
-          ]),
+            actions: [
+              TextButton(onPressed: () => _password(context), child: const Text('비밀번호 바꾸기')),
+              OutlinedButton.icon(
+                key: const Key('logout'),
+                onPressed: () => _logout(context),
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('로그아웃'),
+              ),
+            ],
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${a.name} (${a.roleLabel})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              Text('아이디 ${a.loginId}', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+            ]),
+          ),
           if (!a.isTeacher) ...[
             const Divider(height: 28),
             Row(children: [

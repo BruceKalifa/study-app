@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
 import '../app/theme.dart';
+import 'common.dart';
 import '../services/account_api.dart';
 import '../services/content_import.dart';
 import 'book_files_card.dart';
@@ -169,39 +170,37 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.cloud_download_rounded, color: AppColors.inkSoft),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(teacher ? '서버 교재' : '선생님 교재',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text(
-                    teacher
-                        ? '이 태블릿에 넣은 교재는 저절로 올라가요 · 연결된 학생만 받을 수 있어요'
-                        : '선생님이 올린 교재는 로그인하면 저절로 들어와요',
-                    style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
-              ]),
-            ),
-            const SizedBox(width: 12),
-            if (busy)
-              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-            else if (teacher)
-              FilledButton.icon(
-                key: const Key('server-books-upload'),
-                onPressed: () => _upload(app),
-                icon: const Icon(Icons.cloud_upload_rounded, size: 18),
-                label: const Text('서버에 올리기'),
-              )
-            else
-              IconButton(
-                key: const Key('server-books-refresh'),
-                tooltip: '지금 받기',
-                onPressed: () => _syncNow(app),
-                icon: const Icon(Icons.refresh_rounded),
-              ),
-          ]),
+          ActionRow(
+            leading: const Icon(Icons.cloud_download_rounded, color: AppColors.inkSoft),
+            actions: [
+              if (busy)
+                const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+              else if (teacher)
+                FilledButton.icon(
+                  key: const Key('server-books-upload'),
+                  onPressed: () => _upload(app),
+                  icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                  label: const Text('서버에 올리기'),
+                )
+              else
+                IconButton(
+                  key: const Key('server-books-refresh'),
+                  tooltip: '지금 받기',
+                  onPressed: () => _syncNow(app),
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+            ],
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(teacher ? '서버 교재' : '선생님 교재',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 2),
+              Text(
+                  teacher
+                      ? '이 태블릿에 넣은 교재는 저절로 올라가요 · 연결된 학생만 받을 수 있어요'
+                      : '선생님이 올린 교재는 로그인하면 저절로 들어와요',
+                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
+            ]),
+          ),
           if (msg.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(msg,

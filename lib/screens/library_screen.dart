@@ -485,37 +485,49 @@ class LibraryScreen extends StatelessWidget {
     final total = books.fold<int>(0, (n, w) => n + app.workbookProgress(w).$2);
 
     return LayoutBuilder(builder: (context, box) {
-      final cols = box.maxWidth >= 1200 ? 4 : (box.maxWidth >= 860 ? 3 : 2);
+      final narrow = box.maxWidth < 620;
+      final cols = box.maxWidth >= 1200 ? 4 : (box.maxWidth >= 860 ? 3 : (box.maxWidth >= 560 ? 2 : 1));
       return ListView(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+        padding: EdgeInsets.fromLTRB(narrow ? 16 : 32, narrow ? 18 : 28, narrow ? 16 : 32, 40),
         children: [
-          Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('내 교재', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-                const SizedBox(height: 4),
-                Text(
-                  books.isEmpty ? '풀 문제집을 골라 담으면 여기에서 풀 수 있어요' : '${books.length}권 · $solved/$total 문항 풀이',
-                  style: const TextStyle(fontSize: 15, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
-                ),
-              ]),
-            ),
-            if (books.isNotEmpty) ...[
-              OutlinedButton.icon(
-                onPressed: () => showExamSetup(context),
-                icon: const Icon(Icons.timer_outlined),
-                label: const Text('모의고사 만들기'),
+          // 머리말 — 폰 세로에서는 제목 아래로 버튼을 내린다
+          Builder(builder: (context) {
+            final title = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('내 교재',
+                  style: TextStyle(fontSize: narrow ? 24 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+              const SizedBox(height: 4),
+              Text(
+                books.isEmpty ? '풀 문제집을 골라 담으면 여기에서 풀 수 있어요' : '${books.length}권 · $solved/$total 문항 풀이',
+                style: TextStyle(fontSize: narrow ? 14 : 15, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(width: 10),
-            ],
-            FilledButton.icon(
-              key: const Key('lib-add'),
-              onPressed: () => WorkbookStoreScreen.open(context),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 50)),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('문제집 담기'),
-            ),
-          ]),
+            ]);
+            final buttons = <Widget>[
+              if (books.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () => showExamSetup(context),
+                  icon: const Icon(Icons.timer_outlined),
+                  label: const Text('모의고사 만들기'),
+                ),
+              FilledButton.icon(
+                key: const Key('lib-add'),
+                onPressed: () => WorkbookStoreScreen.open(context),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 50)),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('문제집 담기'),
+              ),
+            ];
+            if (!narrow) {
+              return Row(children: [
+                Expanded(child: title),
+                for (final b in buttons) ...[const SizedBox(width: 10), b],
+              ]);
+            }
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              title,
+              const SizedBox(height: 12),
+              Wrap(spacing: 10, runSpacing: 8, children: buttons),
+            ]);
+          }),
           const SizedBox(height: 24),
           if (books.isEmpty)
             Card(
@@ -651,32 +663,53 @@ class _CourseHeader extends StatelessWidget {
     final c = app.bank.subject(courseId);
     final color = Color(c?.color ?? 0xFF5B6475);
     final t = app.subjectTally(courseId);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-          child: Icon(c == null ? Icons.menu_book_rounded : courseIcon(c), color: Colors.white, size: 19),
-        ),
-        const SizedBox(width: 10),
-        Text(c?.name ?? courseId, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-        const SizedBox(width: 10),
-        if (t.solved > 0)
-          Text('정답률 ${pct(t.accuracy)}', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
-        const Spacer(),
-        TextButton.icon(
-          onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
-          icon: const Icon(Icons.all_inclusive_rounded, size: 18),
-          label: const Text('이 과목 무한 풀기'),
-        ),
-        TextButton.icon(
-          onPressed: () => WorkbookStoreScreen.open(context, course: courseId),
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('더 담기'),
-        ),
-      ]),
-    );
+    return LayoutBuilder(builder: (context, box) {
+      final narrow = box.maxWidth < 620; // 폰 세로에서는 글자 없이 아이콘만
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
+            child: Icon(c == null ? Icons.menu_book_rounded : courseIcon(c), color: Colors.white, size: 19),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(c?.name ?? courseId,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          ),
+          const SizedBox(width: 10),
+          if (t.solved > 0)
+            Text('정답률 ${pct(t.accuracy)}', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+          const Spacer(),
+          if (narrow) ...[
+            IconButton(
+              tooltip: '이 과목 무한 풀기',
+              onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
+              icon: const Icon(Icons.all_inclusive_rounded, size: 20),
+            ),
+            IconButton(
+              tooltip: '더 담기',
+              onPressed: () => WorkbookStoreScreen.open(context, course: courseId),
+              icon: const Icon(Icons.add_rounded, size: 20),
+            ),
+          ] else ...[
+            TextButton.icon(
+              onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
+              icon: const Icon(Icons.all_inclusive_rounded, size: 18),
+              label: const Text('이 과목 무한 풀기'),
+            ),
+            TextButton.icon(
+              onPressed: () => WorkbookStoreScreen.open(context, course: courseId),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('더 담기'),
+            ),
+          ],
+        ]),
+      );
+    });
   }
 }

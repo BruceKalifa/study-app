@@ -308,20 +308,12 @@ class _DailySetCard extends StatelessWidget {
           ]),
         );
 
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1B2A4A), Color(0xFF2B3F6B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Row(children: [
-        ProgressRing(
+    return LayoutBuilder(builder: (context, box) {
+      // 폰 세로: 고리를 위로 올리고 글을 아래로 (나란히 두면 글이 잘린다)
+      final narrow = box.maxWidth < 560;
+      final ring = ProgressRing(
           value: total == 0 ? 0 : done / total,
-          size: 150,
+          size: narrow ? 120 : 150,
           stroke: 14,
           color: set.complete ? AppColors.correct : AppColors.accent,
           track: Colors.white.withValues(alpha: 0.12),
@@ -330,17 +322,16 @@ class _DailySetCard extends StatelessWidget {
               const Icon(Icons.check_rounded, color: Colors.white, size: 44)
             else
               Text('$done',
-                  style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1.5)),
+                  style: TextStyle(
+                      color: Colors.white, fontSize: narrow ? 32 : 40, fontWeight: FontWeight.w800, letterSpacing: -1.5)),
             Text(set.complete ? '완료!' : '/ $total 문제', style: TextStyle(color: white70, fontWeight: FontWeight.w700)),
-          ]),
-        ),
-        const SizedBox(width: 28),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-            Row(children: [
-              const Text('오늘의 오답 변형 세트',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
-              const SizedBox(width: 10),
+          ]));
+      final body =
+          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+            Wrap(spacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text('오늘의 오답 변형 세트',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: narrow ? 20 : 24, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
               Text(fmtDate(DateTime.now().millisecondsSinceEpoch, withTime: false), style: TextStyle(color: white70, fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: 6),
@@ -390,10 +381,26 @@ class _DailySetCard extends StatelessWidget {
                       ? '시작하기'
                       : '이어 풀기 · ${remaining.length}문제 남음'),
             ),
-          ]),
+          ]);
+      return Container(
+        padding: EdgeInsets.all(narrow ? 18 : 28),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1B2A4A), Color(0xFF2B3F6B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ]),
-    );
+        child: narrow
+            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Center(child: ring),
+                const SizedBox(height: 18),
+                body,
+              ])
+            : Row(children: [ring, const SizedBox(width: 28), Expanded(child: body)]),
+      );
+    });
   }
 }
 
