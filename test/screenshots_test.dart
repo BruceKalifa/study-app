@@ -689,6 +689,30 @@ void main() {
     await tester.pumpWidget(_wrap(app, AttemptDetailScreen(attempt: withInk)));
     await tester.pump(const Duration(seconds: 3));
     await _shot(tester, '19_history_replay');
+    // ── 폰 세로 (갤럭시 Z 폴드 겉화면·속화면) ──
+    for (final (name, size) in [
+      ('50_phone', const Size(1080, 2340)), // 보통 폰 세로 (360 x 780)
+      ('51_fold', const Size(1812, 2176)), // 폴드 속화면 세로 (697 x 837)
+    ]) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = name == '50_phone' ? 3.0 : 2.6;
+      await tester.pumpWidget(_wrap(app, const AppRoot()));
+      await tester.pump(const Duration(milliseconds: 600));
+      await _shot(tester, '${name}_home');
+      // 더보기 (아래 막대에 없는 화면들)
+      await tester.tap(find.byKey(const Key('phone-more')));
+      await tester.pump(const Duration(milliseconds: 600));
+      await _shot(tester, '${name}_more');
+      await tester.tap(find.text('설정'));
+      await tester.pump(const Duration(milliseconds: 700));
+      await _shot(tester, '${name}_settings');
+      await tester.tap(find.byIcon(Icons.collections_bookmark_outlined));
+      await tester.pump(const Duration(milliseconds: 700));
+      await _shot(tester, '${name}_shelf');
+    }
+    tester.view.physicalSize = const Size(2960, 1848);
+    tester.view.devicePixelRatio = 2.0;
+
     // requests started inside the fake clock (ranking report) finish or time out before the test ends
     await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));
     await tester.pumpWidget(const SizedBox());

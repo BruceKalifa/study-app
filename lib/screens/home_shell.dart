@@ -79,6 +79,52 @@ class HomeShellState extends State<HomeShell> {
     }
   }
 
+  /// 폰 아래 막대에 두는 탭 (나머지는 더보기).
+  static const _phoneTabs = [0, 1, 2, 4];
+
+  static Widget _badged(Widget icon, int n) => n <= 0 ? icon : Badge(label: Text('$n'), child: icon);
+
+  /// 더보기 — 아래 막대에 없는 화면들.
+  Future<void> _showMore(BuildContext context) async {
+    final rest = [for (var i = 0; i < _dests.length; i++) if (!_phoneTabs.contains(i)) i];
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppColors.paper,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(2))),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('더보기', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+            ),
+          ),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final i in rest)
+                  ListTile(
+                    key: Key('more-${_dests[i].label}'),
+                    leading: Icon(_tab == i ? _dests[i].activeIcon : _dests[i].icon,
+                        color: _tab == i ? AppColors.accent : AppColors.inkSoft),
+                    title: Text(_dests[i].label,
+                        style: TextStyle(fontWeight: FontWeight.w700, color: _tab == i ? AppColors.accent : AppColors.ink)),
+                    onTap: () => Navigator.pop(ctx, i),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (picked != null) go(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
@@ -90,14 +136,26 @@ class HomeShellState extends State<HomeShell> {
       child: KeyedSubtree(key: ValueKey(_tab), child: _page(_tab)),
     );
     if (!wide) {
+      // 폰: 아래 막대에 네 개만 두고 나머지는 "더보기" 에 (12개를 다 넣으면 글자가 안 보인다)
+      final sel = _phoneTabs.indexOf(_tab);
       return Scaffold(
         body: SafeArea(child: body),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _tab > 4 ? 0 : _tab,
-          onDestinationSelected: go,
+          key: const Key('phone-nav'),
+          selectedIndex: sel < 0 ? _phoneTabs.length : sel,
+          onDestinationSelected: (i) => i < _phoneTabs.length ? go(_phoneTabs[i]) : _showMore(context),
           destinations: [
-            for (final d in _dests.take(5))
-              NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.activeIcon), label: d.label),
+            for (final t in _phoneTabs)
+              NavigationDestination(
+                icon: _badged(Icon(_dests[t].icon), t == 2 ? due : (t == 4 ? app.unreadAnswers : 0)),
+                selectedIcon: _badged(Icon(_dests[t].activeIcon), t == 2 ? due : (t == 4 ? app.unreadAnswers : 0)),
+                label: _dests[t].label,
+              ),
+            const NavigationDestination(
+                key: Key('phone-more'),
+                icon: Icon(Icons.more_horiz_rounded),
+                selectedIcon: Icon(Icons.more_horiz_rounded),
+                label: '더보기'),
           ],
         ),
       );
