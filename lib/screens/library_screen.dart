@@ -15,6 +15,9 @@ import 'workbook_store_screen.dart';
 
 enum _Filter { all, unsolved, wrong, bookmarked }
 
+/// 문제를 묶어 보여 주는 방법: 교재(문제집)별 · 단원별.
+enum _GroupBy { book, unit }
+
 /// Problem browser for one course (units, filters, search).
 class CourseBrowser extends StatefulWidget {
   const CourseBrowser({super.key, this.initialSubject, this.standalone = false});
@@ -47,6 +50,7 @@ class CourseBrowser extends StatefulWidget {
 class _CourseBrowserState extends State<CourseBrowser> {
   String? _subject;
   _Filter _filter = _Filter.all;
+  _GroupBy _group = _GroupBy.book;
   int? _difficulty;
   String _query = '';
 
@@ -109,6 +113,16 @@ class _CourseBrowserState extends State<CourseBrowser> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [
+                for (final g in _GroupBy.values) ...[
+                  ChoiceChip(
+                    key: Key('browse-by-${g.name}'),
+                    label: Text(g == _GroupBy.book ? '교재별' : '단원별'),
+                    selected: _group == g,
+                    onSelected: (_) => setState(() => _group = g),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Container(width: 1, height: 26, color: AppColors.line, margin: const EdgeInsets.symmetric(horizontal: 6)),
                 if (!widget.standalone) ...[
                   ChoiceChip(
                     label: const Text('전체 과목'),
@@ -155,8 +169,10 @@ class _CourseBrowserState extends State<CourseBrowser> {
           ]),
         ),
       ),
-      for (final s in shown)
-        ..._subjectSlivers(context, app, s),
+      if (_group == _GroupBy.book)
+        ..._bookSlivers(context, app)
+      else
+        for (final s in shown) ..._subjectSlivers(context, app, s),
       const SliverToBoxAdapter(child: SizedBox(height: 40)),
     ]);
 
@@ -186,6 +202,61 @@ class _CourseBrowserState extends State<CourseBrowser> {
       ),
       body: content,
     );
+  }
+
+  /// 교재별 보기 — 내 교재 먼저, 그다음 그 밖의 교재. 시리즈(FLOW TYPE…)끼리 묶는다.
+  List<Widget> _bookSlivers(BuildContext context, AppState app) {
+    bool inSubject(Workbook w) => _subject == null || app.bank.coursesOf(w).contains(_subject);
+    final books = [
+      for (final w in app.bank.workbooks)
+        if (inSubject(w) && app.bank.problemsOf(w).any((p) => _match(app, p))) w,
+    ];
+    final mine = [for (final w in books) if (app.hasWorkbook(w.id)) w];
+    final rest = [for (final w in books) if (!app.hasWorkbook(w.id)) w];
+    // 선생님은 담는 교재가 따로 없으니 한 묶음으로
+    final sections = app.isTeacher ? [('교재', books)] : [('내 교재', mine), ('그 밖의 교재', rest)];
+    final out = <Widget>[];
+    for (final (title, list) in sections) {
+      if (list.isEmpty) continue;
+      out.add(SliverPadding(
+        padding: const EdgeInsets.fromLTRB(32, 22, 32, 4),
+        sliver: SliverToBoxAdapter(
+          child: Row(children: [
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+            const SizedBox(width: 8),
+            Text('${list.length}권', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      ));
+      String? series;
+      for (final w in list) {
+        if (w.series.isNotEmpty && w.series != series) {
+          series = w.series;
+          out.add(SliverPadding(
+            padding: const EdgeInsets.fromLTRB(32, 12, 32, 2),
+            sliver: SliverToBoxAdapter(
+              child: Text(series,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.inkMuted, letterSpacing: 0.2)),
+            ),
+          ));
+        } else if (w.series.isEmpty) {
+          series = null;
+        }
+        out.add(SliverPadding(
+          padding: const EdgeInsets.fromLTRB(32, 6, 32, 0),
+          sliver: SliverToBoxAdapter(child: WorkbookCard(workbook: w)),
+        ));
+      }
+    }
+    if (out.isEmpty) {
+      out.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.only(top: 40),
+          child: EmptyState(icon: Icons.menu_book_rounded, title: '조건에 맞는 교재가 없어요'),
+        ),
+      ));
+    }
+    return out;
   }
 
   List<Widget> _subjectSlivers(BuildContext context, AppState app, Subject s) {

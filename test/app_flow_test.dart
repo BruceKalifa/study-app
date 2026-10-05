@@ -15,6 +15,9 @@ import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/screens/app_root.dart';
 import 'package:study_app/screens/home_shell.dart';
+import 'package:study_app/screens/library_screen.dart';
+import 'package:study_app/screens/workbook_screen.dart';
+import 'package:study_app/widgets/workbook_card.dart' show WorkbookCard;
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
@@ -891,6 +894,37 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(api.shelf, isEmpty);
     expect(find.byKey(const Key('server-book-srv-1')), findsNothing);
+  });
+
+  testWidgets('문제 보기: 교재별이 기본, 교재 안에서는 단원별', (tester) async {
+    _tabletSize(tester);
+    final app = (await tester.runAsync(_state))!;
+    await tester.runAsync(() => app.importBooks(sampleBookFile()));
+
+    await tester.pumpWidget(_app(app, home: const Scaffold(body: CourseBrowser())));
+    await tester.pump(const Duration(milliseconds: 400));
+    // 기본은 교재별 — 교재 카드가 늘어서고 단원으로 묶이지 않는다
+    expect(find.text('내 교재'), findsOneWidget);
+    expect(find.byType(WorkbookCard), findsWidgets);
+    await tester.scrollUntilVisible(find.byKey(const Key('wbcard-sample-type-01')), 400,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.byKey(const Key('wbcard-sample-type-01')), findsOneWidget);
+
+    // 단원별로 바꾸면 단원 묶음
+    await tester.scrollUntilVisible(find.byKey(const Key('browse-by-unit')), -400,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('browse-by-unit')));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(WorkbookCard), findsNothing);
+    expect(find.textContaining('문제 풀기'), findsWidgets);
+
+    // 교재를 열면 단원(수열·확률·통계)으로 나뉘고 단원별로 풀 수 있다
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(_app(app, home: const WorkbookScreen(workbookId: 'sample-type-01')));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('wb-unit-수열')), findsOneWidget);
+    expect(find.byKey(const Key('wb-unit-확률')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('TeX 교재에서 쓰는 수식 어휘가 flutter_math 로 그려진다', (tester) async {

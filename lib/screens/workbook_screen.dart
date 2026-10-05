@@ -121,19 +121,72 @@ class WorkbookScreen extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 24),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(children: [
-              for (var i = 0; i < ps.length; i++) ...[
-                if (i > 0) const Divider(height: 1),
-                _Row(n: i + 1, problem: ps[i], color: color, onTap: () {
-                  solve(() => SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]));
-                }),
-              ],
-            ]),
-          ),
+          // 단원이 여럿인 교재(FLOW·BRIDGE TYPE 처럼)는 단원별로 묶어서 — 번호는 교재 전체 번호 그대로
+          for (final (unit, idx) in _byUnit(ps)) ...[
+            if (unit.isNotEmpty) _UnitHeader(unit: unit, color: color, count: idx.length, onSolve: () {
+              solve(() => SolveScreen.open(context, title: '${w.title} · $unit', problems: [for (final i in idx) ps[i]]));
+            }),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(children: [
+                for (var k = 0; k < idx.length; k++) ...[
+                  if (k > 0) const Divider(height: 1),
+                  _Row(n: idx[k] + 1, problem: ps[idx[k]], color: color, onTap: () {
+                    final i = idx[k];
+                    solve(() => SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]));
+                  }),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 14),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// 교재의 문항을 단원별로 (단원이 하나뿐이면 묶지 않고 통째로). 값은 [ps] 안의 자리번호.
+List<(String, List<int>)> _byUnit(List<Problem> ps) {
+  final order = <String>[];
+  final by = <String, List<int>>{};
+  for (var i = 0; i < ps.length; i++) {
+    final u = ps[i].unit.trim();
+    if (!by.containsKey(u)) {
+      order.add(u);
+      by[u] = [];
+    }
+    by[u]!.add(i);
+  }
+  if (order.length < 2) return [('', [for (var i = 0; i < ps.length; i++) i])];
+  return [for (final u in order) (u, by[u]!)];
+}
+
+class _UnitHeader extends StatelessWidget {
+  const _UnitHeader({required this.unit, required this.color, required this.count, required this.onSolve});
+  final String unit;
+  final Color color;
+  final int count;
+  final VoidCallback onSolve;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Row(children: [
+        Container(width: 5, height: 20, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+        const SizedBox(width: 10),
+        Text(unit, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+        const SizedBox(width: 8),
+        Text('$count문항', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 13)),
+        const Spacer(),
+        TextButton.icon(
+          key: Key('wb-unit-$unit'),
+          onPressed: onSolve,
+          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+          label: const Text('이 단원 풀기'),
+        ),
+      ]),
     );
   }
 }
