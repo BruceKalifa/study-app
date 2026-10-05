@@ -11,6 +11,7 @@ import 'dashboard_screen.dart' show subjectIcon, courseIcon;
 import '../widgets/workbook_card.dart';
 import 'exam_setup.dart';
 import 'solve_screen.dart';
+import 'workbook_screen.dart';
 import 'workbook_store_screen.dart';
 
 enum _Filter { all, unsolved, wrong, bookmarked }
@@ -244,7 +245,7 @@ class _CourseBrowserState extends State<CourseBrowser> {
         }
         out.add(SliverPadding(
           padding: const EdgeInsets.fromLTRB(32, 6, 32, 0),
-          sliver: SliverToBoxAdapter(child: WorkbookCard(workbook: w)),
+          sliver: SliverToBoxAdapter(child: _BookRow(workbook: w)),
         ));
       }
     }
@@ -335,6 +336,62 @@ class _CourseBrowserState extends State<CourseBrowser> {
       ));
     }
     return out;
+  }
+}
+
+/// 교재별 보기의 한 줄 — 제목 · 범위 · 진도. 누르면 그 교재 화면으로.
+class _BookRow extends StatelessWidget {
+  const _BookRow({required this.workbook});
+  final Workbook workbook;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final w = workbook;
+    final course = app.bank.subject(w.course);
+    final color = Color(course?.color ?? 0xFF5B6475);
+    final (done, total) = app.workbookProgress(w);
+    final sub = [
+      if (w.scope.isNotEmpty) w.scope,
+      if (w.stage.isNotEmpty) w.stage,
+      '$total문항',
+    ].join(' · ');
+    return Card(
+      key: Key('book-row-${w.id}'),
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () => WorkbookScreen.open(context, w.id),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+          child: Row(children: [
+            Container(width: 6, height: 34, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(w.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.3)),
+                const SizedBox(height: 3),
+                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.inkMuted, fontSize: 13, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+            const SizedBox(width: 14),
+            SizedBox(width: 120, child: AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 6)),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 72,
+              child: Text('$done/$total',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
