@@ -39,15 +39,20 @@ for G in android/app/build.gradle.kts android/app/build.gradle; do
   sed -i -E 's/minSdk(Version)? *=? *flutter\.minSdkVersion/minSdk = 24/' "$G"
 done
 
+# Release signing: always the key in tools/keys/debug.keystore, never ~/.android/debug.keystore
+# (that one is made fresh on each machine → every build a different signature → "서명이 달라" 업데이트 불가).
 # Release: no R8 minify/shrink. R8 strips WorkManager's Room database (a dependency of ML Kit)
 # and the app dies right at launch (androidx.work.impl.WorkDatabase could not be created).
 for G in android/app/build.gradle.kts android/app/build.gradle; do
   [ -f "$G" ] || continue
   if [[ "$G" == *.kts ]]; then
-    sed -i -E 's/^([[:space:]]*)signingConfig = signingConfigs\.getByName\("debug"\)/&\n\1isMinifyEnabled = false\n\1isShrinkResources = false/' "$G"
+    sed -i -E 's#^([[:space:]]*)buildTypes \{#\1signingConfigs {\n\1    create("pulinote") {\n\1        storeFile = file("../../tools/keys/debug.keystore")\n\1        storePassword = "android"\n\1        keyAlias = "androiddebugkey"\n\1        keyPassword = "android"\n\1    }\n\1}\n\n&#' "$G"
+    sed -i -E 's/^([[:space:]]*)signingConfig = signingConfigs\.getByName\("debug"\)/\1signingConfig = signingConfigs.getByName("pulinote")\n\1isMinifyEnabled = false\n\1isShrinkResources = false/' "$G"
   else
-    sed -i -E 's/^([[:space:]]*)signingConfig signingConfigs\.debug/&\n\1minifyEnabled false\n\1shrinkResources false/' "$G"
+    sed -i -E 's#^([[:space:]]*)buildTypes \{#\1signingConfigs {\n\1    pulinote {\n\1        storeFile file("../../tools/keys/debug.keystore")\n\1        storePassword "android"\n\1        keyAlias "androiddebugkey"\n\1        keyPassword "android"\n\1    }\n\1}\n\n&#' "$G"
+    sed -i -E 's/^([[:space:]]*)signingConfig signingConfigs\.debug/\1signingConfig signingConfigs.pulinote\n\1minifyEnabled false\n\1shrinkResources false/' "$G"
   fi
+  grep -q 'signingConfigs.getByName("pulinote")\|signingConfigs.pulinote' "$G" || { echo "ERROR: could not set the release signing key in $G"; cat "$G"; exit 1; }
   grep -Eq 'isMinifyEnabled = false|minifyEnabled false' "$G" || { echo "ERROR: could not disable minify in $G"; cat "$G"; exit 1; }
   # FileProvider for in-app updates
   if ! grep -q 'androidx.core:core' "$G"; then
