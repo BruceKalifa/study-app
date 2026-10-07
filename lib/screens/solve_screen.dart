@@ -10,6 +10,7 @@ import '../ink/ink_canvas.dart';
 import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
 import '../ink/ink_toolbar.dart';
+import '../ink/shape_hint.dart';
 import '../services/handwriting.dart';
 import '../services/live_sync.dart';
 import '../widgets/answer_panel.dart';
@@ -652,6 +653,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                 ],
               ]),
             ),
+            Positioned(left: 0, right: 0, bottom: 18, child: Center(child: ShapeSnapHint(controller: ink))),
           ]);
 
     return Scaffold(

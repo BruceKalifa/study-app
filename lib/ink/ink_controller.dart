@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 import 'ink_model.dart';
+import 'shape_snap.dart';
 
 /// Receives ink changes for live sharing (implemented by LiveSync).
 abstract class InkSyncSink {
@@ -31,6 +32,9 @@ class InkSettings {
   bool fingerDraws;
   bool pressure;
   bool holdToStraighten;
+
+  /// 손으로 그린 원·삼각형·사각형 따위를 손을 떼면 반듯하게 맞춘다.
+  bool shapeSnap;
   bool twoFingerUndo;
   PaperStyle paper;
   List<int> palette;
@@ -45,6 +49,7 @@ class InkSettings {
     this.fingerDraws = false,
     this.pressure = true,
     this.holdToStraighten = true,
+    this.shapeSnap = true,
     this.twoFingerUndo = true,
     this.paper = PaperStyle.grid,
     List<int>? palette,
@@ -78,6 +83,7 @@ class InkSettings {
         'fingerDraws': fingerDraws,
         'pressure': pressure,
         'holdToStraighten': holdToStraighten,
+        'shapeSnap': shapeSnap,
         'twoFingerUndo': twoFingerUndo,
         'paper': paper.name,
         'palette': palette,
@@ -105,6 +111,7 @@ class InkSettings {
       fingerDraws: b(j['fingerDraws'], false),
       pressure: b(j['pressure'], true),
       holdToStraighten: b(j['holdToStraighten'], true),
+      shapeSnap: b(j['shapeSnap'], true),
       twoFingerUndo: b(j['twoFingerUndo'], true),
       paper: pick(PaperStyle.values, j['paper'], PaperStyle.grid),
       palette: pal is List ? [for (final c in pal) if (c is num) c.toInt()] : null,
@@ -444,14 +451,74 @@ class InkController extends ChangeNotifier {
     active = null;
     s.invalidate();
     _snapshot();
+    var changed = _straightened;
+    // 도형 맞추기 — 원·삼각형·사각형처럼 그리면 반듯하게 (글씨 크기는 건드리지 않는다)
+    if (settings.shapeSnap && !_straightened && (s.tool == InkTool.pen || s.tool == InkTool.highlighter)) {
+      final snapped = snapShape(s.points);
+      if (snapped != null) {
+        _snappedOriginal = List<InkPoint>.of(s.points);
+        _snappedStrokeId = s.id;
+        s.points
+          ..clear()
+          ..addAll(snapped.points);
+        s.invalidate();
+        changed = true;
+        lastSnap.value = snapped.kind;
+      }
+    }
     _strokes = [..._strokes, s];
-    if (_straightened) {
+    if (changed) {
       sink?.erase([s.id]);
       sink?.strokeBegin(s);
     }
     sink?.strokeEnd(s.id);
     activeTick.value++;
     _commitChanged();
+  }
+
+  // ---------------- 도형 맞추기 ----------------
+  /// 마지막으로 맞춘 도형 (화면이 "원으로 맞췄어요 · 되돌리기" 를 띄우는 데 쓴다).
+  final ValueNotifier<ShapeKind?> lastSnap = ValueNotifier<ShapeKind?>(null);
+  List<InkPoint>? _snappedOriginal;
+  String? _snappedStrokeId;
+
+  /// 방금 맞춘 도형을 손으로 그린 모양으로 되돌린다.
+  void undoShapeSnap() {
+    final id = _snappedStrokeId;
+    final orig = _snappedOriginal;
+    _snappedStrokeId = null;
+    _snappedOriginal = null;
+    lastSnap.value = null;
+    if (id == null || orig == null) return;
+    final i = _strokes.indexWhere((x) => x.id == id);
+    if (i < 0) return;
+    final s = _strokes[i];
+    s.points
+      ..clear()
+      ..addAll(orig);
+    s.invalidate();
+    sink?.erase([s.id]);
+    sink?.strokeBegin(s);
+    sink?.strokeEnd(s.id);
+    _commitChanged();
+  }
+
+  /// 만들어 둔 획들을 그대로 넣는다 (함수 그래프·좌표축). 한 번에 되돌릴 수 있다.
+  void addStrokes(List<InkStroke> added) {
+    if (added.isEmpty) return;
+    _snapshot();
+    _strokes = [..._strokes, ...added];
+    for (final s in added) {
+      sink?.strokeBegin(s);
+      sink?.strokeEnd(s.id);
+    }
+    var bottom = pageHeight;
+    for (final s in added) {
+      bottom = math.max(bottom, s.bounds.bottom + 120);
+    }
+    if (autoExtend && bottom > pageHeight) pageHeight = bottom;
+    _commitChanged();
+    notifyListeners();
   }
 
   // hold-to-straighten
@@ -696,6 +763,7 @@ class InkController extends ChangeNotifier {
     _holdTimer?.cancel();
     committed.dispose();
     activeTick.dispose();
+    lastSnap.dispose();
     super.dispose();
   }
 }

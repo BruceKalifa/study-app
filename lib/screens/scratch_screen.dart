@@ -9,6 +9,7 @@ import '../ink/ink_canvas.dart';
 import '../ink/ink_controller.dart';
 import '../ink/ink_model.dart';
 import '../ink/ink_toolbar.dart';
+import '../ink/shape_hint.dart';
 
 /// Free notebook (연습장): multiple pages, auto-saved.
 class ScratchScreen extends StatefulWidget {
@@ -144,6 +145,7 @@ class _ScratchScreenState extends State<ScratchScreen> {
                         onResetView: () => _canvas.currentState?.resetView(),
                       ),
                     ),
+                    Positioned(left: 0, right: 0, bottom: 18, child: Center(child: ShapeSnapHint(controller: c))),
                     Positioned(
                       right: 18,
                       bottom: 16,

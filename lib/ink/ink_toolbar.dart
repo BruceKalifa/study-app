@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
+import 'function_sheet.dart';
 import 'ink_controller.dart';
 import 'ink_model.dart';
 
@@ -66,6 +67,11 @@ class InkToolbar extends StatelessWidget {
                 active: c.tool == InkTool.lasso,
                 onTap: () => c.tool = InkTool.lasso,
               ),
+              _ToolButton(
+                icon: Icons.show_chart_rounded,
+                tooltip: '함수 그리기',
+                onTap: () => showFunctionSheet(context, c),
+              ),
               const _Divider(),
               Expanded(
                 child: SingleChildScrollView(
@@ -119,6 +125,14 @@ class InkToolbar extends StatelessWidget {
                       onSettingsChanged();
                     },
                     child: const Text('멈추면 직선으로'),
+                  ),
+                  CheckedPopupMenuItem<VoidCallback>(
+                    checked: s.shapeSnap,
+                    value: () {
+                      s.shapeSnap = !s.shapeSnap;
+                      onSettingsChanged();
+                    },
+                    child: const Text('도형 자동 맞추기'),
                   ),
                   CheckedPopupMenuItem<VoidCallback>(
                     checked: s.pressure,
