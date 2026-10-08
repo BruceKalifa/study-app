@@ -19,7 +19,6 @@ import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/library_screen.dart';
 import 'package:study_app/screens/workbook_screen.dart';
 import 'package:study_app/screens/answer_key_screen.dart';
-import 'package:study_app/screens/series_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
@@ -245,7 +244,7 @@ void main() {
         kind: PointerDeviceKind.stylus);
     await tapPen.up();
     await tester.pump();
-    expect(find.text('${other}번 선택'), findsOneWidget);
+    expect(find.text('$other번 선택'), findsOneWidget);
     await _penRest(tester);
 
     // a finger tap on the right choice changes the mark; then grade
