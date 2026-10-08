@@ -131,3 +131,81 @@ List<int> sampleCollectionFile() {
     'books': [sampleBookJson(), second],
   })));
 }
+
+/// 인적성 교재 (tools/text_book.py 가 쓰는 모양) — 지문 묶음 객관식 + 자료해석 표.
+/// 대상 학년이 `취준` 이라 고등 학생 화면에는 나오지 않는다.
+Map<String, dynamic> aptBookJson() => {
+      'format': 'pulinote-bundle',
+      'version': 1,
+      'id': 'apt-mock-01',
+      'title': '인적성 모의고사 1회차',
+      'courses': [
+        {
+          'subject': '인적성',
+          'subjectId': 'apt',
+          'color': '#0E7C86',
+          'group': 'apt',
+          'level': 'high',
+          'grades': ['취준'],
+          'track': '공통',
+          'units': ['언어이해', '자료해석'],
+          'passages': [
+            {
+              'id': 'apt-mock-01-p-p1',
+              'title': '데이터 압축과 정보량',
+              'body': '정보를 압축한다는 것은 같은 내용을 더 짧은 기호로 적는 일이다.\n\n'
+                  '따라서 압축률은 원본에 **같은 모양이 얼마나 자주 나오는지**에 달려 있다.',
+            },
+          ],
+          'problems': [
+            {
+              'id': 'apt-mock-01-lang-01',
+              'unit': '언어이해',
+              'topic': '주제 찾기',
+              'section': '언어이해',
+              'difficulty': 3,
+              'type': 'choice',
+              'stem': '위 글의 주제로 가장 적절한 것은?',
+              'choices': [
+                '압축은 늘 손실을 낳는다',
+                '기호는 짧을수록 좋다',
+                '압축률은 반복되는 모양의 빈도에 달려 있다',
+                '정보량은 측정할 수 없다',
+                '원본이 길면 압축이 쉽다',
+              ],
+              'answer': '3',
+              'solution': '둘째 문단에서 같은 모양의 빈도를 압축률의 조건으로 들었다.',
+              'passageId': 'apt-mock-01-p-p1',
+              'label': '유형 연습',
+            },
+            {
+              'id': 'apt-mock-01-data-01',
+              'unit': '자료해석',
+              'topic': '표 읽기',
+              'section': '자료해석',
+              'difficulty': 4,
+              'type': 'choice',
+              'stem': '다음 표에 대한 설명으로 옳은 것은?\n\n| 구분 | 2020년 | 2025년 |\n|---|---|---|\n| 갑국 | 30 | 45 |',
+              'choices': ['갑국은 줄었다', '갑국은 50 % 늘었다'],
+              'answer': '2',
+              'solution': r'$45/30 = 1.5$ 이므로 50 % 늘었다.',
+              'points': 1,
+            },
+          ],
+        },
+      ],
+      'workbooks': [
+        {
+          'id': 'apt-mock-01',
+          'title': '인적성 모의고사 1회차',
+          'course': 'apt',
+          'stage': '모의고사',
+          'scope': '언어이해·자료해석',
+          'level': '기본',
+          'series': '인적성 모의고사',
+          'problems': ['apt-mock-01-lang-01', 'apt-mock-01-data-01'],
+        },
+      ],
+    };
+
+List<int> aptBookFile() => gzip.encode(utf8.encode(jsonEncode(aptBookJson())));

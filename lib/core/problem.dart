@@ -466,6 +466,7 @@ class SubjectGroup {
     SubjectGroup('eng', '영어', 0xFF2F9E6E),
     SubjectGroup('soc', '사회', 0xFF8C5BD6),
     SubjectGroup('sci', '과학', 0xFF2F6BFF),
+    SubjectGroup('apt', '인적성', 0xFF0E7C86),
   ];
 
   static SubjectGroup? byId(String id) {
@@ -476,9 +477,8 @@ class SubjectGroup {
   }
 }
 
-/// 학년 값 (schema `grades`).
-/// 학년 값 (고등 전용 서비스).
-const List<String> kGrades = ['고1', '고2', '고3', 'N수'];
+/// 학년 값 (schema `grades`). 고등 수험생 + 인적성(취준) 과정.
+const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준'];
 
 /// A course (과목): 물리학Ⅰ, 수학Ⅰ, 국어(독서)… — one JSON file.
 class Subject {

@@ -35,6 +35,9 @@ jobs:
       - name: Validate problem bank
         run: python3 tools/validate_problems.py | tail -15
 
+      - name: Text book converter selftest
+        run: python3 tools/text_book.py selftest
+
       - name: Fetch fonts (Pretendard, OFL)
         run: bash tools/fetch_fonts.sh
 

@@ -1,7 +1,7 @@
 # 문제 데이터 형식 (assets/problems/*.json)
 
-각 파일은 하나의 **과목(코스)** 이다. 예: 물리학Ⅰ, 수학Ⅰ, 중2 수학, 국어(독서), 영어, 통합사회.
-과목은 교과군(국어·수학·영어·사회·과학) 하나에 속한다.
+각 파일은 하나의 **과목(코스)** 이다. 예: 물리학Ⅰ, 수학Ⅰ, 중2 수학, 국어(독서), 영어, 통합사회, 인적성.
+과목은 교과군(국어·수학·영어·사회·과학·인적성) 하나에 속한다.
 
 ```json
 {
@@ -23,9 +23,9 @@
 | `subject` | string | 과목 이름(화면 표시) |
 | `subjectId` | string | 과목 id(전체에서 유일, 영문 소문자·숫자·`-`) |
 | `color` | `#RRGGBB` | 과목 색 |
-| `group` | `kor` `math` `eng` `soc` `sci` | 교과군: 국어·수학·영어·사회·과학 |
+| `group` | `kor` `math` `eng` `soc` `sci` `apt` | 교과군: 국어·수학·영어·사회·과학·인적성 |
 | `level` | `mid` `high` | 중등 / 고등 |
-| `grades` | string[] | 대상 학년. 값: `중1 중2 중3 고1 고2 고3 N수` |
+| `grades` | string[] | 대상 학년. 값: `중1 중2 중3 고1 고2 고3 N수 취준`. `취준` 과정은 고등 학생 화면에 나오지 않는다 |
 | `track` | string (선택) | `수능` `내신` `공통` |
 | `units` | string[] (선택) | 대단원 순서(문제집·무한 풀기 목록 순서). 없으면 문제에 나온 순서 |
 | `passages` | Passage[] (선택) | 지문(국어·영어 지문형 문항용) |
@@ -122,6 +122,11 @@
 
 TeX 원문 교재는 `python3 tools/tex_book.py <교재 폴더> <출력 폴더> [--preview]` 로
 `<id>.pulinote` (gzip JSON `{format:"pulinote-bundle", version:1, id, title, courses:[과목 파일 형식], workbooks:[문제집]}`) 를 만든다.
+TeX 원본이 없는 자료(인적성·NCS 등)는 `python3 tools/text_book.py <교재 폴더> <출력 폴더>` 로 만든다.
+교재 폴더는 `정보.txt` (머리말) + `문항.txt` (`#문항`/`#지문` 토막) + `그림/*.svg` 이고,
+`python3 tools/text_book.py check <교재 폴더>` 는 변환하지 않고 빠진 정답·어긋난 선택지만 알려 준다
+(`selftest` 는 지어낸 보기 교재로 변환기를 시험한다 — CI 가 돌린다).
+
 앱 설정 → **교재 파일** → 파일 가져오기 (또는 다른 앱에서 "풀이노트로 열기") 로 넣는다.
 교재 내용은 저작물이므로 이 저장소·CI 에는 올리지 않는다 (테스트는 `test/fixtures/sample_book.dart` 의 지어낸 예시만 쓴다).
 

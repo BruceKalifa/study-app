@@ -11,6 +11,7 @@ import 'package:study_app/app/app_state.dart';
 import 'package:study_app/app/storage.dart';
 import 'package:study_app/app/theme.dart';
 import 'package:study_app/core/problem.dart';
+import 'package:study_app/core/grader.dart';
 import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/screens/app_root.dart';
@@ -100,6 +101,7 @@ Future<void> _penRest(WidgetTester tester) =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  _aptTests();
 
   test('problem bank loads every subject from assets', () async {
     final bank = await ProblemBank.load(rootBundle);
@@ -1341,4 +1343,39 @@ void main() {
       other.dispose();
     }, _RealHttp());
   }, skip: server == null ? 'COMMUNITY_SERVER not set' : false, timeout: const Timeout(Duration(minutes: 2)));
+}
+
+void _aptTests() {
+  group('인적성 과정', () {
+    testWidgets('취준 학생에게만 보인다', (tester) async {
+      final app = (await tester.runAsync(() => _state(onboard: false)))!;
+      await tester.runAsync(() => app.importBooks(aptBookFile()));
+
+      // 교과군에 인적성이 있다
+      expect(SubjectGroup.byId('apt')?.name, '인적성');
+      expect(kGrades, contains('취준'));
+
+      // 고등 학생 화면에는 나오지 않고, 취준 학생에게만 나온다
+      String ids(String grade) => app.coursesForGrade(grade).map((s) => s.id).join(',');
+      expect(ids('고3').split(','), isNot(contains('apt')));
+      expect(ids('취준').split(','), contains('apt'));
+
+      final apt = app.bank.subject('apt')!;
+      expect(apt.group, 'apt');
+      expect(apt.units, ['언어이해', '자료해석']);
+      expect(apt.passages.single.title, '데이터 압축과 정보량');
+
+      // 지문 묶음 객관식 — 채점은 번호로
+      final p = app.bank.byId('apt-mock-01-lang-01')!;
+      expect(p.type, ProblemType.choice);
+      expect(p.choices, hasLength(5));
+      expect(p.passageId, 'apt-mock-01-p-p1');
+      expect(Grader.grade(p, '3').correct, isTrue);
+      expect(Grader.grade(p, '2').correct, isFalse);
+
+      // 자료해석 표는 본문에 그대로 남는다
+      expect(app.bank.byId('apt-mock-01-data-01')!.stem, contains('| 갑국 | 30 | 45 |'));
+      app.dispose();
+    });
+  });
 }
