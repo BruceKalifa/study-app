@@ -36,6 +36,7 @@ class _FunctionSheetState extends State<_FunctionSheet> {
   final _from = TextEditingController(text: '-5');
   final _to = TextEditingController(text: '5');
   bool _axes = true;
+  bool _fitY = false; // 세로도 가로와 같은 비율로
   double _scale = 36; // 한 칸 픽셀
   String? _error;
 
@@ -49,49 +50,68 @@ class _FunctionSheetState extends State<_FunctionSheet> {
 
   Expr? get _expr => Expr.tryParse(stripFunctionPrefix(_text.text));
 
-  void _draw() {
+  /// 지금 설정으로 [clip] 안에 그래프 획을 만든다 (못 그리면 null + 이유).
+  (List<InkStroke>?, String?) _build(Rect clip) {
     final src = stripFunctionPrefix(_text.text);
     final Expr f;
     try {
       f = Expr.parse(src);
     } on FormatException catch (e) {
-      setState(() => _error = e.message);
-      return;
+      return (null, e.message);
     }
     final x0 = double.tryParse(_from.text.trim()) ?? -5;
     final x1 = double.tryParse(_to.text.trim()) ?? 5;
-    if (!(x1 > x0)) {
-      setState(() => _error = 'x 범위를 확인하세요');
-      return;
-    }
+    if (!(x1 > x0)) return (null, 'x 범위를 확인하세요');
     final c = widget.controller;
-    final w = kPageWidth;
-    final left = w * 0.08, right = w * 0.92;
-    final span = (x1 - x0);
-    final scaleX = (right - left) / span;
-    final scaleY = _scale;
-    final top = (widget.at?.dy ?? 120) - 150;
-    final clip = Rect.fromLTRB(left, math.max(8, top), right, math.max(8, top) + 300);
-    final origin = Offset(left + (0 - x0) * scaleX, clip.center.dy);
+    final span = x1 - x0;
+    final scaleX = clip.width / span;
+    final scaleY = _fitY ? scaleX : _scale;
+    final origin = Offset(clip.left + (0 - x0) * scaleX, clip.center.dy);
     final frame = PlotFrame(origin: origin, scaleX: scaleX, scaleY: scaleY);
     final now = DateTime.now().millisecondsSinceEpoch;
     final strokes = <InkStroke>[
       if (_axes)
-        ...plotAxes(
-            frame: frame,
-            clip: clip,
-            color: 0xFF9AA4B2,
-            width: 1.6,
-            step: _niceStep(span),
-            startedAt: now),
+        ...plotAxes(frame: frame, clip: clip, color: 0xFF9AA4B2, width: 1.6, step: _niceStep(span), startedAt: now),
       ...plotFunction(f, frame: frame, clip: clip, color: c.settings.penColor, width: c.settings.penWidth, startedAt: now + 100),
     ];
-    if (strokes.isEmpty) {
-      setState(() => _error = '이 범위에서는 그릴 값이 없어요');
+    if (strokes.isEmpty) return (null, '이 범위에서는 그릴 값이 없어요');
+    return (strokes, null);
+  }
+
+  /// 기본 자리 (연습장 위쪽 가운데).
+  Rect get _defaultClip {
+    const w = kPageWidth * 0.84;
+    final top = math.max(8.0, (widget.at?.dy ?? 180) - 150);
+    return Rect.fromLTWH(kPageWidth * 0.08, top, w, 300);
+  }
+
+  void _draw({Rect? clip}) {
+    final (strokes, err) = _build(clip ?? _defaultClip);
+    if (strokes == null) {
+      setState(() => _error = err);
       return;
     }
-    c.addStrokes(strokes);
+    widget.controller.addStrokes(strokes);
+    if (clip == null) Navigator.pop(context);
+  }
+
+  /// 캔버스에서 자리를 끌어 고른 뒤 거기에 그린다.
+  void _place() {
+    final (_, err) = _build(_defaultClip);
+    if (err != null) {
+      setState(() => _error = err);
+      return;
+    }
+    final c = widget.controller;
     Navigator.pop(context);
+    c.startPlacing(PlaceRequest(
+      hint: '그래프를 놓을 자리를 손가락으로 끌어 보세요 · 톡 누르면 기본 크기로',
+      defaultSize: Size(_defaultClip.width, _defaultClip.height),
+      onPick: (rect) {
+        final (strokes, _) = _build(rect);
+        if (strokes != null) c.addStrokes(strokes);
+      },
+    ));
   }
 
   /// 눈금 간격 — 한 화면에 5~10칸쯤 되게.
@@ -173,12 +193,17 @@ class _FunctionSheetState extends State<_FunctionSheet> {
                 value: _scale,
                 min: 10,
                 max: 90,
-                onChanged: (v) => setState(() => _scale = v),
+                onChanged: _fitY ? null : (v) => setState(() => _scale = v),
               ),
             ),
-            Switch(value: _axes, onChanged: (v) => setState(() => _axes = v)),
+            Switch(key: const Key('fn-axes'), value: _axes, onChanged: (v) => setState(() => _axes = v)),
             const SizedBox(width: 6),
             const Text('좌표축', style: TextStyle(fontWeight: FontWeight.w700)),
+          ]),
+          Row(children: [
+            Checkbox(value: _fitY, onChanged: (v) => setState(() => _fitY = v ?? false)),
+            const Text('가로세로 같은 비율 (원·정비례가 안 찌그러져요)',
+                style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.inkSoft, fontSize: 13.5)),
           ]),
           const SizedBox(height: 14),
           Row(children: [
@@ -189,11 +214,18 @@ class _FunctionSheetState extends State<_FunctionSheet> {
               ),
             ),
             const SizedBox(width: 12),
+            OutlinedButton.icon(
+              key: const Key('fn-place'),
+              onPressed: _place,
+              icon: const Icon(Icons.crop_free_rounded),
+              label: const Text('자리 고르기'),
+            ),
+            const SizedBox(width: 8),
             FilledButton.icon(
               key: const Key('fn-draw'),
               onPressed: _draw,
               icon: const Icon(Icons.show_chart_rounded),
-              label: const Text('그리기'),
+              label: const Text('바로 그리기'),
             ),
           ]),
         ]),

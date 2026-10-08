@@ -476,6 +476,37 @@ class InkController extends ChangeNotifier {
     _commitChanged();
   }
 
+  // ---------------- 자리 고르기 (함수 그래프 놓기) ----------------
+  /// 자리를 고르는 중이면 캔버스가 그리기 대신 사각형을 끌게 한다.
+  final ValueNotifier<PlaceRequest?> placing = ValueNotifier<PlaceRequest?>(null);
+
+  /// 지금 끌고 있는 사각형 (캔버스가 점선으로 그린다).
+  Rect? placePreview;
+
+  void startPlacing(PlaceRequest r) {
+    placing.value = r;
+    placePreview = null;
+    activeTick.value++;
+  }
+
+  void cancelPlacing() {
+    if (placing.value == null) return;
+    placing.value = null;
+    placePreview = null;
+    activeTick.value++;
+  }
+
+  /// 캔버스가 부른다 — 손을 떼면 고른 자리로 [PlaceRequest.onPick] 을 부른다.
+  void finishPlacing(Rect rect) {
+    final r = placing.value;
+    placing.value = null;
+    placePreview = null;
+    activeTick.value++;
+    if (r == null) return;
+    final small = rect.width < 40 || rect.height < 40;
+    r.onPick(small ? Rect.fromCenter(center: rect.center, width: r.defaultSize.width, height: r.defaultSize.height) : rect);
+  }
+
   // ---------------- 도형 맞추기 ----------------
   /// 마지막으로 맞춘 도형 (화면이 "원으로 맞췄어요 · 되돌리기" 를 띄우는 데 쓴다).
   final ValueNotifier<ShapeKind?> lastSnap = ValueNotifier<ShapeKind?>(null);
@@ -764,6 +795,19 @@ class InkController extends ChangeNotifier {
     committed.dispose();
     activeTick.dispose();
     lastSnap.dispose();
+    placing.dispose();
     super.dispose();
   }
+}
+
+/// 캔버스에서 자리를 고르는 요청 (함수 그래프를 놓을 자리).
+class PlaceRequest {
+  const PlaceRequest({required this.hint, required this.defaultSize, required this.onPick});
+
+  /// 화면 위에 띄울 안내 ("그래프를 놓을 자리를 끌거나 톡 누르세요").
+  final String hint;
+
+  /// 끌지 않고 톡 눌렀을 때 쓸 크기.
+  final Size defaultSize;
+  final void Function(Rect rect) onPick;
 }

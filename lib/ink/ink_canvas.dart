@@ -223,6 +223,15 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     final isStylus = _isStylus(e.kind);
     final isMouse = e.kind == PointerDeviceKind.mouse;
 
+    // 자리 고르기(함수 그래프 놓기) — 그리는 대신 사각형을 끈다
+    if (c.placing.value != null && _placePointer == null) {
+      _placePointer = e.pointer;
+      _placeStart = toPage(e.localPosition);
+      c.placePreview = Rect.fromPoints(_placeStart!, _placeStart!);
+      c.activeTick.value++;
+      return;
+    }
+
     if (isStylus || isMouse) {
       if (isStylus) _markPen(e);
       if (widget.readOnly) return;
@@ -270,6 +279,32 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     _beginGesture();
   }
 
+  // 자리 고르기
+  int? _placePointer;
+  Offset? _placeStart;
+
+  bool _placeMove(PointerEvent e) {
+    if (_placePointer != e.pointer) return false;
+    final a = _placeStart;
+    if (a == null) return true;
+    c.placePreview = Rect.fromPoints(a, toPage(e.localPosition));
+    c.activeTick.value++;
+    return true;
+  }
+
+  bool _placeUp(PointerEvent e, {required bool cancelled}) {
+    if (_placePointer != e.pointer) return false;
+    final a = _placeStart;
+    _placePointer = null;
+    _placeStart = null;
+    if (cancelled || a == null) {
+      c.cancelPlacing();
+      return true;
+    }
+    c.finishPlacing(Rect.fromPoints(a, toPage(e.localPosition)));
+    return true;
+  }
+
   void _startDraw(PointerEvent e, {required bool stylus}) {
     _drawPointer = e.pointer;
     _drawIsStylus = stylus;
@@ -311,6 +346,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
 
   void _onMove(PointerMoveEvent e) {
     if (_ignored.contains(e.pointer)) return;
+    if (_placeMove(e)) return;
     if (e.pointer == _drawPointer) {
       if (_isStylus(e.kind)) _markPen(e);
       _drawTravel = math.max(_drawTravel, (e.localPosition - _drawStart).distance);
@@ -352,6 +388,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
 
   void _onUp(PointerEvent e, {bool cancelled = false}) {
     if (_ignored.remove(e.pointer)) return;
+    if (_placeUp(e, cancelled: cancelled)) return;
     if (e.pointer == _drawPointer) {
       if (_isStylus(e.kind)) _markPen(e);
       _drawPointer = null;
@@ -669,6 +706,14 @@ class ActiveInkPainter extends CustomPainter {
     if (ec != null) {
       canvas.drawCircle(ec, c.eraserRadius, _cursorFill);
       canvas.drawCircle(ec, c.eraserRadius, _cursor);
+    }
+
+    // 자리 고르기 — 끌고 있는 사각형
+    final pp = c.placePreview;
+    if (pp != null && pp.width.abs() > 1 && pp.height.abs() > 1) {
+      final r = RRect.fromRectAndRadius(pp, const Radius.circular(8));
+      canvas.drawRRect(r, _lassoFill);
+      _dashedRRect(canvas, r, _lasso);
     }
   }
 

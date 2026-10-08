@@ -276,7 +276,7 @@ class ProblemSheet extends StatelessWidget {
                     ),
                   ],
                   if (!p.isChoice) ...[
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 22),
                     Padding(
                       padding: const EdgeInsets.only(left: _indent),
                       child: _AnswerBox(
@@ -553,8 +553,8 @@ class _AnswerBox extends StatelessWidget {
           children: [
             Container(
               key: boxKey,
-              width: 470,
-              height: 150,
+              width: 330,
+              height: 104,
               decoration: BoxDecoration(
                 color: const Color(0x08000000),
                 border: Border.all(color: AppColors.ink, width: 1.8),
@@ -573,7 +573,7 @@ class _AnswerBox extends StatelessWidget {
                 if (empty)
                   const Center(
                     child: Text('여기에 답을 쓰세요',
-                        style: TextStyle(fontFamily: sans, fontSize: 19, color: AppColors.lineStrong, fontWeight: FontWeight.w700)),
+                        style: TextStyle(fontFamily: sans, fontSize: 16, color: AppColors.lineStrong, fontWeight: FontWeight.w700)),
                   ),
               ]),
             ),

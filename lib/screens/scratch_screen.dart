@@ -146,6 +146,7 @@ class _ScratchScreenState extends State<ScratchScreen> {
                       ),
                     ),
                     Positioned(left: 0, right: 0, bottom: 18, child: Center(child: ShapeSnapHint(controller: c))),
+                    Positioned(left: 16, right: 16, bottom: 64, child: Center(child: PlacingHint(controller: c))),
                     Positioned(
                       right: 18,
                       bottom: 16,

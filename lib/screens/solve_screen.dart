@@ -654,6 +654,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
               ]),
             ),
             Positioned(left: 0, right: 0, bottom: 18, child: Center(child: ShapeSnapHint(controller: ink))),
+            Positioned(left: 16, right: 16, bottom: 64, child: Center(child: PlacingHint(controller: ink))),
           ]);
 
     return Scaffold(

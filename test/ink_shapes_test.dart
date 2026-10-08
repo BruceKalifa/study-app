@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:study_app/ink/function_plot.dart';
 import 'package:study_app/ink/ink_model.dart';
+import 'package:study_app/ink/ink_controller.dart';
 import 'package:study_app/ink/shape_snap.dart';
 
 /// 손으로 그린 것처럼 흔들리는 획을 만든다.
@@ -187,6 +188,57 @@ void main() {
       final out = plotAxes(frame: frame, clip: clip, color: 0xFF999999, width: 1.5, step: 1);
       expect(out.length, greaterThan(4));
       expect(out.first.points, hasLength(2));
+    });
+  });
+
+  group('자리 고르기', () {
+    test('끌어서 고른 사각형이 그대로 온다', () {
+      final c = InkController(settings: InkSettings());
+      Rect? picked;
+      c.startPlacing(PlaceRequest(
+          hint: '자리', defaultSize: const Size(400, 300), onPick: (r) => picked = r));
+      expect(c.placing.value, isNotNull);
+      c.finishPlacing(const Rect.fromLTRB(100, 200, 500, 440));
+      expect(picked, const Rect.fromLTRB(100, 200, 500, 440));
+      expect(c.placing.value, isNull, reason: '한 번 고르면 끝난다');
+      c.dispose();
+    });
+
+    test('톡 누르면(사각형이 작으면) 기본 크기로 가운데에 놓는다', () {
+      final c = InkController(settings: InkSettings());
+      Rect? picked;
+      c.startPlacing(PlaceRequest(
+          hint: '자리', defaultSize: const Size(400, 300), onPick: (r) => picked = r));
+      c.finishPlacing(const Rect.fromLTRB(300, 300, 302, 301));
+      expect(picked!.width, 400);
+      expect(picked!.height, 300);
+      expect(picked!.center.dx, closeTo(301, 1));
+      c.dispose();
+    });
+
+    test('취소하면 아무 일도 없다', () {
+      final c = InkController(settings: InkSettings());
+      var called = false;
+      c.startPlacing(PlaceRequest(
+          hint: '자리', defaultSize: const Size(400, 300), onPick: (_) => called = true));
+      c.cancelPlacing();
+      expect(c.placing.value, isNull);
+      expect(called, isFalse);
+      c.dispose();
+    });
+
+    test('만든 획을 그대로 넣는다', () {
+      final c = InkController(settings: InkSettings());
+      final before = c.strokes.length;
+      final strokes = plotFunction(Expr.parse('x'),
+          frame: const PlotFrame(origin: Offset(500, 300), scaleX: 40, scaleY: 40),
+          clip: const Rect.fromLTRB(100, 150, 900, 450),
+          color: 0xFF000000,
+          width: 3);
+      c.addStrokes(strokes);
+      expect(c.strokes.length, before + strokes.length);
+      expect(c.canUndo, isTrue, reason: '한 번에 되돌릴 수 있다');
+      c.dispose();
     });
   });
 }
