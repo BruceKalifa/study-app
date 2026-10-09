@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// 앱 이름 — 바꿀 때는 여기와 tools/patch_android.sh 의 android:label 을 함께 고친다.
-const String kAppName = '풀이노트';
+const String kAppName = 'Solvit';
 
 /// 앱이 쓰는 서버. 학생·선생님이 주소를 입력할 일이 없게 여기서 정한다
 /// (바꾸려면: 서버를 옮길 때 이 줄만 고치고 다시 배포하면 된다).

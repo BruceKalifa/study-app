@@ -39,15 +39,15 @@ function readBundle(buf) {
     try { raw = zlib.gunzipSync(buf); } catch (_) { throw new HttpError(400, '파일이 손상되었습니다'); }
   }
   let j;
-  try { j = JSON.parse(raw.toString('utf8')); } catch (_) { throw new HttpError(400, '풀이노트 교재 파일이 아닙니다'); }
-  if (!j || typeof j !== 'object' || Array.isArray(j)) throw new HttpError(400, '풀이노트 교재 파일이 아닙니다');
+  try { j = JSON.parse(raw.toString('utf8')); } catch (_) { throw new HttpError(400, 'Solvit 교재 파일이 아닙니다'); }
+  if (!j || typeof j !== 'object' || Array.isArray(j)) throw new HttpError(400, 'Solvit 교재 파일이 아닙니다');
   const list = j.format === COLLECTION ? j.books : [j];
   if (!Array.isArray(list) || list.length === 0) throw new HttpError(400, '교재가 없습니다');
   const bookIds = [];
   const titles = [];
   let problems = 0;
   for (const b of list) {
-    if (!b || typeof b !== 'object' || b.format !== BUNDLE) throw new HttpError(400, '풀이노트 교재 파일이 아닙니다');
+    if (!b || typeof b !== 'object' || b.format !== BUNDLE) throw new HttpError(400, 'Solvit 교재 파일이 아닙니다');
     const id = `${b.id ?? ''}`;
     if (!ID_RE.test(id)) throw new HttpError(400, '교재 id 가 잘못되었습니다');
     if (!Array.isArray(b.courses)) throw new HttpError(400, '문항이 없습니다');

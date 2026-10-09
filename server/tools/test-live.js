@@ -204,7 +204,7 @@ async function main() {
 
   console.log('12) HTTP');
   const idx = await get('/');
-  ok(idx.status === 200 && idx.type.includes('text/html') && idx.body.includes('풀이노트'), 'GET / → 선생님 웹');
+  ok(idx.status === 200 && idx.type.includes('text/html') && idx.body.includes('Solvit'), 'GET / → 선생님 웹');
   ok((await get('/app.js')).status === 200 && (await get('/style.css')).status === 200, 'GET /app.js, /style.css');
   const info = await get('/api/info');
   let infoJ = null; try { infoJ = JSON.parse(info.body); } catch (_) { /* */ }

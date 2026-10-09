@@ -470,7 +470,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
     final weak = app.weakTopics.take(3).map((e) => e.$1).join(', ');
     final b = StringBuffer()
-      ..writeln('[풀이노트 주간 리포트] ${app.profile.name} (${app.learner.grade})')
+      ..writeln('[Solvit 주간 리포트] ${app.profile.name} (${app.learner.grade})')
       ..writeln('· 기간: ${days.first.month}/${days.first.day} ~ ${days.last.month}/${days.last.day}')
       ..writeln('· 순공 시간: ${fmtDuration(study)}')
       ..writeln('· 푼 문제: $solved문제 (정답률 ${solved == 0 ? '-' : pct(correct / solved)})')

@@ -1,6 +1,6 @@
 'use strict';
 /**
- * 풀이노트 실시간 필기 공유 서버
+ * Solvit 실시간 필기 공유 서버
  *
  *  - 학생 앱(Flutter)  ⇄  ws://<서버>:8080/ws?role=student
  *  - 선생님 웹          ⇄  ws://<서버>:8080/ws?role=teacher   (http://<서버>:8080/ 에서 제공)
@@ -678,7 +678,7 @@ loadRecords();
 server.listen(PORT, HOST, () => {
   const ips = lanAddresses();
   const line = '─'.repeat(52);
-  console.log(`\n${line}\n 풀이노트 실시간 서버가 켜졌습니다 (포트 ${PORT})\n${line}`);
+  console.log(`\n${line}\n Solvit 실시간 서버가 켜졌습니다 (포트 ${PORT})\n${line}`);
   if (ips.length === 0) {
     console.log(' 네트워크 주소를 찾지 못했습니다. Wi-Fi 연결을 확인하세요.');
     console.log(` 이 컴퓨터에서 보기: http://localhost:${PORT}/`);

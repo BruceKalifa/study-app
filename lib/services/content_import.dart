@@ -82,14 +82,14 @@ class ContentImport {
     try {
       j = jsonDecode(utf8.decode(raw));
     } catch (_) {
-      throw const FormatException('풀이노트 교재 파일이 아니에요');
+      throw const FormatException('Solvit 교재 파일이 아니에요');
     }
-    if (j is! Map) throw const FormatException('풀이노트 교재 파일이 아니에요');
+    if (j is! Map) throw const FormatException('Solvit 교재 파일이 아니에요');
     return j.map((k, v) => MapEntry('$k', v));
   }
 
   static Map<String, dynamic> _check(Object? j) {
-    if (j is! Map || j['format'] != format) throw const FormatException('풀이노트 교재 파일이 아니에요');
+    if (j is! Map || j['format'] != format) throw const FormatException('Solvit 교재 파일이 아니에요');
     final id = '${j['id'] ?? ''}';
     if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$').hasMatch(id)) throw const FormatException('교재 id 가 잘못됐어요');
     if (j['courses'] is! List) throw const FormatException('문항이 없어요');
@@ -239,7 +239,7 @@ class ContentImport {
   }
 }
 
-/// 다른 앱에서 "풀이노트로 열기" (MainActivity, channel `pulinote/files`).
+/// 다른 앱에서 "Solvit으로 열기" (MainActivity, channel `pulinote/files`).
 /// 앱 안에서 파일을 고르는 길은 없앴다 — 교재는 서버 교재 창고에서 받는다.
 class BookFiles {
   BookFiles._();

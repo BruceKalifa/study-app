@@ -25,13 +25,13 @@ cat > android/app/src/main/res/xml/pulinote_update_paths.xml <<'XML'
 </paths>
 XML
 
-# 교재 파일(.pulinote): 다른 앱에서 "풀이노트로 열기" (content:// 파일, 확장자를 모르는 파일은 octet-stream)
+# 교재 파일(.pulinote): 다른 앱에서 "Solvit으로 열기" (content:// 파일, 확장자를 모르는 파일은 octet-stream)
 grep -q 'application/x-gzip' "$M" || \
   sed -i '0,/<\/intent-filter>/s##</intent-filter>\n            <intent-filter>\n                <action android:name="android.intent.action.VIEW"/>\n                <category android:name="android.intent.category.DEFAULT"/>\n                <data android:scheme="content"/>\n                <data android:mimeType="application/octet-stream"/>\n                <data android:mimeType="application/gzip"/>\n                <data android:mimeType="application/x-gzip"/>\n            </intent-filter>#' "$M"
 grep -q 'application/x-gzip' "$M" || { echo "ERROR: could not add the VIEW intent-filter"; exit 1; }
 
 # App name
-sed -i 's#android:label="[^"]*"#android:label="풀이노트"#' "$M"
+sed -i 's#android:label="[^"]*"#android:label="Solvit"#' "$M"
 
 # minSdk 24 (ML Kit + modern stylus APIs)
 for G in android/app/build.gradle.kts android/app/build.gradle; do

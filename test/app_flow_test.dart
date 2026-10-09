@@ -750,7 +750,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('예제'), findsWidgets);
-    expect(find.text('풀이노트 예시 문항'), findsWidgets);
+    expect(find.text('Solvit 예시 문항'), findsWidgets);
     expect(find.byType(Math), findsWidgets);
     bool hasPoints() => tester
         .widgetList<RichText>(find.byType(RichText))

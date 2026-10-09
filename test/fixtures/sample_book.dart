@@ -32,7 +32,7 @@ Map<String, dynamic> sampleBookJson() => {
               'solution': '\$a_1=3\$이 홀수이므로 \$a_2=5\$이고, 홀수에 \$2\$를 더하면 다시 홀수이다.\n'
                   '\$\$a_n=2n+1\\quad(n\\ge1)\$\$\n따라서 \$a_{10}=21\$이다.',
               'label': '예제',
-              'source': '풀이노트 예시 문항',
+              'source': 'Solvit 예시 문항',
               'texStyle': true,
               'points': 0,
             },
@@ -92,7 +92,7 @@ Map<String, dynamic> sampleBookJson() => {
           'stage': 'N제',
           'scope': '수학Ⅰ 수열 · 확률과 통계 확률',
           'level': '심화',
-          'publisher': '풀이노트',
+          'publisher': 'Solvit',
           'series': 'SAMPLE TYPE',
           'desc': '교재 파일 예시',
           'problems': ['sample-type-01-cls-1', 'sample-type-01-cls-2', 'sample-type-01-hw-1'],

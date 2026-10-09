@@ -363,7 +363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _Tip(Icons.auto_awesome_rounded, '틀린 문제는 숫자를 바꾼 변형문제로 다시 풀어 보세요.'),
         ]),
         const Center(
-          child: Text('풀이노트 0.1 · 오픈소스 · 글꼴 Pretendard (SIL OFL)',
+          child: Text('Solvit 0.1 · 오픈소스 · 글꼴 Pretendard (SIL OFL)',
               style: TextStyle(fontSize: 12, color: AppColors.inkMuted)),
         ),
       ],

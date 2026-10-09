@@ -1,4 +1,4 @@
-/* 풀이노트 출제실 — 문항·지문·문제집 편집 (빌드 없이 쓰는 순수 JS)
+/* Solvit 출제실 — 문항·지문·문제집 편집 (빌드 없이 쓰는 순수 JS)
  * 서버 API: docs/content-api.md · 데이터 형식: docs/problem-schema.md
  * 검증·표기법 파서는 schema.js(서버와 같은 파일)를 쓴다. */
 (() => {
@@ -154,7 +154,7 @@
     if (st.pDirty) parts.push('지문');
     if (st.wbDirty) parts.push('문제집');
     el.querySelector('.txt').textContent = state === 'saving' ? '저장 중…' : state === 'error' ? '저장 실패 — 오류 확인' : state === 'dirty' ? `저장 안 됨 (${parts.join('·')}) · Ctrl+S` : '저장됨';
-    document.title = (isDirty() ? '● ' : '') + '풀이노트 · 출제실';
+    document.title = (isDirty() ? '● ' : '') + 'Solvit · 출제실';
   }
   function confirmDiscard(which) {
     const d = which === 'problem' ? st.dirty : which === 'passage' ? st.pDirty : which === 'workbook' ? st.wbDirty : isDirty();

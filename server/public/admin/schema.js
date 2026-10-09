@@ -1,5 +1,5 @@
 /**
- * 풀이노트 문제 데이터(v2) 공용 모듈 — 서버(Node)와 출제 웹(브라우저)이 같은 파일을 쓴다.
+ * Solvit 문제 데이터(v2) 공용 모듈 — 서버(Node)와 출제 웹(브라우저)이 같은 파일을 쓴다.
  *   - 본문 표기법 파서: $수식$, **굵게**, __밑줄__, |표|
  *   - 변형문제(template) 식 계산기 (docs/problem-schema.md 의 식 문법, tools/validate_problems.py 와 동일)
  *   - 검증: 문항 / 지문 / 과목 / 문제집  → [{ where, field, message }] (한국어)
