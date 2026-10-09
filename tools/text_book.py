@@ -42,24 +42,40 @@ import os
 import re
 import sys
 
-# 영역 이름 → 앱 과목(course): (id, 이름, 색, 교과군)
+# 과목·영역 이름 → 앱 과목(course): (id, 이름, 색, 교과군)
+# assets/problems/*.json 의 subjectId·색과 같아야 한다 (같으면 한 과목으로 합쳐진다).
+APT = ('apt', '인적성', '#0E7C86', 'apt')
 COURSES = {
-    '인적성': ('apt', '인적성', '#0E7C86', 'apt'),
-    '언어': ('apt', '인적성', '#0E7C86', 'apt'),
-    '수리': ('apt', '인적성', '#0E7C86', 'apt'),
-    '자료해석': ('apt', '인적성', '#0E7C86', 'apt'),
-    '추리': ('apt', '인적성', '#0E7C86', 'apt'),
-    '도식': ('apt', '인적성', '#0E7C86', 'apt'),
-    '공간': ('apt', '인적성', '#0E7C86', 'apt'),
-    '지각': ('apt', '인적성', '#0E7C86', 'apt'),
-    '상식': ('apt', '인적성', '#0E7C86', 'apt'),
+    # 인적성·NCS
+    '인적성': APT, '언어': APT, '수리': APT, '자료해석': APT, '추리': APT,
+    '도식': APT, '공간': APT, '지각': APT, '상식': APT,
     'NCS': ('ncs', 'NCS', '#0E7C86', 'apt'),
+    # 교과 (앱에 이미 있는 과목과 같은 id)
+    '지구과학Ⅰ': ('earth1', '지구과학Ⅰ', '#169C6B', 'sci'),
+    '지구과학1': ('earth1', '지구과학Ⅰ', '#169C6B', 'sci'),
+    '지구과학': ('earth1', '지구과학Ⅰ', '#169C6B', 'sci'),
+    '물리학Ⅰ': ('phy1', '물리학Ⅰ', '#2F6BFF', 'sci'),
+    '물리학1': ('phy1', '물리학Ⅰ', '#2F6BFF', 'sci'),
+    '물리학Ⅱ': ('phy2', '물리학Ⅱ', '#1D4ED8', 'sci'),
+    '물리학2': ('phy2', '물리학Ⅱ', '#1D4ED8', 'sci'),
+    '통합과학': ('integ', '통합과학', '#0EA5E9', 'sci'),
+    '수학': ('math', '수학', '#E0703B', 'math'),
+    '수학Ⅰ': ('math', '수학', '#E0703B', 'math'),
+    '수학Ⅱ': ('math', '수학', '#E0703B', 'math'),
+    '확률과 통계': ('math', '수학', '#E0703B', 'math'),
+    '미적분': ('math', '수학', '#E0703B', 'math'),
+    '기하': ('math', '수학', '#E0703B', 'math'),
 }
-DEFAULT_COURSE = ('apt', '인적성', '#0E7C86', 'apt')
+DEFAULT_COURSE = APT
+
+# 교과군별 기본 대상 학년 (정보.txt 에 '대상 학년' 이 없을 때)
+DEFAULT_GRADES = {'apt': ['취준'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수']}
 
 STAGES = ('개념', '유형', '기출', 'N제', '모의고사')
 SECTIONS = ('문제', '선택지', '해설', '본문', '보기')
 CIRCLED = '①②③④⑤⑥⑦⑧⑨'
+# <보기> 항목 머리 (ㄱ. ㄴ. ㄷ. / 가. 나. / (가) (나))
+BOX_HEAD = re.compile(r'^\s*(?:\(?\s*([ㄱ-ㅎ가-힣])\s*[.)]|\(\s*([ㄱ-ㅎ가-힣])\s*\))\s*(.*)$')
 
 
 def read_info(path):
@@ -91,7 +107,7 @@ def parse_blocks(text):
             continue
         m = re.match(r'^\[\s*([^\]]+?)\s*\]\s*$', line)
         if m and m.group(1) in SECTIONS:
-            sec = '문제' if m.group(1) == '보기' else m.group(1)
+            sec = m.group(1)
             cur['body'].setdefault(sec, [])
             continue
         if sec is None:
@@ -140,28 +156,72 @@ def split_choices(text, problems, where):
     return [c for c in items if c]
 
 
-def course_of(area, fallback):
-    for name, c in COURSES.items():
-        if area.startswith(name) or name in area:
-            return c
-    for name, c in COURSES.items():
-        if fallback.startswith(name):
-            return c
+def split_box(text):
+    """<보기> 글 → ['ㄱ. …', 'ㄴ. …'] (머리 글자는 그대로 남긴다 — 선택지가 그 글자를 가리킨다)."""
+    items, cur = [], None
+    for line in text.splitlines():
+        if BOX_HEAD.match(line):
+            if cur is not None:
+                items.append('\n'.join(cur).strip())
+            cur = [line.strip()]
+        elif cur is not None:
+            cur.append(line)
+        elif line.strip():
+            cur = [line.strip()]
+    if cur is not None:
+        items.append('\n'.join(cur).strip())
+    return [c for c in items if c]
+
+
+def course_of(*keys):
+    """과목 → 영역 → 정보.txt 과목 순으로 먼저 맞는 과목을 쓴다.
+
+    이름의 앞머리만 본다 ('해양 지각' 이 인적성 '지각' 으로 가지 않게).
+    """
+    for key in keys:
+        key = (key or '').strip()
+        if not key:
+            continue
+        for name, c in COURSES.items():
+            if key == name or key.startswith(name):
+                return c
     return DEFAULT_COURSE
 
 
+# 흔한 한글 낱말 → 영문 (id 를 사람이 읽을 수 있게)
+WORDS = (
+    ('자료해석', 'data'), ('언어이해', 'lang'), ('공간지각', 'sp'), ('모의고사', 'mock'),
+    ('지구과학', 'earth'), ('통합과학', 'integ'), ('물리학', 'phy'), ('확률과 통계', 'prob'),
+    ('언어', 'lang'), ('수리', 'num'), ('자료', 'data'), ('추리', 'rea'), ('도식', 'dia'),
+    ('도형', 'fig'), ('공간', 'sp'), ('지각', 'per'), ('상식', 'gen'), ('인적성', 'apt'),
+    ('고체 지구', 'solid'), ('고체', 'solid'), ('대기와 해양', 'air'), ('대기', 'air'),
+    ('해양', 'sea'), ('우주', 'space'), ('지구', 'earth'), ('수학', 'math'), ('과학', 'sci'),
+    ('수업', 'cls'), ('숙제', 'hw'), ('기출', 'gc'), ('변형', 'var'), ('심화', 'adv'), ('예제', 'ex'),
+)
+
+
 def slug(s):
-    for a, b in (('자료해석', 'data'), ('언어이해', 'lang'), ('언어', 'lang'), ('수리', 'num'),
-                 ('자료', 'data'), ('추리', 'rea'), ('도식', 'dia'), ('도형', 'fig'), ('공간', 'sp'),
-                 ('지각', 'per'), ('상식', 'gen'), ('인적성', 'apt'), ('모의고사', 'mock')):
+    for a, b in WORDS:
         s = s.replace(a, b)
     return re.sub(r'[^0-9A-Za-z]+', '-', s).strip('-').lower() or 'book'
 
 
+def stable_slug(text):
+    """이름 → id 토막. 한글이 영문으로 옮겨지지 못해 떨어져 나가면 (그래서 다른 이름과
+    구별되지 않으면) 짧은 지문을 붙인다. 같은 이름은 늘 같은 토막이 된다."""
+    mapped = text
+    for a, b in WORDS:
+        mapped = mapped.replace(a, b)
+    base = slug(text)
+    if base == 'book' or re.search(r'[가-힣]', mapped):
+        base = f'{base}-{hashlib.md5(text.encode()).hexdigest()[:4]}'
+    return base
+
+
 def item_slug(no, used):
-    """문항번호 → id 꼬리. 한글이 떨어져 나가 겹치면 짧은 지문을 붙여 가른다."""
-    base = slug(no)
-    if base == 'book' or base in used:
+    """문항번호 → id 꼬리 (겹치면 지문을 붙여 가른다)."""
+    base = stable_slug(no)
+    if base in used:
         base = f'{base}-{hashlib.md5(no.encode()).hexdigest()[:4]}'
     used.add(base)
     return base
@@ -186,11 +246,10 @@ def build(folder, outdir=None):
     title = re.sub(r'\s*문항.*$', '', meta.get('교재명', os.path.basename(folder))).strip()
     series = meta.get('시리즈', '').split('(')[0].strip() or title.split()[0]
     num = re.search(r'(\d+)\s*회차', title)
-    head = slug(series)
-    if head == 'book':  # 한글만 있는 이름 — 교재마다 다른 꼬리를 붙여 겹치지 않게
-        head = 'book-' + hashlib.md5(series.encode()).hexdigest()[:4]
-    book_id = head + (f'-{int(num.group(1)):02d}' if num else '')
-    grades = [g.strip() for g in re.split(r'[,，·/]', meta.get('대상 학년', '취준')) if g.strip()]
+    book_id = stable_slug(series) + (f'-{int(num.group(1)):02d}' if num else '')
+    book_course = course_of(meta.get('과목', ''))
+    grades = [g.strip() for g in re.split(r'[,，·/]', meta.get('대상 학년', '')) if g.strip()] \
+        or DEFAULT_GRADES.get(book_course[3], ['고2', '고3', 'N수'])
 
     problems = []
     passages, items = [], []
@@ -226,6 +285,7 @@ def build(folder, outdir=None):
             problems.append(f'{where}: 정답이 비어 있어요 (앱 채점에 꼭 필요해요)')
         kind = head.get('형식', '').strip()
         choices = split_choices(body.get('선택지', ''), problems, where) if body.get('선택지') else []
+        box = split_box(clean(body.get('보기', ''), figs, problems, where)) if body.get('보기') else []
         is_choice = kind.startswith('객관') or (not kind and len(choices) >= 2)
         if is_choice and len(choices) < 2:
             problems.append(f'{where}: 객관식인데 선택지가 {len(choices)}개예요')
@@ -237,10 +297,10 @@ def build(folder, outdir=None):
             diff = max(1, min(5, int(re.sub(r'[^0-9]', '', head.get('난이도', '3')) or 3)))
         except ValueError:
             diff = 3
-        cid, cname, color, group = course_of(area, meta.get('과목', ''))
+        cid, cname, color, group = course_of(head.get('과목', ''), area, meta.get('과목', ''))
         course = courses.setdefault(cid, {
             'subject': cname, 'subjectId': cid, 'color': color, 'group': group, 'level': 'high',
-            'grades': grades, 'track': meta.get('시험', '').strip() or '공통',
+            'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '수능'),
             'passages': [], 'problems': []})
         p = {
             'id': f'{book_id}-{item_slug(b["no"], used)}',
@@ -256,6 +316,8 @@ def build(folder, outdir=None):
         }
         if choices:
             p['choices'] = choices
+        if box:
+            p['boxItems'] = box
         if head.get('지문'):
             pid = pass_ids.get(head['지문'])
             if pid:
@@ -293,6 +355,7 @@ def build(folder, outdir=None):
               'courses': list(courses.values()), 'workbooks': [wb]}
     report = {'book': title, 'id': book_id, 'problems': len(all_ids), 'passages': len(pass_json),
               'choice': sum(1 for c in courses.values() for p in c['problems'] if p['type'] == 'choice'),
+              'box': sum(1 for c in courses.values() for p in c['problems'] if p.get('boxItems')),
               'figures': len(set(figs.values())), 'issues': problems}
     want = meta.get('문항 수', '').strip()
     if want.isdigit() and int(want) != len(all_ids):
@@ -384,6 +447,53 @@ $45 > 30$
 
 SELFTEST_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"></svg>'
 
+SELFTEST_SCI_INFO = """- 교재명: 보기 과학 01회차
+- 시리즈: 보기 과학
+- 과목: 지구과학Ⅰ
+- 커리큘럼 단계: 유형
+- 범위: 고체 지구 / 대기와 해양
+- 문항 수: 2
+"""
+
+SELFTEST_SCI_ITEMS = """#문항 고체-01
+영역: 고체 지구
+유형: 판 구조론
+형식: 객관식
+정답: 3
+난이도: 2
+힌트: 순서대로 발전하였다.
+
+[문제]
+옳은 것만을 <보기>에서 있는 대로 고른 것은?
+
+[보기]
+ㄱ. 첫째 것은 옳다.
+ㄴ. 둘째 것은 틀리다.
+ㄷ. 셋째 것은 옳다.
+
+[선택지]
+1. ㄱ
+2. ㄴ
+3. ㄱ, ㄷ
+4. ㄴ, ㄷ
+5. ㄱ, ㄴ, ㄷ
+
+[해설]
+ㄴ 만 틀리다.
+
+#문항 해양 지각-01
+영역: 대기와 해양
+형식: 단답형
+정답: 35
+단위: psu
+
+[문제]
+표층 염분을 구하시오.
+
+[해설]
+표에서 읽는다.
+"""
+
 
 def selftest():
     """스스로 만든 보기 교재로 변환기가 제대로 도는지 본다 (CI)."""
@@ -444,7 +554,37 @@ def selftest():
         for w in want:
             if not any(w in i for i in bad['issues']):
                 fails.append(f'흠을 못 잡았어요: {w} — {bad["issues"]}')
-    print('\n'.join(fails) if fails else f'text_book selftest ok ({3} 문항 · 1 지문)')
+    # 과학 교재 (보기 ㄱㄴㄷ 합답형 · 교과 과목 고르기)
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, '보기 과학 01회차')
+        os.makedirs(folder)
+        for name, body in (('정보.txt', SELFTEST_SCI_INFO), ('문항.txt', SELFTEST_SCI_ITEMS)):
+            with open(os.path.join(folder, name), 'w', encoding='utf-8') as f:
+                f.write(body)
+        rep = build(folder, os.path.join(tmp, 'out'))
+        eq(rep['issues'], [], '과학 교재도 흠 없이 변환')
+        eq(rep['box'], 1, '보기 합답형 수')
+        with gzip.open(rep['file']) as f:
+            c = json.loads(f.read().decode('utf-8'))['courses'][0]
+        eq(c['subjectId'], 'earth1', '앱에 있는 지구과학Ⅰ 과목으로 들어간다')
+        eq(c['group'], 'sci', '교과군')
+        eq(c['grades'], ['고2', '고3', 'N수'], '대상 학년 (안 적으면 과학 기본값)')
+        eq(c['track'], '수능', '시험')
+        eq(c['units'], ['고체 지구', '대기와 해양'], '단원 순서')
+        ps = {p['id']: p for p in c['problems']}
+        solid = ps[rep['id'] + '-solid-01']
+        eq(len(solid['boxItems']), 3, '보기 세 줄')
+        eq(solid['boxItems'][1], 'ㄴ. 둘째 것은 틀리다.', '보기 머리 글자는 남긴다')
+        eq(len(solid['choices']), 5, '선택지 5개')
+        eq(solid['choices'][2], 'ㄱ, ㄷ', '합답형 선택지')
+        eq(solid['answer'], '3', '정답은 번호')
+        eq(solid['hint'], '순서대로 발전하였다.', '힌트')
+        assert '<보기>' in solid['stem'], '문제 글은 그대로'
+        # 한글이 떨어져 나가는 번호도 서로 갈린다 ('해양 지각-01' → sea-per-01 은 안 된다)
+        sea = [i for i in ps if i.endswith('-01') and 'solid' not in i]
+        eq(len(sea), 1, '둘째 문항 id')
+
+    print('\n'.join(fails) if fails else 'text_book selftest ok (인적성 3문항 · 지문 1 / 과학 2문항 · 보기 1)')
     return 1 if fails else 0
 
 

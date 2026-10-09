@@ -122,8 +122,12 @@
 
 TeX 원문 교재는 `python3 tools/tex_book.py <교재 폴더> <출력 폴더> [--preview]` 로
 `<id>.pulinote` (gzip JSON `{format:"pulinote-bundle", version:1, id, title, courses:[과목 파일 형식], workbooks:[문제집]}`) 를 만든다.
-TeX 원본이 없는 자료(인적성·NCS 등)는 `python3 tools/text_book.py <교재 폴더> <출력 폴더>` 로 만든다.
+TeX 원본이 없는 자료(인적성·NCS, 직접 쓴 교과 문항)는
+`python3 tools/text_book.py <교재 폴더> <출력 폴더>` 로 만든다.
 교재 폴더는 `정보.txt` (머리말) + `문항.txt` (`#문항`/`#지문` 토막) + `그림/*.svg` 이고,
+문항 토막은 `키: 값` 머리말(과목·영역·유형·형식·정답·난이도·배점·지문·목차·머리표·출처·단위·힌트)과
+`[문제] [보기] [선택지] [해설]` 구역으로 되어 있다 (`[보기]` 의 `ㄱ. ㄴ. ㄷ.` 줄 → `boxItems`,
+`과목`·`영역` 으로 앱 과목을 고른다 — `tools/text_book.py` 의 `COURSES`),
 `python3 tools/text_book.py check <교재 폴더>` 는 변환하지 않고 빠진 정답·어긋난 선택지만 알려 준다
 (`selftest` 는 지어낸 보기 교재로 변환기를 시험한다 — CI 가 돌린다).
 
