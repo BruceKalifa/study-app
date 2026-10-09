@@ -62,6 +62,7 @@ class ProblemSheet extends StatelessWidget {
     this.serif = true,
     this.passage,
     this.passageLabel,
+    this.pageShare = 1,
   });
 
   /// 지문형: the passage printed with the question (left column in landscape, on top in portrait).
@@ -69,6 +70,10 @@ class ProblemSheet extends StatelessWidget {
 
   /// e.g. "[1~3] 다음 글을 읽고 물음에 답하시오."
   final String? passageLabel;
+
+  /// 종이 너비 중 이 문제지가 차지하는 몫 (세로 화면: 0.5 — 왼쪽 절반에 문제, 오른쪽 절반은 풀이 공간).
+  /// 글자 크기는 그대로고 문제지만 그만큼 좁게 놓인다.
+  final double pageShare;
 
   final Problem problem;
   final int number;
@@ -113,7 +118,7 @@ class ProblemSheet extends StatelessWidget {
     // laid out wider and scaled down to the page width; [keys.root] stays in page coordinates
     return SizedBox(
       key: keys.root,
-      width: 1000,
+      width: 1000 * pageShare,
       child: FittedBox(
         fit: BoxFit.fitWidth,
         alignment: Alignment.topLeft,

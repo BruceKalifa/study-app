@@ -132,8 +132,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   /// 세로 화면(지문형): 태블릿을 채우고도 남을 만큼 긴 종이 (더 쓰면 autoExtend 가 늘린다).
   static const double _portraitPageHeight = 2200;
 
-  /// 세로 화면(그 밖의 문항): 가로 화면과 같은 두 단 종이 — 왼쪽이 문제, 오른쪽이 풀이 공간이고 화면에는
-  /// 처음 왼쪽 단만 꽉 차게 보인다. 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다.
+  /// 세로 화면(그 밖의 문항): 종이를 가로로 길게 — 왼쪽 절반에 문제(예전 그대로의 크기), 오른쪽 절반은 빈 풀이 공간.
+  /// 화면에는 처음 문제만 꽉 차게 보이고, 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다. 경계선은 없다.
   static const double _portraitSplitPageHeight = 1700;
 
   /// 세로 화면에서 두 단 종이를 쓰나 (지문형은 지문이 길어 예전처럼 위아래).
@@ -636,13 +636,14 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final answer = _answers[_index];
 
     // 가로 화면은 시험지처럼 두 단: 왼쪽이 문제, 오른쪽이 풀이 공간.
-    // 세로 화면도 같은 두 단 종이를 쓰되, 화면 너비의 두 배 종이를 그리고 처음엔 왼쪽 단만 보인다 (오른쪽으로 넘기면 풀이 공간).
-    final zoom = (950 / (split ? 2 * mq.size.width : mq.size.width)).clamp(0.45, 1.0);
-    final twoColumns = landscape || split;
-    final columnFraction = twoColumns ? 0.44 : 1.0;
+    // 세로 화면은 문제를 예전 그대로(화면 너비) 놓고, 풀이 공간은 그 오른쪽에 가로로 이어 붙인다 —
+    // 처음엔 문제만 화면에 꽉 차게 보이고, 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다. 경계선은 없다.
+    final zoom = (950 / mq.size.width).clamp(0.45, 1.0);
+    final columnFraction = landscape ? 0.44 : 1.0;
     // 단 경계선의 페이지 좌표 (ProblemSheet 의 안쪽 여백 64 · 줄 너비 = 1000/zoom − 128 과 맞춘다)
-    final ruleX = twoColumns ? 64 * zoom + (1000 - 128 * zoom) * columnFraction + 22 : null;
-    final initialZoom = split ? (1000 / (ruleX! + 16)).clamp(1.0, 2.6) : 1.0;
+    final ruleX = landscape ? 64 * zoom + (1000 - 128 * zoom) * columnFraction + 22 : null;
+    final pageShare = split ? 0.5 : 1.0;
+    final initialZoom = split ? 2.0 : 1.0;
 
     final passage = app.bank.passageOf(p);
     String? passageLabel;
@@ -673,6 +674,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       // the page always spans the screen width; keep print the same size on screen as in portrait
       zoom: zoom,
       columnFraction: columnFraction,
+      pageShare: pageShare,
       serif: app.settings.examFont,
     );
 
