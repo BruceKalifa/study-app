@@ -542,8 +542,8 @@ const server = http.createServer((req, res) => {
   if (booksApi.handle(req, res, reqUrl)) return;
   // 문제 콘텐츠 API (앱 다운로드용 /api/content/…, 출제 웹용 /api/admin/…)
   if (contentApi.handle(req, res, reqUrl)) return;
-  if (urlPath === '/admin') {
-    res.writeHead(301, { Location: '/admin/' + (reqUrl.search || '') }).end();
+  if (urlPath === '/admin' || urlPath === '/books') {
+    res.writeHead(301, { Location: `${urlPath}/${reqUrl.search || ''}` }).end();
     return;
   }
 
@@ -555,6 +555,7 @@ const server = http.createServer((req, res) => {
       wsUrls: ips.map((ip) => `ws://${ip}:${PORT}/ws`),
       teacherUrls: ips.map((ip) => `http://${ip}:${PORT}/`),
       adminUrls: ips.map((ip) => `http://${ip}:${PORT}/admin`), // 추가: 출제 도구 주소
+      bookUrls: ips.map((ip) => `http://${ip}:${PORT}/books`), // 교재 창고 (교재 올리기)
       students: students.size,
       online: Array.from(students.values()).filter((s) => s.online).length,
     });

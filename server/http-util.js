@@ -90,6 +90,6 @@ function firstGrapheme(s) {
   return Array.from(s)[0] || '';
 }
 
-const GRADES = ['고1', '고2', '고3', 'N수'];
+const GRADES = ['고1', '고2', '고3', 'N수', '취준'];
 
 module.exports = { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, firstGrapheme, GRADES };

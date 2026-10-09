@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>풀이노트 · 교재 창고</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231B2A4A'/%3E%3Cpath d='M9 9h8a3 3 0 013 3v12a3 3 0 00-3-3H9z' fill='none' stroke='%23FF6B4A' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="books.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">
+      <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M9 9h8a3 3 0 013 3v12a3 3 0 00-3-3H9z" fill="none" stroke="#FF6B4A" stroke-width="2.2" stroke-linejoin="round"/></svg>
+      풀이노트 <b>교재 창고</b>
+    </span>
+    <span class="who" id="who" hidden>
+      <span id="whoName"></span>
+      <button class="ghost" id="logout" type="button">로그아웃</button>
+    </span>
+  </header>
+
+  <!-- 로그인 -->
+  <main class="pane" id="loginPane">
+    <form class="card login" id="loginForm" autocomplete="on">
+      <h1>선생님 로그인</h1>
+      <p class="muted">앱에서 쓰는 선생님 아이디로 들어옵니다. 올린 교재는 연결된 학생의 앱이 받아 갑니다.</p>
+      <label>아이디
+        <input id="loginId" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <label>비밀번호
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="loginError" hidden></p>
+      <button class="primary" type="submit" id="loginBtn">들어가기</button>
+    </form>
+  </main>
+
+  <!-- 교재 창고 -->
+  <main class="pane" id="booksPane" hidden>
+    <section class="card drop" id="drop">
+      <input type="file" id="file" accept=".pulinote,application/gzip" multiple hidden>
+      <div class="drop-art" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="44" height="44"><path d="M24 32V10m0 0l-7 7m7-7l7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30v6a4 4 0 004 4h24a4 4 0 004-4v-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+      </div>
+      <h2>교재 파일을 여기에 끌어다 놓으세요</h2>
+      <p class="muted"><code>.pulinote</code> 파일 · 한 번에 여러 개 · 한 파일 40MB까지</p>
+      <button class="primary" type="button" id="pick">파일 고르기</button>
+      <label class="check"><input type="checkbox" id="openAll" checked> 올리면서 바로 모든 학생에게 열기</label>
+    </section>
+
+    <section class="log" id="log" hidden></section>
+
+    <section class="list-head">
+      <h2>올라와 있는 교재 <span class="count" id="count"></span></h2>
+      <button class="ghost" type="button" id="refresh">다시 읽기</button>
+    </section>
+    <section id="list" class="list"></section>
+    <p class="empty" id="empty" hidden>아직 올린 교재가 없습니다.</p>
+  </main>
+
+  <template id="rowTpl">
+    <article class="row">
+      <div class="row-main">
+        <h3 class="row-title"></h3>
+        <p class="row-meta muted"></p>
+        <p class="row-titles muted" hidden></p>
+      </div>
+      <div class="row-side">
+        <label class="switch"><input type="checkbox" class="row-open"> <span>모두에게 열기</span></label>
+        <div class="row-students" hidden>
+          <p class="muted">받을 학생 고르기</p>
+          <div class="chips"></div>
+        </div>
+        <button class="danger ghost row-del" type="button">지우기</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="books.js"></script>
+</body>
+</html>
