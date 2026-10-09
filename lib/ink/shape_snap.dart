@@ -63,6 +63,19 @@ SnappedShape? snapShape(List<InkPoint> pts, {double minSize = 26}) {
   final closed = chord < pathLen * 0.22 || chord < box.longestSide * 0.3;
   final center = Offset(box.center.dx, box.center.dy);
 
+  // ── 다각형 (삼각형·사각형) ──
+  // 어디서 그리기 시작했든(꼭짓점이든 변 한가운데든) 같은 도형이 나와야 한다.
+  final tol = math.max(4.0, box.longestSide * 0.055);
+  if (closed) {
+    final cs = _polygonCorners(pts, tol: tol, perimeter: pathLen);
+    if (cs != null && cs.length == 3) {
+      return SnappedShape(ShapeKind.triangle, poly(_levelPolygon(_rightAngleTriangle(cs)), close: true));
+    }
+    if (cs != null && cs.length == 4) {
+      final (quad, kind) = _tidyQuad(cs);
+      return SnappedShape(kind, poly(quad, close: true));
+    }
+  }
   // ── 원 · 타원 (닫힌 획 중 모서리가 없고 반지름이 고른 것) ──
   if (closed && pathLen > box.longestSide * 2.2) {
     final rs = [for (final p in pts) (p.offset - center).distance];
@@ -90,19 +103,6 @@ SnappedShape? snapShape(List<InkPoint> pts, {double minSize = 26}) {
     }
   }
 
-  // ── 다각형 (삼각형·사각형) ──
-  // 어디서 그리기 시작했든(꼭짓점이든 변 한가운데든) 같은 도형이 나와야 한다.
-  final tol = math.max(4.0, box.longestSide * 0.055);
-  if (closed) {
-    final cs = _polygonCorners(pts, tol: tol, perimeter: pathLen);
-    if (cs != null && cs.length == 3) {
-      return SnappedShape(ShapeKind.triangle, poly(_levelPolygon(_rightAngleTriangle(cs)), close: true));
-    }
-    if (cs != null && cs.length == 4) {
-      final (quad, kind) = _tidyQuad(cs);
-      return SnappedShape(kind, poly(quad, close: true));
-    }
-  }
   final corners = _corners(pts, tol: tol);
   if (!closed && corners.length == 3) {
     // ㄱ자 꺾은선은 그대로 두고, 직각에 가까우면 모서리만 깎아 준다
@@ -302,7 +302,7 @@ List<Offset>? _polygonCorners(List<InkPoint> pts, {required double tol, required
   }
   // 고른 꼭짓점을 이은 도형이 손으로 그린 획과 많이 다르면 도형으로 보지 않는다
   for (final p in os) {
-    if (_distToPolygon(p, v) > tol * 3) return null;
+    if (_distToPolygon(p, v) > tol * 2) return null;
   }
   return v;
 }
