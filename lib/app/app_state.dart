@@ -787,7 +787,6 @@ class AppState extends ChangeNotifier {
       learner.examDate = d.millisecondsSinceEpoch;
       learner.examName = goal == '내신' ? '기말고사' : '수능';
     }
-    if (learner.trialStartedAt == 0) learner.trialStartedAt = _now;
     _daily = null; // rebuild today's set for the new books
     _configureLive();
     _changed();
@@ -806,27 +805,6 @@ class AppState extends ChangeNotifier {
     final t = DateTime.fromMillisecondsSinceEpoch(learner.examDate);
     final n = DateTime.now();
     return DateTime(t.year, t.month, t.day).difference(DateTime(n.year, n.month, n.day)).inDays;
-  }
-
-  // ------------------------------------------------------------ subscription (결제 연동 전)
-  static const int trialDays = 7;
-  bool get subscribed => learner.plan.isNotEmpty;
-  int get trialDaysLeft {
-    if (learner.trialStartedAt == 0) return trialDays;
-    final used = (_now - learner.trialStartedAt) ~/ Duration.millisecondsPerDay;
-    return math.max(0, trialDays - used);
-  }
-
-  void subscribe(String plan) {
-    learner
-      ..plan = plan
-      ..subscribedAt = _now;
-    _changed();
-  }
-
-  void cancelSubscription() {
-    learner.plan = '';
-    _changed();
   }
 
   // ------------------------------------------------------------ 매일 오답 변형 세트
@@ -1144,9 +1122,16 @@ class AppState extends ChangeNotifier {
     required String name,
     String grade = '',
     List<String> grades = const <String>[],
+    String teacherCode = '',
   }) async {
-    final (token, info) = await AccountApi(server)
-        .signup(role: role, loginId: loginId.trim(), password: password, name: name.trim(), grade: grade, grades: grades);
+    final (token, info) = await AccountApi(server).signup(
+        role: role,
+        loginId: loginId.trim(),
+        password: password,
+        name: name.trim(),
+        grade: grade,
+        grades: grades,
+        teacherCode: teacherCode);
     await _signIn(server: server, token: token, info: info, fresh: true, grade: grade, grades: grades);
   }
 

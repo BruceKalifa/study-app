@@ -4,7 +4,7 @@
  *
  *  인증:  Authorization: Bearer <token>   (로그인/가입 응답의 token)
  *
- *    POST   /api/auth/signup         { role: student|teacher, loginId, password, name, grade? }
+ *    POST   /api/auth/signup         { role: student|teacher, loginId, password, name, grade?, teacherCode? (선생님만) }
  *    POST   /api/auth/login          { loginId, password }
  *    POST   /api/auth/logout
  *    GET    /api/me
@@ -279,10 +279,24 @@ function createAccountsApi({ dataDir, log, seedFile }) {
   }
 
   // ── 가입 · 로그인 ──
+  // 선생님 계정은 승인된 사람만: 환경변수 TEACHER_SIGNUP_CODE 와 같은 코드를 내야 한다.
+  // 코드를 정해 두지 않았으면 선생님 가입은 닫혀 있다 (학생 가입은 항상 열림).
+  function checkTeacherCode(given, req) {
+    const want = (process.env.TEACHER_SIGNUP_CODE || '').trim();
+    if (!want) throw new HttpError(403, '선생님 계정은 승인된 분만 만들 수 있어요');
+    const a = crypto.createHash('sha256').update(String(typeof given === 'string' ? given.trim() : '')).digest();
+    const c = crypto.createHash('sha256').update(want).digest();
+    if (!crypto.timingSafeEqual(a, c)) {
+      checkSignupRate(req.socket.remoteAddress || ''); // 코드 대입 공격 방지: 틀릴 때도 횟수를 센다
+      throw new HttpError(403, '승인 코드가 맞지 않아요');
+    }
+  }
+
   async function signup(req) {
     const b = await readJson(req, 16 * 1024);
     const role = typeof b.role === 'string' ? b.role.trim() : '';
     if (!ROLES.includes(role)) throw new HttpError(400, '학생 또는 선생님을 골라 주세요');
+    if (role === 'teacher') checkTeacherCode(b.teacherCode, req);
     const loginId = normLoginId(b.loginId);
     if (!LOGIN_RE.test(loginId)) throw new HttpError(400, '아이디는 영문 소문자·숫자로 시작하는 4~20자(영문·숫자·. _ -)여야 합니다');
     const password = needPassword(b.password);

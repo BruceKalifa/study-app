@@ -22,3 +22,7 @@ services:
         value: /var/data/content
       - key: TZ_OFFSET_MIN
         value: "540"
+      # 선생님 계정 가입 승인 코드 — Render 대시보드(Environment)에서 값을 직접 넣는다.
+      # 비워 두면 선생님 가입은 닫힌다 (학생 가입은 항상 열림).
+      - key: TEACHER_SIGNUP_CODE
+        sync: false

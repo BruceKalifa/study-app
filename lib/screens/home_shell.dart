@@ -11,7 +11,6 @@ import 'library_screen.dart';
 import 'onboarding_screen.dart';
 import 'planner_screen.dart';
 import 'questions_screen.dart';
-import 'subscription_screen.dart';
 import 'scratch_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
@@ -44,7 +43,6 @@ class HomeShellState extends State<HomeShell> {
     _Dest(Icons.history_rounded, Icons.history_rounded, '기록'),
     _Dest(Icons.draw_outlined, Icons.draw_rounded, '연습장'),
     _Dest(Icons.edit_note_outlined, Icons.edit_note_rounded, '내 문제'),
-    _Dest(Icons.workspace_premium_outlined, Icons.workspace_premium_rounded, '구독'),
     _Dest(Icons.settings_outlined, Icons.settings_rounded, '설정'),
   ];
 
@@ -72,8 +70,6 @@ class HomeShellState extends State<HomeShell> {
         return const ScratchScreen();
       case 9:
         return const EditorScreen();
-      case 10:
-        return const SubscriptionScreen();
       default:
         return const SettingsScreen();
     }

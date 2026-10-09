@@ -477,6 +477,7 @@ class AccountApi {
     required String name,
     String grade = '',
     List<String> grades = const <String>[],
+    String teacherCode = '',
   }) async {
     final d = await _req('POST', '/api/auth/signup', body: {
       'role': role,
@@ -485,6 +486,7 @@ class AccountApi {
       'name': name,
       'grade': grades.isNotEmpty ? grades.first : grade,
       if (grades.isNotEmpty) 'grades': grades,
+      if (teacherCode.trim().isNotEmpty) 'teacherCode': teacherCode.trim(),
     });
     return (_s(d['token']), MeInfo.fromJson(d));
   }

@@ -57,12 +57,6 @@ class DashboardScreen extends StatelessWidget {
             child: Pill('선생님 답변 ${app.unreadAnswers}개', icon: Icons.mark_chat_unread_rounded, color: AppColors.correct),
           ),
         if (app.streak > 0) Pill('${app.streak}일 연속', icon: Icons.local_fire_department_rounded, color: AppColors.accent),
-        if (!app.subscribed)
-          InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () => onNavigate(10),
-            child: Pill('무료 체험 ${app.trialDaysLeft}일 남음', icon: Icons.workspace_premium_rounded, color: AppColors.blue),
-          ),
         if (l.examDate > 0) _DdayBadge(name: l.examName, dday: dday, onTap: () => onNavigate(3)),
       ];
       return ListView(

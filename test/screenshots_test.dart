@@ -171,7 +171,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
   final png = (await tester.runAsync(_samplePagePng))!;
   final bank = (await tester.runAsync(() => ProblemBank.load(fixtureBundle)))!;
   final setup = await tester.runAsync(() async {
-    final (tToken, tMe) = await AccountApi(server).signup(role: 'teacher', loginId: 'shot$stamp', password: 'teach-pass', name: '우네');
+    final (tToken, tMe) = await AccountApi(server).signup(role: 'teacher', loginId: 'shot$stamp', password: 'teach-pass', name: '우네', teacherCode: 'ci-teacher-code');
     final students = <(String, String)>[];
     final rnd = math.Random(7);
     for (final (i, (name, grade)) in [('오예진', '고3'), ('김선주', '고2'), ('박민수', '고3'), ('이서연', 'N수')].indexed) {
@@ -408,7 +408,7 @@ void main() {
     }
 
     // 2..11 tabs
-    const tabs = ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정'];
+    const tabs = ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '설정'];
     for (var i = 0; i < tabs.length; i++) {
       await tester.ensureVisible(find.text(tabs[i]).first);
       await tester.pump();
@@ -430,7 +430,7 @@ void main() {
         await _write(tester, c + const Offset(150, 140), _wave());
       }
       await _shot(tester,
-          '${(i + 2).toString().padLeft(2, '0')}_${['shelf', 'wrongnote', 'planner', 'questions_offline', 'community', 'stats', 'history', 'scratch', 'editor', 'subscription', 'settings'][i]}');
+          '${(i + 2).toString().padLeft(2, '0')}_${['shelf', 'wrongnote', 'planner', 'questions_offline', 'community', 'stats', 'history', 'scratch', 'editor', 'settings'][i]}');
     }
 
     // onboarding (fresh learner)

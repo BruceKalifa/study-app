@@ -18,6 +18,8 @@ const SEED_DIR = path.join(SERVER_DIR, '..', 'assets', 'problems');
 const KEEP = process.argv.includes('--keep');
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
+/** 테스트 서버의 선생님 가입 승인 코드 */
+const TC = 'test-teacher-code';
 let passed = 0;
 let failed = 0;
 function ok(cond, label, extra) {
@@ -83,8 +85,27 @@ function attempt(id, pid, ok, at, extra) {
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pulinote-accounts-test-'));
   const DATA_DIR = path.join(tmp, 'data');
-  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR, ADMIN_KEY: 'k-1234', SEED_DIR };
+  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR, ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC };
   console.log(`임시 폴더: ${tmp}`);
+
+  // ───────── 선생님 가입은 승인된 사람만 ─────────
+  section('선생님 가입 승인 코드');
+  const closed = { CONTENT_DIR: path.join(tmp, 'content0'), DATA_DIR: path.join(tmp, 'data0'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: '' };
+  await startServer(closed);
+  let q = await post('/api/auth/signup', { role: 'teacher', loginId: 'closed.t', password: 'teach-pass', name: '선생', teacherCode: 'anything' });
+  ok(q.status === 403 && isKo(q), '승인 코드를 정해 두지 않으면 선생님 가입은 닫혀 있다', q.json);
+  q = await post('/api/auth/signup', { role: 'student', loginId: 'closed.s', password: 'stud-pass', name: '학생', grade: '고3' });
+  ok(q.status === 200, '그래도 학생 가입은 열려 있다', q.json);
+  await stopServer();
+  await startServer(Object.assign({}, closed, { TEACHER_SIGNUP_CODE: 'secret-code' }));
+  q = await post('/api/auth/signup', { role: 'teacher', loginId: 'closed.t', password: 'teach-pass', name: '선생' });
+  ok(q.status === 403 && isKo(q), '코드를 안 내면 403', q.json);
+  q = await post('/api/auth/signup', { role: 'teacher', loginId: 'closed.t', password: 'teach-pass', name: '선생', teacherCode: 'wrong' });
+  ok(q.status === 403 && isKo(q), '코드가 틀리면 403', q.json);
+  q = await post('/api/auth/signup', { role: 'teacher', loginId: 'closed.t', password: 'teach-pass', name: '선생', teacherCode: ' secret-code ' });
+  ok(q.status === 200 && q.json.user.role === 'teacher', '맞는 코드면 가입 (앞뒤 공백 무시)', q.json);
+  await stopServer();
+
   await startServer(env);
 
   // ───────── 가입 ─────────
@@ -102,14 +123,14 @@ async function main() {
   r = await post('/api/auth/signup', { role: 'student', loginId: 'yejin01', password: '123456', name: '오예진', grade: '중3' });
   ok(r.status === 400, '고등 외 학년이면 400');
 
-  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'Teacher.Une', password: 'phys-pass-1', name: '우네 선생님' });
+  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'Teacher.Une', password: 'phys-pass-1', name: '우네 선생님', teacherCode: TC });
   ok(r.status === 200 && r.json.token && r.json.user.role === 'teacher', '선생님 가입', r.json);
   ok(r.json.user.loginId === 'teacher.une', '아이디는 소문자로 저장');
   ok(/^[A-HJ-NP-Z2-9]{6}$/.test(r.json.inviteCode || ''), '선생님은 6자리 초대 코드를 받는다', r.json.inviteCode);
   ok(!('passHash' in r.json.user) && !('salt' in r.json.user), '응답에 비밀번호 해시 없음');
   const T = { token: r.json.token, id: r.json.user.id, code: r.json.inviteCode };
 
-  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'other.t', password: 'other-pass', name: '김선생' });
+  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'other.t', password: 'other-pass', name: '김선생', teacherCode: TC });
   const T2 = { token: r.json.token, id: r.json.user.id, code: r.json.inviteCode };
   ok(T2.code !== T.code, '초대 코드는 선생님마다 다르다');
 

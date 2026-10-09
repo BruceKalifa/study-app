@@ -24,10 +24,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   final _pw = TextEditingController();
   final _pw2 = TextEditingController();
   final _name = TextEditingController();
+  final _code = TextEditingController();
 
   @override
   void dispose() {
-    for (final c in [_id, _pw, _pw2, _name]) {
+    for (final c in [_id, _pw, _pw2, _name, _code]) {
       c.dispose();
     }
     super.dispose();
@@ -43,6 +44,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       err = '이름을 입력하세요';
     } else if (_signup && _pw.text != _pw2.text) {
       err = '비밀번호 확인이 맞지 않아요';
+    } else if (_signup && _role == 'teacher' && _code.text.trim().isEmpty) {
+      err = '승인 코드를 입력하세요';
     } else if (_signup && _role == 'student' && _grades.isEmpty) {
       err = '학년·과정을 하나 이상 골라 주세요';
     }
@@ -64,6 +67,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           name: _name.text,
           grade: _role == 'student' ? (_grades.firstOrNull ?? '') : '',
           grades: _role == 'student' ? List<String>.of(_grades) : const <String>[],
+          teacherCode: _role == 'teacher' ? _code.text : '',
         );
       } else {
         await app.login(server: server, loginId: _id.text, password: _pw.text);
@@ -240,6 +244,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           obscureText: true,
           decoration: const InputDecoration(labelText: '비밀번호 확인', prefixIcon: Icon(Icons.lock_outline_rounded)),
         ),
+        if (teacher) ...[
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('auth-teacher-code'),
+            controller: _code,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: const InputDecoration(
+              labelText: '승인 코드',
+              helperText: '정식 출시 전에는 승인받은 선생님만 가입할 수 있어요',
+              prefixIcon: Icon(Icons.verified_user_outlined),
+            ),
+          ),
+        ],
         if (!teacher) ...[
           const SizedBox(height: 16),
           const Text('학년·과정', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),

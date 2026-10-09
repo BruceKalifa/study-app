@@ -1,4 +1,4 @@
-/// Learner profile and study-management records (학년·목표·과목·문제집, 구독, 매일 세트,
+/// Learner profile and study-management records (학년·목표·과목·문제집, 매일 세트,
 /// 순공 시간, 할 일, 모의고사 성적). Stored per profile in state.json under "learner".
 library;
 
@@ -41,11 +41,6 @@ class Learner {
   String examName;
   int examDate; // ms since epoch (local midnight)
 
-  // subscription (결제 연동 전: 체험 상태만 관리)
-  int trialStartedAt;
-  String plan; // '' | monthly | yearly
-  int subscribedAt;
-
   /// 커뮤니티 닉네임 ('' → 가린 이름 "오XX")
   String nickname;
 
@@ -61,9 +56,6 @@ class Learner {
     List<String>? workbooks,
     this.examName = '수능',
     this.examDate = 0,
-    this.trialStartedAt = 0,
-    this.plan = '',
-    this.subscribedAt = 0,
     this.nickname = '',
     this.rankingOptIn = true,
   })  : grades = (grades == null || grades.isEmpty) ? <String>[grade] : List<String>.of(grades),
@@ -94,9 +86,6 @@ class Learner {
         'workbooks': workbooks,
         'examName': examName,
         'examDate': examDate,
-        'trial': trialStartedAt,
-        'plan': plan,
-        'subAt': subscribedAt,
         'nick': nickname,
         'rank': rankingOptIn,
       };
@@ -112,9 +101,6 @@ class Learner {
         workbooks: _ls(j['workbooks']),
         examName: _s(j['examName'], '수능'),
         examDate: _i(j['examDate']),
-        trialStartedAt: _i(j['trial']),
-        plan: _s(j['plan']),
-        subscribedAt: _i(j['subAt']),
         nickname: _s(j['nick']),
         rankingOptIn: j['rank'] != false,
     );

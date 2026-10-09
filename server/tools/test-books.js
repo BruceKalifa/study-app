@@ -16,6 +16,8 @@ const { spawn } = require('child_process');
 const SERVER_DIR = path.join(__dirname, '..');
 const SEED_DIR = path.join(SERVER_DIR, '..', 'assets', 'problems');
 
+/** 테스트 서버의 선생님 가입 승인 코드 */
+const TC = 'test-teacher-code';
 let passed = 0;
 let failed = 0;
 function ok(cond, label, extra) {
@@ -103,15 +105,15 @@ const gz = (obj) => zlib.gzipSync(Buffer.from(JSON.stringify(obj), 'utf8'));
 
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pulinote-books-test-'));
-  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR: path.join(tmp, 'data'), ADMIN_KEY: 'k-1234', SEED_DIR };
+  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR: path.join(tmp, 'data'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC };
   console.log(`임시 폴더: ${tmp}`);
   await startServer(env);
 
   // ───────── 계정 ─────────
   section('계정 준비');
-  let r = await post('/api/auth/signup', { role: 'teacher', loginId: 'book.teacher', password: 'teach-pass-1', name: '우네 선생님' });
+  let r = await post('/api/auth/signup', { role: 'teacher', loginId: 'book.teacher', password: 'teach-pass-1', name: '우네 선생님', teacherCode: TC });
   const T = { token: r.json.token, id: r.json.user.id, code: r.json.inviteCode };
-  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'other.teacher', password: 'teach-pass-2', name: '김선생' });
+  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'other.teacher', password: 'teach-pass-2', name: '김선생', teacherCode: TC });
   const T2 = { token: r.json.token, id: r.json.user.id };
   r = await post('/api/auth/signup', { role: 'student', loginId: 'mine.student', password: 'stu-pass-1', name: '내 학생', grade: '고3' });
   const S = { token: r.json.token, id: r.json.user.id };

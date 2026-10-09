@@ -141,7 +141,7 @@ void main() {
     await tester.pumpWidget(_app(s!));
     await tester.pump(const Duration(seconds: 1));
     expect(find.byKey(const Key('daily-start')), findsOneWidget);
-    for (final tab in ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '구독', '설정', '홈']) {
+    for (final tab in ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '설정', '홈']) {
       await tester.ensureVisible(find.text(tab).first); // the rail comes first (and scrolls)
       await tester.pump();
       await tester.tap(find.text(tab).first);
@@ -405,7 +405,6 @@ void main() {
     final mine = {for (final p in s.myProblems) p.id};
     expect(s.dailySet.problemIds, isNotEmpty);
     expect(s.dailyProblems.every((p) => mine.contains(p.id)), isTrue, reason: '내 교재 문제만');
-    expect(s.trialDaysLeft, AppState.trialDays);
     expect(tester.takeException(), isNull);
   });
 
@@ -486,6 +485,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('auth-name')), findsOneWidget);
     expect(find.byKey(const Key('auth-grade-고3')), findsNothing, reason: '선생님은 학년 없음');
+    expect(find.byKey(const Key('auth-teacher-code')), findsOneWidget, reason: '선생님 가입에는 승인 코드');
+    await tester.enterText(find.byKey(const Key('auth-name')), '우네');
+    await tester.enterText(find.byKey(const Key('auth-id')), 'une.new');
+    await tester.enterText(find.byKey(const Key('auth-pw')), 'secret-1');
+    await tester.enterText(find.byKey(const Key('auth-pw2')), 'secret-1');
+    await tester.tap(find.byKey(const Key('auth-submit')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('승인 코드를 입력하세요'), findsOneWidget);
     await tester.tap(find.byKey(const Key('welcome-back')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -1103,7 +1110,7 @@ void main() {
       final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
       // 선생님 (API 로 바로 가입)
       final (tToken, tMe) = await AccountApi(server!)
-          .signup(role: 'teacher', loginId: 't$stamp', password: 'teach-pass', name: '우네 선생님');
+          .signup(role: 'teacher', loginId: 't$stamp', password: 'teach-pass', name: '우네 선생님', teacherCode: 'ci-teacher-code');
       final teacher = AccountApi(server, tToken);
       expect(tMe.inviteCode, hasLength(6));
 

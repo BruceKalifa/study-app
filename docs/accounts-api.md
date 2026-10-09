@@ -10,12 +10,14 @@
 
 | 요청 | 본문 | 응답 |
 |---|---|---|
-| `POST /api/auth/signup` | `{ role: "student"\|"teacher", loginId, password, name, grade? }` | `{ token, user, communityKey, counts, inviteCode? \| teachers? }` |
+| `POST /api/auth/signup` | `{ role: "student"\|"teacher", loginId, password, name, grade?, teacherCode? }` | `{ token, user, communityKey, counts, inviteCode? \| teachers? }` |
 | `POST /api/auth/login` | `{ loginId, password }` | 위와 같음 |
 | `POST /api/auth/logout` | – | `{ ok }` (이 토큰만 끊김) |
 | `GET /api/me` | – | `{ user, communityKey, counts, inviteCode?, studentCount? \| teachers? }` |
 | `POST /api/me` | `{ name?, grade? }` | `GET /api/me` 와 같음 |
 | `POST /api/me/password` | `{ current, next }` | `{ ok }` (다른 기기의 로그인은 모두 끊김) |
+
+> **선생님 가입은 승인제.** 서버 환경변수 `TEACHER_SIGNUP_CODE` 와 같은 `teacherCode` 를 내야 선생님 계정을 만들 수 있다 (틀리면 403, 환경변수를 안 정했으면 선생님 가입은 닫힘). 학생 가입은 항상 열려 있다. Render 대시보드 → Environment 에서 값을 넣는다.
 
 - `loginId`: 영문 소문자·숫자로 시작하는 4~20자 (영문·숫자·`.`·`_`·`-`). 대소문자는 구분하지 않는다(소문자로 저장). 이미 있으면 409.
 - `password`: 6~100자. `name`: 1~20자. `grades`(학생만): 위 값 중 여러 개를 함께 고를 수 있는 배열 (예: `["한양대","N수","편입"]`, 첫 번째가 대표). 옛 앱은 `grade` 하나만 보내도 된다. 값: `고1 고2 고3 N수 취준 한양대 편입` 또는 빈 값 (`취준` 은 인적성, `한양대` 는 대학 전공 기초, `편입` 은 편입 준비 과정). 응답의 `user.grade` 는 대표 학년, `user.grades` 는 전체다. 선생님 화면에는 `한양대 · N수` 처럼 이어서 보인다.
@@ -154,4 +156,4 @@
 
 - 클라우드 서버 + HTTPS (Render, `render.yaml`).
 - 소셜 로그인(카카오·구글·애플), 비밀번호 찾기(휴대폰·이메일 인증), 선생님 계정 인증.
-- 구독 결제 상태를 계정에 저장.
+- 구독 결제 상태를 계정에 저장 (Play 스토어 출시 때 — 지금은 구독 기능을 뺐다).
