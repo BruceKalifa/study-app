@@ -640,14 +640,27 @@ class PaperPainter extends CustomPainter {
 
     // 시험지처럼 단을 가르는 세로선 — 왼쪽은 문제, 오른쪽은 풀이 공간
     final rx = columnRuleX;
-    if (rx != null && rx > 0 && rx < size.width) {
+    if (rx != null && rx > 0 && rx < size.width - 60) {
       canvas.drawLine(
-        Offset(rx, 24),
+        Offset(rx, 70),
         Offset(rx, size.height - 24),
         Paint()
-          ..color = const Color(0x1A1D2433)
+          ..color = const Color(0x2E1D2433)
           ..strokeWidth = 1.2,
       );
+      final label = TextPainter(
+        text: const TextSpan(
+          text: '풀이',
+          style: TextStyle(
+            color: Color(0x5A1D2433),
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      label.paint(canvas, Offset(rx + 16, 44));
     }
   }
 
