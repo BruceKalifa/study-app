@@ -642,7 +642,7 @@ class PaperPainter extends CustomPainter {
     final rx = columnRuleX;
     if (rx != null && rx > 0 && rx < size.width - 60) {
       canvas.drawLine(
-        Offset(rx, 70),
+        Offset(rx, 108),
         Offset(rx, size.height - 24),
         Paint()
           ..color = const Color(0x2E1D2433)
@@ -652,6 +652,7 @@ class PaperPainter extends CustomPainter {
         text: const TextSpan(
           text: '풀이',
           style: TextStyle(
+            fontFamily: 'Pretendard', // 기본 글꼴에는 한글이 없다
             color: Color(0x5A1D2433),
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -660,7 +661,7 @@ class PaperPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      label.paint(canvas, Offset(rx + 16, 44));
+      label.paint(canvas, Offset(rx + 16, 74)); // 머리글 줄에 맞춘다 (위 도구막대에 가리지 않게)
     }
   }
 
