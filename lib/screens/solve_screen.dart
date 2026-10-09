@@ -320,11 +320,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       if (mounted && _ink == ink) _scheduleRecognize(force: true);
     });
     _fitPageSoon();
-    for (final ms in [300, 900, 2000]) {
-      Future<void>.delayed(Duration(milliseconds: ms), () {
-        if (mounted && _ink == ink) _fitPageToProblem();
-      });
-    }
+
   }
 
   void _onInkChanged() {
