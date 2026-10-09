@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * 교재 창고 API 점검 — 선생님이 올리고, 연결된 학생만 받을 수 있는지 (서버를 직접 띄워서 확인)
+ * 교재 창고 API 점검 — 선생님이 올리고, 공개한 교재는 모든 학생이 · 공개 안 한 교재는 지정된 학생만 받는지 (서버를 직접 띄워서 확인)
  *
  *   npm run test:books
  */
@@ -153,7 +153,7 @@ async function main() {
   ok(r.json.book.problems === 4, '덮어쓴 내용이 반영된다');
 
   // 다른 선생님 교재
-  r = await req('POST', '/api/books', gz(bundle('other01', '남의 교재')), T2.token, true);
+  r = await req('POST', '/api/books?open=0', gz(bundle('other01', '남의 교재')), T2.token, true);
   const BX = r.json.book.id;
 
   // ───────── 목록 ─────────
@@ -167,18 +167,18 @@ async function main() {
   ok(r.json.books.every((b) => b.mine === undefined && b.students === undefined), '학생에게는 공개 설정이 보이지 않는다', r.json.books[0]);
   ok(r.json.books[0].teacher && r.json.books[0].teacher.name === '우네 선생님', '누가 올린 교재인지 보인다');
   r = await get('/api/books', S2.token);
-  ok(r.status === 200 && r.json.books.length === 0, '연결 안 된 학생에게는 아무것도 안 보인다', r.json.books);
+  ok(r.status === 200 && r.json.books.length === 2, '연결 안 된 학생도 공개한 교재는 본다 (공개 안 한 남의 교재는 안 보인다)', r.json.books.map((b) => b.title));
 
   // ───────── 받기 ─────────
   section('내려받기');
   r = await get(`/api/books/${B1}/file`);
   ok(r.status === 401, '로그인 없이 파일 401');
   r = await get(`/api/books/${B1}/file`, S2.token);
-  ok(r.status === 404 && isKo(r), '남의 학생은 파일을 받을 수 없다 (404)');
+  ok(r.status === 200, '연결 안 된 학생도 공개한 교재 파일은 받는다', r.status);
   r = await get(`/api/books/${B1}/file`, T2.token);
   ok(r.status === 404, '다른 선생님도 받을 수 없다');
   r = await get(`/api/books/${BX}/file`, S.token);
-  ok(r.status === 404, '내 선생님이 올린 것이 아니면 받을 수 없다');
+  ok(r.status === 404, '공개하지 않은 남의 교재는 받을 수 없다');
 
   r = await get(`/api/books/${B1}/file`, S.token);
   ok(r.status === 200, '연결된 학생이 파일을 받는다', r.status);

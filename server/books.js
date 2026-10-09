@@ -10,7 +10,8 @@
  *   DELETE /api/books/:id              (올린 선생님) 지우기
  *
  * 교재 내용은 공개 저장소에 두지 않고 여기에만 둔다. 파일은 로그인 없이는 받을 수 없고,
- * 학생은 자기와 연결된 선생님이 올린 교재 중 공개(open)이거나 자기에게 지정된 것만 받는다.
+ * 공개(open)한 교재는 로그인한 학생 누구나 받는다 (선생님과 연결돼 있지 않아도).
+ * 공개하지 않은 교재는 선생님이 지정한(연결된) 학생만 받는다.
  * 저장: DATA_DIR/books.json (목록) + DATA_DIR/books/<id>.pulinote (파일 그대로)
  */
 
@@ -112,8 +113,8 @@ function createBooksApi({ dataDir, accounts, log }) {
     if (!b) return false;
     if (u.id === b.ownerId) return true;
     if (u.role !== 'student') return false;
-    if (!accounts.isLinked(u.id, b.ownerId)) return false;
-    return b.open === true || (Array.isArray(b.students) && b.students.includes(u.id));
+    if (b.open === true) return true; // 모두에게 열기: 연결 여부와 상관없이 모든 학생
+    return accounts.isLinked(u.id, b.ownerId) && Array.isArray(b.students) && b.students.includes(u.id);
   }
   function mine(u, id) {
     const b = byId(id);
