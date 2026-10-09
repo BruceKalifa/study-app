@@ -785,26 +785,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('설정 → 교재 파일 가져오기 → 목록 → 빼기', (tester) async {
+  testWidgets('설정 → 넣어 둔 교재 목록 → 빼기 (가져오기 단추는 없다)', (tester) async {
     _tabletSize(tester);
     final app = (await tester.runAsync(_state))!;
-    BookFilesCard.picker = () async => Uint8List.fromList(sampleBookFile());
-    addTearDown(() => BookFilesCard.picker = BookFiles.pick);
     await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: BookFilesCard()))));
-    await tester.tap(find.byKey(const Key('books-import')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
-    await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('books-msg')), findsOneWidget);
-    expect(find.textContaining('3문항'), findsWidgets);
-    expect(find.byKey(const Key('book-sample-type-01')), findsOneWidget);
-    expect(app.hasWorkbook('sample-type-01'), isTrue);
+    // 파일로 가져오는 길은 없앴다 — 교재는 서버 교재 창고에서만 들어온다
+    expect(find.byKey(const Key('books-import')), findsNothing);
+    expect(find.text('파일 가져오기'), findsNothing);
+    expect(find.byKey(const Key('books-empty')), findsOneWidget);
 
-    BookFilesCard.picker = () async => Uint8List.fromList(utf8.encode('not a book'));
-    await tester.tap(find.byKey(const Key('books-import')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    // 서버에서 받은 교재는 목록에 뜨고, 여기서 뺄 수 있다
+    await tester.runAsync(() => app.importBooks(sampleBookFile()));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('풀이노트 교재 파일이 아니에요'), findsOneWidget);
+    expect(find.byKey(const Key('book-sample-type-01')), findsOneWidget);
+    expect(find.textContaining('3문항'), findsWidgets);
 
     await tester.tap(find.byKey(const Key('book-remove-sample-type-01')));
     await tester.pump(const Duration(milliseconds: 400));

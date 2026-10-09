@@ -239,20 +239,11 @@ class ContentImport {
   }
 }
 
-/// Android file picker / "열기" from other apps (MainActivity, channel `pulinote/files`).
+/// 다른 앱에서 "풀이노트로 열기" (MainActivity, channel `pulinote/files`).
+/// 앱 안에서 파일을 고르는 길은 없앴다 — 교재는 서버 교재 창고에서 받는다.
 class BookFiles {
   BookFiles._();
   static const MethodChannel _ch = MethodChannel('pulinote/files');
-
-  /// Lets the user choose a file; its bytes, or null when cancelled / unsupported.
-  static Future<Uint8List?> pick() async {
-    try {
-      return await _ch.invokeMethod<Uint8List>('pick');
-    } catch (e) {
-      debugPrint('pick: $e');
-      return null;
-    }
-  }
 
   /// A file opened with the app from another app (카카오톡, 내 파일…), once.
   static Future<Uint8List?> takeOpened() async {

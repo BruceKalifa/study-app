@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -128,8 +129,20 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
 
   Problem get _p => _problems[_index];
 
-  /// Enough paper to fill a portrait tablet (and then some) before auto-extend kicks in.
-  static const double _minPageHeight = 2200;
+  /// 세로 화면: 태블릿을 채우고도 남을 만큼 긴 종이 (더 쓰면 autoExtend 가 늘린다).
+  static const double _portraitPageHeight = 2200;
+
+  /// 지문형 문항은 가로에서도 지문이 길어 종이를 넉넉히 둔다.
+  static const double _passagePageHeight = 1200;
+
+  /// 가로 화면: 종이를 화면에 꼭 맞춰 풀이 공간이 문제 **아래**가 아니라 **옆**에 오게 한다.
+  /// (오른쪽 단이 풀이 공간. 더 쓰면 autoExtend 가 아래로 늘려 준다.)
+  double _pageHeightFor(BuildContext context) {
+    final size = MediaQuery.maybeOf(context)?.size;
+    if (size == null || size.width <= size.height * 1.15) return _portraitPageHeight;
+    if (_app.bank.passageOf(_p) != null) return _passagePageHeight;
+    return math.max(620.0, kPageWidth * size.height / size.width);
+  }
   bool get _locked => !_exam && _graded.containsKey(_index);
 
   @override
@@ -161,6 +174,20 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   }
 
   bool _backgrounded = false;
+
+  @override
+  void didChangeMetrics() {
+    // 세로로 돌리면 종이가 더 길어야 한다 (줄이지는 않는다 — 써 둔 글씨가 잘리면 안 되니까)
+    final ink = _ink;
+    if (ink == null || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _ink != ink) return;
+      final want = _pageHeightFor(context);
+      if (ink.pageHeight < want) {
+        setState(() => ink.pageHeight = want);
+      }
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -230,7 +257,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     }
     _recogTimer?.cancel();
     final ink = InkController(settings: _app.ink);
-    ink.pageHeight = _minPageHeight;
+    ink.pageHeight = _pageHeightFor(context);
     ink.committed.addListener(_onInkChanged);
     setState(() {
       _index = i;
@@ -244,7 +271,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final draft = await _app.loadDraft(p.id);
     if (!mounted || _ink != ink) return;
     if (draft != null && ink.isEmpty) ink.load(draft); // never wipe strokes written while loading
-    if (ink.pageHeight < _minPageHeight) ink.pageHeight = _minPageHeight;
+    final want = _pageHeightFor(context);
+    if (ink.pageHeight < want) ink.pageHeight = want;
     final live = _app.live;
     if (live != null) {
       ink.sink = live;
@@ -589,6 +617,12 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final landscape = mq.size.width > mq.size.height * 1.15;
     final answer = _answers[_index];
 
+    // 가로 화면은 시험지처럼 두 단: 왼쪽이 문제, 오른쪽이 풀이 공간
+    final zoom = (950 / mq.size.width).clamp(0.45, 1.0);
+    final columnFraction = landscape ? 0.44 : 1.0;
+    // 단 경계선의 페이지 좌표 (ProblemSheet 의 안쪽 여백 64 · 줄 너비 = 1000/zoom − 128 과 맞춘다)
+    final ruleX = landscape ? 64 * zoom + (1000 - 128 * zoom) * columnFraction + 22 : null;
+
     final passage = app.bank.passageOf(p);
     String? passageLabel;
     if (passage != null) {
@@ -616,8 +650,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       answerNote: _answerNote(app),
       answerBoxEmpty: _boxEmpty,
       // the page always spans the screen width; keep print the same size on screen as in portrait
-      zoom: (950 / mq.size.width).clamp(0.45, 1.0),
-      columnFraction: landscape ? 0.58 : 1.0,
+      zoom: zoom,
+      columnFraction: columnFraction,
       serif: app.settings.examFont,
     );
 
@@ -632,6 +666,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                   controller: ink,
                   onTapPage: _onTapPage,
                   underlay: sheet,
+                  columnRuleX: passage == null ? ruleX : null,
                 ),
               ),
             ),
