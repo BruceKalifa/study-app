@@ -1279,6 +1279,17 @@ void _aptTests() {
 }
 
 void _univTests() {
+  group('커뮤니티 신분', () {
+    test('가입할 때 고른 과정이 글 옆에 보이는 신분이 된다', () {
+      expect(identityLabel(['고2']), '고2');
+      expect(identityLabel(['한양대']), '한양대생');
+      expect(identityLabel(['한양대', 'N수', '편입']), '한양대생 · N수생 · 편입생');
+      expect(identityLabel(['취준', '취준']), '취준생');
+      expect(identityLabel(['고1', '고2', '고3', 'N수']), '고1 · 고2 · 고3');
+      expect(identityLabel(const []), '');
+    });
+  });
+
   group('학습 목표', () {
     test('과정마다 목표 목록이 다르고, 여러 과정을 고르면 겹치는 것은 한 번만 나온다', () {
       expect(goalLabels(['취준']), ['인적성 실전 대비', 'NCS 대비', '영역별 약점 보완', '시간 단축 연습']);

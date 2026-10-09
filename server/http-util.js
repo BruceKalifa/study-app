@@ -92,4 +92,7 @@ function firstGrapheme(s) {
 
 const GRADES = ['고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
 
-module.exports = { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, firstGrapheme, GRADES };
+/** 커뮤니티 글·댓글 옆에 보이는 신분 (가입할 때 고른 과정에서 만든다): 고2, N수생, 한양대생 … 여러 개면 " · " 로 잇는다. */
+const IDENTITIES = ['고1', '고2', '고3', 'N수생', '취준생', '한양대생', '편입생', '선생님'];
+
+module.exports = { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, firstGrapheme, GRADES, IDENTITIES };

@@ -1011,6 +1011,9 @@ class AppState extends ChangeNotifier {
   /// Name shown on posts: the nickname, or the masked real name (오XX).
   String get communityName => learner.nickname.trim().isNotEmpty ? learner.nickname.trim() : maskName(profile.name);
 
+  /// 글·댓글 옆에 보이는 신분 — 가입할 때 고른 과정 ("고3", "한양대생 · N수생"). 선생님은 "선생님".
+  String get communityIdentity => isTeacher ? '선생님' : identityLabel(learner.grades);
+
   /// 오늘 공부시간 = 순공 타이머 + 앱에서 문제 푼 시간.
   int get todayTotalStudyMs => todayStudyMs + solveMsOn(dayKey(DateTime.now()));
 

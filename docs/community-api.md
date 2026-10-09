@@ -46,7 +46,7 @@
 
 `{ "userId": "…", "author": "닉네임", "grade": "고3", "board": "qna", "title": "…", "body": "…", "problemId": "선택" }` → `{ "post": {…} }`
 
-- 검증: board 존재, title 1~80자, body 1~5000자, author 1~20자, grade 는 `고1 고2 고3 N수` 중 하나 또는 빈 값. 같은 userId 는 20초에 글 1개(429).
+- 검증: board 존재, title 1~80자, body 1~5000자, author 1~20자, grade(신분)는 빈 값, 또는 `고1 고2 고3 N수생 취준생 한양대생 편입생 선생님` (옛 값 `N수 취준 한양대 편입` 도 받음) 중 최대 3개를 " · " 로 이은 글자 (예: `한양대생 · N수생`). 앱은 가입할 때 고른 과정으로 만들어 보낸다. 그 밖의 값은 400. 같은 userId 는 20초에 글 1개(429).
 - 400 `{ "error": "한국어 메시지" }`
 
 ### 댓글 `POST /api/community/posts/:id/comments`

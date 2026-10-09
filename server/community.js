@@ -27,7 +27,7 @@
 const path = require('path');
 const crypto = require('crypto');
 const { JsonStore } = require('./json-store');
-const { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, GRADES } = require('./http-util');
+const { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, GRADES, IDENTITIES } = require('./http-util');
 
 // tracks: 이 게시판이 맞는 학년·과정 (앱이 가입 때 고른 과정에 맞는 게시판만 칩으로 보여 준다). 빈 배열 = 모두.
 // 앱의 lib/services/community_api.dart 의 Board.defaults 와 id·이름이 같아야 한다.
@@ -108,11 +108,20 @@ function needText(value, label, max, isBody) {
   if (n > max) throw new HttpError(400, `${josa(label, '은', '는')} ${max}자까지 쓸 수 있습니다 (지금 ${n}자)`);
   return s;
 }
+// 신분 표시: 빈 값 | 학년 하나('고2' '한양대' …) | 신분 라벨('N수생' '한양대생' …)을 " · " 로 이은 것 (최대 3개)
 function needGrade(v) {
   const g = typeof v === 'string' ? v.trim() : v == null ? '' : null;
   if (g === '') return '';
-  if (g == null || !GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준·한양대·편입 중 하나이거나 비워 두어야 합니다');
-  return g;
+  const bad = () => new HttpError(400, '신분은 고1·고2·고3·N수생·취준생·한양대생·편입생 중에서(여러 개는 " · " 로 이어) 보내거나 비워 두어야 합니다');
+  if (g == null) throw bad();
+  const parts = g.split(/\s*·\s*/);
+  if (parts.length > 3) throw bad();
+  const seen = [];
+  for (const x of parts) {
+    if (!GRADES.includes(x) && !IDENTITIES.includes(x)) throw bad();
+    if (!seen.includes(x)) seen.push(x);
+  }
+  return seen.join(' · ');
 }
 function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}${crypto.randomBytes(4).toString('hex')}`;

@@ -506,6 +506,27 @@
     return null;
   }
 
+  // 숫자·분수 말고도 복소수(3+2i, 1±i), 여러 값(1, -2 · ±3), 구간·집합([1,3) ∪ (5,∞), {1,2}), 제곱근·π 식(2√3, 3π/2) 도 정답으로 쓸 수 있다.
+  // 앱 채점기(lib/core/grader.dart)가 읽는 글자만 허용하고, 괄호 짝과 숫자·기호가 하나라도 있는지만 본다.
+  const EXT_ANSWER_RE = /^[0-9A-Za-z.+\-*\/^()\[\]{},;±∞∪<>≤≥√πθ°\s]+$/;
+  function isExtendedAnswer(s) {
+    s = String(s).trim();
+    if (!s || !EXT_ANSWER_RE.test(s)) return false;
+    if (!/[0-9iπeθ]|sqrt|∞/.test(s)) return false;
+    const st = [];
+    const pairs = { ')': '(', ']': '[', '}': '{' };
+    for (const ch of s) {
+      if ('([{'.includes(ch)) st.push(ch);
+      else if (ch in pairs) {
+        const o = st.pop();
+        if (o === undefined) return false;
+        // 구간은 [1,3) 처럼 모양이 섞이는 게 정상이라 ( 와 [ 짝은 서로 허용
+        if (ch === '}' ? o !== '{' : o === '{') return false;
+      }
+    }
+    return st.length === 0;
+  }
+
   function validateTemplate(p, where, rep) {
     const tpl = p.template;
     const F = 'template';
@@ -612,7 +633,7 @@
       if (p.answerUnit) rep.warn(where, 'answerUnit', '선택형 문항에는 answerUnit 이 쓰이지 않습니다');
     } else if (p.type === 'short') {
       if (Array.isArray(p.choices) && p.choices.length) rep.err(where, 'choices', '단답형 문항에는 선택지를 넣지 않습니다');
-      if (nonEmpty(p.answer) && parseAnswerNumber(p.answer) == null) rep.err(where, 'answer', `단답형 정답 "${p.answer}" 은(는) 숫자 또는 분수여야 합니다 (예: 12, -3/2, 2.5) — 단위는 "단위" 칸에`);
+      if (nonEmpty(p.answer) && parseAnswerNumber(p.answer) == null && !isExtendedAnswer(p.answer)) rep.err(where, 'answer', `단답형 정답 "${p.answer}" 은(는) 숫자·분수·복소수·구간 꼴이어야 합니다 (예: 12, -3/2, 2.5, 3+2i, 1±√2, [1,3)) — 단위는 "단위" 칸에`);
       if ('tolerance' in p && !(typeof p.tolerance === 'number' && p.tolerance >= 0)) rep.err(where, 'tolerance', '허용 오차는 0 이상의 숫자여야 합니다');
     } else if ('type' in p) {
       rep.err(where, 'type', '형식(type)은 "choice"(5지선다) 또는 "short"(단답형) 이어야 합니다');
@@ -786,6 +807,6 @@
     splitMath, countDollars, parseBlocks, inlineTokens, parseEmphasis, plain, tableCells,
     ExprError, parseExpr, evaluate, exprNames, fmtNum, roundTo, paramChoices, renderPlaceholders, makeVariant, seededRandom,
     Report, checkText, validateProblem, validatePassage, validateCourseMeta, validateCourse, validateWorkbooks,
-    parseAnswerNumber, formatIssue, points,
+    parseAnswerNumber, isExtendedAnswer, formatIssue, points,
   };
 });

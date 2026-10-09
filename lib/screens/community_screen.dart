@@ -378,7 +378,7 @@ class _PostScreenState extends State<PostScreen> {
     final app = AppScope.read(context);
     setState(() => _sending = true);
     try {
-      await _api.comment(widget.postId, author: app.communityName, grade: app.learner.grade, body: t);
+      await _api.comment(widget.postId, author: app.communityName, grade: app.communityIdentity, body: t);
       _comment.clear();
       await _load();
     } on CommunityError catch (e) {
@@ -538,7 +538,7 @@ class _PostScreenState extends State<PostScreen> {
                         controller: _comment,
                         minLines: 1,
                         maxLines: 4,
-                        decoration: InputDecoration(hintText: '${app.communityName}(으)로 댓글 달기', isDense: true),
+                        decoration: InputDecoration(hintText: '${app.communityName}${app.communityIdentity.isEmpty ? '' : ' · ${app.communityIdentity}'}(으)로 댓글 달기', isDense: true),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -593,7 +593,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
     try {
       await api.write(
         author: app.communityName,
-        grade: app.learner.grade,
+        grade: app.communityIdentity,
         board: _board,
         title: _title.text.trim(),
         body: _body.text.trim(),
@@ -669,7 +669,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
                 ]),
               ),
             const SizedBox(height: 12),
-            Text('${app.communityName}(으)로 올라가요 · 실명·연락처 등 개인정보는 쓰지 마세요',
+            Text('${app.communityName}${app.communityIdentity.isEmpty ? '' : ' · ${app.communityIdentity}'}(으)로 올라가요 · 실명·연락처 등 개인정보는 쓰지 마세요',
                 style: const TextStyle(color: AppColors.inkMuted)),
           ]),
         ),

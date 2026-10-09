@@ -540,6 +540,30 @@ def parse_answer_number(s: str):
     return None
 
 
+EXT_ANSWER_RE = re.compile(r"^[0-9A-Za-z.+\-*/^()\[\]{},;±∞∪<>≤≥√πθ°\s]+$")
+
+
+def is_extended_answer(s: str) -> bool:
+    """복소수(3+2i)·여러 값(1±√2)·구간/집합([1,3) ∪ (5,∞)) 꼴 정답 — schema.js isExtendedAnswer 와 같은 규칙."""
+    s = s.strip()
+    if not s or not EXT_ANSWER_RE.match(s):
+        return False
+    if not re.search(r"[0-9iπeθ∞]|sqrt", s):
+        return False
+    st = []
+    pairs = {")": "(", "]": "[", "}": "{"}
+    for ch in s:
+        if ch in "([{":
+            st.append(ch)
+        elif ch in pairs:
+            if not st:
+                return False
+            o = st.pop()
+            if (o != "{") if ch == "}" else (o == "{"):
+                return False
+    return not st
+
+
 # ---------------------------------------------------------------------------
 # Template variants
 
@@ -844,8 +868,8 @@ def validate_problem(p: dict, where: str, errs, warns, stats, rng):
     elif t == "short":
         if "choices" in p:
             errs.append(f"{where}: short problem must not have choices")
-        if parse_answer_number(p["answer"]) is None:
-            errs.append(f"{where}: short answer {p['answer']!r} is not a number/fraction")
+        if parse_answer_number(p["answer"]) is None and not is_extended_answer(p["answer"]):
+            errs.append(f"{where}: short answer {p['answer']!r} is not a number/fraction/complex/interval")
         tol = p.get("tolerance", 0)
         if not isinstance(tol, (int, float)) or tol < 0:
             errs.append(f"{where}: tolerance must be a non-negative number")

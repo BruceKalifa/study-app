@@ -135,7 +135,11 @@ async function main() {
   r = await post('/api/community/posts', postBody(U.v, { author: '' }));
   ok(r.status === 400 && /닉네임/.test(r.json.error), '빈 닉네임 → 400');
   r = await post('/api/community/posts', postBody(U.v, { grade: '중3' }));
-  ok(r.status === 400 && /학년/.test(r.json.error), '학년 "중3" → 400', r.json);
+  ok(r.status === 400 && /신분/.test(r.json.error), '신분 "중3" → 400', r.json);
+  r = await post('/api/community/posts', postBody(U.v, { grade: '한양대생 · N수생 · 편입생 · 고3' }));
+  ok(r.status === 400 && /신분/.test(r.json.error), '신분 4개 → 400', r.json);
+  r = await post('/api/community/posts', postBody(U.v, { grade: '한양대생 · 중3' }));
+  ok(r.status === 400 && /신분/.test(r.json.error), '신분 중 하나가 틀리면 → 400', r.json);
   r = await post('/api/community/posts', postBody(''));
   ok(r.status === 400 && /userId/.test(r.json.error), 'userId 없음 → 400');
   r = await post('/api/community/posts', '{ broken');
@@ -149,9 +153,10 @@ async function main() {
 
   // ───────── 도배 방지 ─────────
   section('도배 방지 (같은 userId 20초에 글 1개)');
-  r = await post('/api/community/posts', postBody(U.a, { title: '첫 글', board: 'free' }));
+  r = await post('/api/community/posts', postBody(U.a, { title: '첫 글', board: 'free', grade: '한양대생 · N수생 · 한양대생' }));
   ok(r.status === 200, 'A 첫 글 → 200');
   const pA1 = r.json.post;
+  ok(pA1.grade === '한양대생 · N수생', '신분 여러 개는 " · " 로 이어 저장 (중복 제거)', pA1);
   r = await post('/api/community/posts', postBody(U.a, { title: '둘째 글' }));
   ok(r.status === 429 && isKo(r) && /초/.test(r.json.error), 'A 바로 또 쓰기 → 429', r.json);
   r = await post('/api/community/posts', postBody(U.b, { title: '포물선 운동 공식', body: '수평 방향 속도는 일정합니다.', board: 'qna', grade: '고2', author: '비닉' }));

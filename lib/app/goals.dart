@@ -116,3 +116,29 @@ List<String> parseGoals(String goal) {
       if (p.trim().isNotEmpty) p.trim()
   ];
 }
+
+/// 커뮤니티에서 이름 옆에 보이는 신분 한 칸 ("한양대" → "한양대생", "N수" → "N수생").
+String identityOf(String grade) {
+  switch (grade) {
+    case 'N수':
+      return 'N수생';
+    case '취준':
+      return '취준생';
+    case '한양대':
+      return '한양대생';
+    case '편입':
+      return '편입생';
+    default:
+      return grade;
+  }
+}
+
+/// 가입할 때 고른 과정으로 만든 신분 글자: "고3", "한양대생 · N수생" (최대 3개).
+String identityLabel(Iterable<String> grades) {
+  final l = <String>[];
+  for (final g in grades) {
+    final x = identityOf(g.trim());
+    if (x.isNotEmpty && !l.contains(x)) l.add(x);
+  }
+  return l.take(3).join(' · ');
+}
