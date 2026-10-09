@@ -5,7 +5,7 @@ import '../app/app_state.dart';
 import '../app/records.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
-import '../widgets/answer_panel.dart' show gradeAnswer, expectedDisplay, answerDisplay;
+import '../widgets/answer_panel.dart' show gradeAnswer, expectedDisplay, answerDisplay, showAnswerKeypad;
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import 'workbook_screen.dart' show byTableOfContents, tocRowLabel, usesTableOfContents;
@@ -299,7 +299,7 @@ class _AnswerRow extends StatelessWidget {
           ),
         ] else ...[
           SizedBox(
-            width: 130,
+            width: choices ? 130 : 170,
             child: TextField(
               key: Key('answer-${p.id}'),
               controller: controller,
@@ -313,6 +313,22 @@ class _AnswerRow extends StatelessWidget {
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 hintText: teacher ? '정답' : '내 답',
+                // 복소수(i)·√·π·±·구간 기호 키패드 — 시스템 키보드에 없는 기호를 넣을 때
+                suffixIcon: choices || !editable
+                    ? null
+                    : IconButton(
+                        key: Key('answer-keypad-${p.id}'),
+                        tooltip: '수학 기호 키패드 (i, √, π, ±, ∞ …)',
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 20,
+                        icon: const Icon(Icons.calculate_outlined),
+                        onPressed: () async {
+                          final res = await showAnswerKeypad(context, problem: p, initial: controller.text, color: color);
+                          if (res == null) return;
+                          controller.text = res;
+                          onChanged(res);
+                        },
+                      ),
                 filled: true,
                 fillColor: AppColors.surface,
                 border: OutlineInputBorder(

@@ -193,12 +193,13 @@ class _CourseBrowserState extends State<CourseBrowser> {
             icon: const Icon(Icons.auto_awesome_rounded),
             label: const Text('변형문제 10개'),
           ),
-          FilledButton.icon(
-            key: const Key('course-endless'),
-            onPressed: () => SolveScreen.endless(context, courseId: _subject),
-            icon: const Icon(Icons.all_inclusive_rounded),
-            label: const Text('무한 풀기'),
-          ),
+          if (kEndlessEnabled)
+            FilledButton.icon(
+              key: const Key('course-endless'),
+              onPressed: () => SolveScreen.endless(context, courseId: _subject),
+              icon: const Icon(Icons.all_inclusive_rounded),
+              label: const Text('무한 풀기'),
+            ),
           const SizedBox(width: 16),
         ],
       ),
@@ -296,11 +297,12 @@ class _CourseBrowserState extends State<CourseBrowser> {
                       ]),
                     ]),
                   ),
-                  IconButton(
-                    tooltip: '이 단원 무한 풀기',
-                    onPressed: () => SolveScreen.endless(context, courseId: s.id, unit: unit, title: unit),
-                    icon: const Icon(Icons.all_inclusive_rounded),
-                  ),
+                  if (kEndlessEnabled)
+                    IconButton(
+                      tooltip: '이 단원 무한 풀기',
+                      onPressed: () => SolveScreen.endless(context, courseId: s.id, unit: unit, title: unit),
+                      icon: const Icon(Icons.all_inclusive_rounded),
+                    ),
                   const SizedBox(width: 4),
                   OutlinedButton.icon(
                     onPressed: () {
@@ -536,7 +538,7 @@ class LibraryScreen extends StatelessWidget {
                 child: EmptyState(
                   icon: Icons.collections_bookmark_rounded,
                   title: '내 교재가 비어 있어요',
-                  message: '개념서부터 N제·모의고사까지, 과목과 커리큘럼별로 골라 담아 보세요.\n담은 문제집으로 오늘의 세트와 무한 풀기가 만들어져요.',
+                  message: '개념서부터 N제·모의고사까지, 과목과 커리큘럼별로 골라 담아 보세요.\n담은 문제집으로 오늘의 세트가 만들어져요.',
                   action: FilledButton.icon(
                     key: const Key('lib-empty-add'),
                     onPressed: () => WorkbookStoreScreen.open(context),
@@ -671,22 +673,24 @@ class _CourseHeader extends StatelessWidget {
             Text('정답률 ${pct(t.accuracy)}', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
           const Spacer(),
           if (narrow) ...[
-            IconButton(
-              tooltip: '이 과목 무한 풀기',
-              onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
-              icon: const Icon(Icons.all_inclusive_rounded, size: 20),
-            ),
+            if (kEndlessEnabled)
+              IconButton(
+                tooltip: '이 과목 무한 풀기',
+                onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
+                icon: const Icon(Icons.all_inclusive_rounded, size: 20),
+              ),
             IconButton(
               tooltip: '더 담기',
               onPressed: () => WorkbookStoreScreen.open(context, course: courseId),
               icon: const Icon(Icons.add_rounded, size: 20),
             ),
           ] else ...[
-            TextButton.icon(
-              onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
-              icon: const Icon(Icons.all_inclusive_rounded, size: 18),
-              label: const Text('이 과목 무한 풀기'),
-            ),
+            if (kEndlessEnabled)
+              TextButton.icon(
+                onPressed: () => SolveScreen.endless(context, courseId: courseId, title: c?.name),
+                icon: const Icon(Icons.all_inclusive_rounded, size: 18),
+                label: const Text('이 과목 무한 풀기'),
+              ),
             TextButton.icon(
               onPressed: () => WorkbookStoreScreen.open(context, course: courseId),
               icon: const Icon(Icons.add_rounded, size: 18),

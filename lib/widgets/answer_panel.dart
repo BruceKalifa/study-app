@@ -87,7 +87,7 @@ class _KeypadSheetState extends State<_KeypadSheet> {
       child: Center(
         heightFactor: 1,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: const BoxConstraints(maxWidth: 640),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -101,7 +101,7 @@ class _KeypadSheetState extends State<_KeypadSheet> {
               const SizedBox(height: 14),
               const Text('답 고치기', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              const Text('답칸에 쓴 글씨가 다르게 인식됐을 때 여기서 고쳐요',
+              const Text('답칸에 쓴 글씨가 다르게 인식됐을 때 여기서 고쳐요 · 복소수는 i, 여러 답은 ± 나 쉼표로',
                   style: TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
               const SizedBox(height: 14),
               Container(
@@ -169,6 +169,7 @@ class AnswerKeypad extends StatelessWidget {
   const AnswerKeypad({super.key, required this.onKey});
   final ValueChanged<String> onKey;
 
+  /// 왼쪽: 숫자·분수·√·π (4열)
   static const _keys = [
     ['7', '8', '9', '/'],
     ['4', '5', '6', '√'],
@@ -176,42 +177,59 @@ class AnswerKeypad extends StatelessWidget {
     ['-', '0', '.', '⌫'],
   ];
 
+  /// 오른쪽: 복소수(i)·±·구간 기호 등 (5열)
+  static const symbolKeys = [
+    ['+', '(', ')', '^', 'i'],
+    ['±', '∞', 'e', ',', '∪'],
+    ['[', ']', '≤', '≥', '<'],
+    ['>', '{', '}', '°', 'θ'],
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (final row in _keys)
+        for (var r = 0; r < _keys.length; r++)
           Expanded(
             child: Row(
               children: [
-                for (final k in row)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Material(
-                        key: Key('key-$k'),
-                        color: _isOp(k) ? AppColors.paperDeep : AppColors.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () => onKey(k),
-                          onLongPress: k == '⌫' ? () => onKey('C') : null,
-                          child: Container(
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.line),
-                            ),
-                            child: Text(k, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                Expanded(
+                  flex: 4,
+                  child: Row(children: [for (final k in _keys[r]) Expanded(child: _key(k))]),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 5,
+                  child: Row(children: [for (final k in symbolKeys[r]) Expanded(child: _key(k, symbol: true))]),
+                ),
               ],
             ),
           ),
       ],
+    );
+  }
+
+  Widget _key(String k, {bool symbol = false}) {
+    return Padding(
+      padding: const EdgeInsets.all(3),
+      child: Material(
+        key: Key('key-$k'),
+        color: symbol || _isOp(k) ? AppColors.paperDeep : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => onKey(k),
+          onLongPress: k == '⌫' ? () => onKey('C') : null,
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Text(k, style: TextStyle(fontSize: symbol ? 19 : 22, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ),
     );
   }
 

@@ -11,7 +11,7 @@ import 'exam_setup.dart';
 import 'solve_screen.dart';
 import 'workbook_store_screen.dart';
 
-/// 홈: 오늘의 오답 변형 세트 · 순공 · 무한 풀기 · 내 문제집 · 할 일 · 약점 유형.
+/// 홈: 오늘의 오답 변형 세트 · 순공 · 내 문제집 · 할 일 · 약점 유형.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key, required this.onNavigate});
   final ValueChanged<int> onNavigate;
@@ -151,25 +151,28 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          // ---------- endless (내 교재에서만)
+          // ---------- endless (내 교재에서만) — kEndlessEnabled 가 false 면 모의고사 만들기만 남는다
           if (books.isNotEmpty) ...[
-            const SectionHeader('무한 풀기', subtitle: '내 교재 문제로 · 맞히면 더 어렵게, 틀리면 쉽게'),
+            SectionHeader(kEndlessEnabled ? '무한 풀기' : '모의고사',
+                subtitle: kEndlessEnabled ? '내 교재 문제로 · 맞히면 더 어렵게, 틀리면 쉽게' : '내 교재 문제로 시험처럼 풀어요'),
             Wrap(spacing: 12, runSpacing: 12, children: [
-              _EndlessChip(
-                key: const Key('endless-all'),
-                label: '내 교재 전체',
-                icon: Icons.all_inclusive_rounded,
-                color: AppColors.ink,
-                onTap: () => SolveScreen.endless(context, title: '내 교재 전체'),
-              ),
-              for (final w in books.take(6))
+              if (kEndlessEnabled)
                 _EndlessChip(
-                  key: Key('endless-wb-${w.id}'),
-                  label: w.title,
-                  icon: app.bank.subject(w.course) == null ? Icons.menu_book_rounded : courseIcon(app.bank.subject(w.course)!),
-                  color: Color(app.bank.subject(w.course)?.color ?? 0xFF5B6475),
-                  onTap: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
+                  key: const Key('endless-all'),
+                  label: '내 교재 전체',
+                  icon: Icons.all_inclusive_rounded,
+                  color: AppColors.ink,
+                  onTap: () => SolveScreen.endless(context, title: '내 교재 전체'),
                 ),
+              if (kEndlessEnabled)
+                for (final w in books.take(6))
+                  _EndlessChip(
+                    key: Key('endless-wb-${w.id}'),
+                    label: w.title,
+                    icon: app.bank.subject(w.course) == null ? Icons.menu_book_rounded : courseIcon(app.bank.subject(w.course)!),
+                    color: Color(app.bank.subject(w.course)?.color ?? 0xFF5B6475),
+                    onTap: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
+                  ),
               _EndlessChip(
                 label: '모의고사 만들기',
                 icon: Icons.timer_outlined,
@@ -333,7 +336,7 @@ class _DailySetCard extends StatelessWidget {
               total == 0 && noBooks
                   ? '문제집을 골라 내 교재에 담으면, 내 교재의 진도와 틀린 문제의 변형으로 매일 세트를 만들어 드려요.'
                   : total == 0
-                      ? '내 교재를 다 풀었어요! 새 문제집을 담거나 무한 풀기로 이어 가세요.'
+                      ? '내 교재를 다 풀었어요! 새 문제집을 담아 이어 가세요.'
                       : hasWrong
                           ? '틀린 문제를 쌍둥이 문항과 변형으로 다시 풀고, 내 교재의 진도를 채웠어요.'
                           : '아직 오답이 없어서 내 교재의 다음 문제로 채웠어요. 틀리면 내일 세트에 변형이 나와요.',
@@ -590,11 +593,13 @@ class _WeakTopics extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: AccuracyBar(value: acc, color: accuracyColor(acc)),
                 ),
-                trailing: TextButton.icon(
-                  onPressed: () => SolveScreen.endless(context, topic: topic, title: topic),
-                  icon: const Icon(Icons.all_inclusive_rounded, size: 18),
-                  label: Text('${pct(acc)} · 집중 풀기'),
-                ),
+                trailing: kEndlessEnabled
+                    ? TextButton.icon(
+                        onPressed: () => SolveScreen.endless(context, topic: topic, title: topic),
+                        icon: const Icon(Icons.all_inclusive_rounded, size: 18),
+                        label: Text('${pct(acc)} · 집중 풀기'),
+                      )
+                    : Text(pct(acc), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
               ),
           ]),
         ),

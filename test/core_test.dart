@@ -254,6 +254,55 @@ void main() {
       expect(Grader.grade(_short('ㄱ,ㄴ'), 'ㄱ, ㄷ').correct, isFalse);
     });
 
+    test('복소수 답', () {
+      bool ok(String exp, String given) => Grader.grade(_short(exp), given).correct;
+      expect(ok('3+4i', '3+4i'), isTrue);
+      expect(ok('3+4i', '4i+3'), isTrue, reason: '순서만 다른 같은 수');
+      expect(ok('3+4i', '3 + 4 i'), isTrue);
+      expect(ok('3+4i', '3−4i'), isFalse, reason: '허수부 부호');
+      expect(ok('3+4i', '3'), isFalse);
+      expect(ok('-2i', '−2i'), isTrue);
+      expect(ok('i', 'i'), isTrue);
+      expect(ok('1-i', '-i+1'), isTrue);
+      expect(ok('1/2+sqrt(3)/2*i', '1/2+√3/2i'), isTrue);
+      expect(ok('1/2+sqrt(3)/2*i', '(1+√3i)/2'), isTrue);
+      expect(ok('2i', '√-4'), isFalse, reason: '√ 뒤 음수는 읽지 못해 오답 처리');
+      expect(ok('2i', 'sqrt(-4)'), isTrue);
+      expect(ok('-1', 'i^2'), isTrue, reason: '식도 계산해서 비교');
+      expect(ok('-4', '(2i)^2'), isTrue);
+      expect(ok('2', '(1+i)(1-i)'), isTrue);
+      expect(ok('1', '3+0i'), isFalse);
+      expect(ok('3', '3+0i'), isTrue, reason: '허수부 0 이면 실수와 같다');
+      expect(ok('2+i', 'abc'), isFalse);
+      final r = Grader.grade(_short('2+i'), '2+@');
+      expect(r.correct, isFalse);
+      expect(r.note, contains('인식'));
+    });
+
+    test('± 와 쉼표로 이은 여러 값', () {
+      bool ok(String exp, String given) => Grader.grade(_short(exp), given).correct;
+      expect(ok('±2', '2, -2'), isTrue);
+      expect(ok('2,-2', '±2'), isTrue);
+      expect(ok('±2', '-2,2'), isTrue, reason: '순서 상관없음');
+      expect(ok('±2', '2'), isFalse);
+      expect(ok('1,3', '3,1'), isTrue);
+      expect(ok('1,3', '1,4'), isFalse);
+      expect(ok('1±sqrt(2)', '1+√2, 1-√2'), isTrue);
+      expect(ok('1±√2', '1±√2'), isTrue);
+      expect(ok('±i', 'i,-i'), isTrue);
+      expect(ok('1200', '1,200'), isTrue, reason: '천 단위 쉼표는 그대로');
+    });
+
+    test('구간·집합 답은 괄호 모양까지 비교한다', () {
+      bool ok(String exp, String given) => Grader.grade(_short(exp), given).correct;
+      expect(ok('(-∞,3]', '(−∞, 3]'), isTrue);
+      expect(ok('(-∞,3]', '(-∞,3)'), isFalse, reason: '닫힘/열림이 다르다');
+      expect(ok('[1,2)', '[1,2)'), isTrue);
+      expect(ok('{1,2}', '{1, 2}'), isTrue);
+      expect(ok('x≤3', 'x≦3'), isTrue);
+      expect(ok('x<3', 'x≤3'), isFalse);
+    });
+
     test('normalize / parseNumber', () {
       expect(Grader.normalize('   '), isNull);
       expect(Grader.normalize('√3'), 'sqrt(3)');

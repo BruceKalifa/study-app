@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ]),
 
         // ---------------- study
-        _Section(title: '학년 · 목표 · 내 교재', subtitle: '오늘의 세트와 무한 풀기는 내 교재의 문제로 만들어져요', children: [
+        _Section(title: '학년 · 목표 · 내 교재', subtitle: '오늘의 세트는 내 교재의 문제로 만들어져요', children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.school_outlined),

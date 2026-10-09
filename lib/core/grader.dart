@@ -1,6 +1,7 @@
 // Grading of keypad / handwriting answers.
 import 'dart:math' as math;
 
+import 'complex_expr.dart';
 import 'expr.dart';
 import 'problem.dart';
 
@@ -119,26 +120,133 @@ class Grader {
         note: '답을 입력하지 않았습니다',
       );
     }
-    final e = parseNumber(expectedRaw);
-    if (e != null) {
-      final g = _evalNumber(givenNorm);
-      if (g == null) {
+
+    // 정답이 숫자·복소수(또는 그 식)이거나 ±·쉼표로 이은 여러 값이면 값으로 비교한다.
+    final expItems = _items(expectedRaw);
+    final expVals = [for (final x in expItems) _value(x)];
+    if (expVals.isNotEmpty && expVals.every((v) => v != null)) {
+      final givenItems = _items(givenRaw);
+      final givenVals = [for (final x in givenItems) _value(x)];
+      if (givenVals.isEmpty || givenVals.any((v) => v == null)) {
         return GradeResult(
           correct: false,
           given: givenNorm,
           expected: p.answer.trim(),
-          note: '숫자(또는 식)로 인식할 수 없습니다',
+          note: '숫자·복소수(또는 식)로 인식할 수 없습니다',
         );
       }
-      final tol = math.max(p.tolerance, 1e-9 * math.max(1.0, e.abs()));
-      final correct = (g - e).abs() <= tol;
-      return GradeResult(
-          correct: correct, given: givenNorm, expected: p.answer.trim());
+      final e = [for (final v in expVals) v!];
+      final g = [for (final v in givenVals) v!];
+      double tolFor(Cx x) => math.max(p.tolerance, 1e-9 * math.max(1.0, x.abs));
+      bool same(Cx a, Cx b) => a.near(b, tolFor(a));
+      bool correct;
+      if (e.length == 1 && g.length == 1) {
+        correct = same(g.first, e.first);
+      } else {
+        // 순서 상관없이 같은 값들인지 (중복은 하나로 본다)
+        List<Cx> uniq(List<Cx> xs) {
+          final out = <Cx>[];
+          for (final x in xs) {
+            if (!out.any((y) => same(x, y))) out.add(x);
+          }
+          return out;
+        }
+
+        final ue = uniq(e);
+        final ug = uniq(g);
+        correct = ue.length == ug.length && ue.every((x) => ug.any((y) => same(x, y)));
+      }
+      return GradeResult(correct: correct, given: givenNorm, expected: p.answer.trim());
     }
-    final expNorm = normalize(expectedRaw) ?? expectedRaw;
-    final correct = givenNorm.toLowerCase() == expNorm.toLowerCase();
-    return GradeResult(
-        correct: correct, given: givenNorm, expected: p.answer.trim());
+
+    // 그 밖의 답(구간 ( -∞, 3 ] · 집합 · 식 등)은 글자로 비교한다.
+    final expNorm = _symbolic(expectedRaw);
+    final correct = _symbolic(givenRaw).toLowerCase() == expNorm.toLowerCase();
+    return GradeResult(correct: correct, given: givenNorm, expected: p.answer.trim());
+  }
+
+  static final RegExp _thousands = RegExp(r'^\d{1,3}(,\d{3})+(\.\d+)?$');
+
+  /// 답을 값 하나씩으로 쪼갠다: "±2" → ["2","-2"], "1, 3" → ["1","3"], "1,200" → ["1,200"], "1±√2" → ["1+√2","1-√2"].
+  static List<String> _items(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return const [];
+    final parts = <String>[];
+    if (_thousands.hasMatch(t.replaceAll(RegExp(r'\s+'), ''))) {
+      parts.add(t);
+    } else {
+      var depth = 0;
+      var start = 0;
+      for (var k = 0; k < t.length; k++) {
+        final c = t[k];
+        if (c == '(' || c == '（') depth++;
+        if ((c == ')' || c == '）') && depth > 0) depth--;
+        if ((c == ',' || c == '，') && depth == 0) {
+          parts.add(t.substring(start, k));
+          start = k + 1;
+        }
+      }
+      parts.add(t.substring(start));
+    }
+    final out = <String>[];
+    for (final x in parts) {
+      final y = x.trim();
+      if (y.isNotEmpty) out.addAll(_expandPm(y));
+    }
+    return out;
+  }
+
+  static List<String> _expandPm(String s) {
+    final k = s.indexOf('±');
+    if (k < 0) return [s];
+    final rest = s.substring(k + 1);
+    final head = s.substring(0, k);
+    final plus = head.trim().isEmpty ? rest : '$head+$rest';
+    final minus = head.trim().isEmpty ? '-($rest)' : '$head-($rest)';
+    return [..._expandPm(plus), ..._expandPm(minus)];
+  }
+
+  /// 값 하나를 복소수로 읽는다 (실수는 허수부 0). 못 읽으면 null.
+  static Cx? _value(String raw) {
+    final n = normalize(raw);
+    if (n == null) return null;
+    final r = _evalNumber(n);
+    if (r != null) return Cx(r, 0);
+    // I, ⅈ 도 허수 단위로 받는다
+    return evalComplex(n.replaceAllMapped(RegExp(r'\bI\b'), (_) => 'i'));
+  }
+
+  static final RegExp _symbolicHint = RegExp(r'[\[\]{}∞∪∩≤≥<>∈∉⊂]');
+
+  /// 구간·집합처럼 괄호 모양이 뜻을 가르는 답: 공백만 지우고 괄호·쉼표는 그대로 둔다.
+  /// 그런 기호가 없으면 예전처럼 [normalize] 로 비교한다 (2x = 2*x).
+  static String _symbolic(String raw) {
+    if (!_symbolicHint.hasMatch(raw)) return normalize(raw) ?? raw.trim();
+    final b = StringBuffer();
+    for (final r in raw.runes) {
+      if (_isSpaceRune(r)) continue;
+      final ch = String.fromCharCode(r);
+      switch (ch) {
+        case '−':
+        case '–':
+        case '—':
+        case '－':
+          b.write('-');
+        case '（':
+          b.write('(');
+        case '）':
+          b.write(')');
+        case '，':
+          b.write(',');
+        case '≦':
+          b.write('≤');
+        case '≧':
+          b.write('≥');
+        default:
+          b.write(ch);
+      }
+    }
+    return b.toString();
   }
 
   /// Parses a choice answer: "3", "③", "3번", " 3 ", "(3)", "3)".
@@ -255,6 +363,8 @@ class Grader {
         case 'π':
         case 'Π':
           mapped.write('pi');
+        case 'ⅈ':
+          mapped.write('i');
         default:
           mapped.write(ch);
       }

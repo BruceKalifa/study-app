@@ -5,6 +5,10 @@ const String kAppName = 'Solvit';
 
 /// 앱이 쓰는 서버. 학생·선생님이 주소를 입력할 일이 없게 여기서 정한다
 /// (바꾸려면: 서버를 옮길 때 이 줄만 고치고 다시 배포하면 된다).
+/// 무한 풀기 (내 교재·과목·단원·약점 유형을 끝없이 풀기). 지금은 숨겨 둠 — 나중에 쓸 때 true 로 바꾸면 진입점이 다시 나온다.
+/// 코드(SolveScreen.endless, AppState.nextEndless)는 그대로 있다.
+const bool kEndlessEnabled = false;
+
 const String kDefaultServer = 'https://pulinote-server.onrender.com';
 
 /// Design tokens — "paper & ink": warm paper surfaces, deep ink navy text,

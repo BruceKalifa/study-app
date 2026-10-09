@@ -85,7 +85,7 @@ class WorkbookScreen extends StatelessWidget {
                       ? '처음부터 풀기'
                       : (unsolved.isEmpty ? '다시 풀기' : '이어 풀기 · ${unsolved.length}문항 남음')),
             ),
-            if (onShelf)
+            if (kEndlessEnabled && onShelf)
               OutlinedButton.icon(
                 onPressed: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
                 icon: const Icon(Icons.all_inclusive_rounded),
