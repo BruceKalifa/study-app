@@ -23,6 +23,7 @@ import 'package:study_app/screens/library_screen.dart';
 import 'package:study_app/screens/workbook_screen.dart';
 import 'package:study_app/screens/workbook_store_screen.dart';
 import 'package:study_app/screens/answer_key_screen.dart';
+import 'package:study_app/screens/concept_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
@@ -34,6 +35,38 @@ import 'package:study_app/widgets/problem_brief.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'fixtures/sample_book.dart';
+
+/// 개념 페이지가 든 교재 (CORE TYPE 처럼 개념·실전개념과 문제가 함께) — 샘플 교재에 개념 셋을 얹는다.
+List<int> _conceptBookFile() {
+  final j = sampleBookJson();
+  final courses = j['courses'] as List;
+  (courses.first as Map<String, dynamic>)['concepts'] = [
+    {'id': 'sample-type-01-c-intro', 'title': '이 책 보는 법', 'section': '책머리', 'body': '먼저 읽어 보세요.'},
+    {
+      'id': 'sample-type-01-c-seq',
+      'title': '수열의 귀납적 정의',
+      'kind': '개념',
+      'topic': '예제',
+      'section': '수업문항',
+      'links': ['예제'],
+      'body': '\$a_{n+1}=a_n+d\$ 이면 등차수열이다.\n\n[[box]]\n핵심: 공차 \$d\$\n[[/box]]',
+    },
+    {
+      'id': 'sample-type-01-c-hw',
+      'title': '숙제 1 실전 스킬',
+      'kind': '실전개념',
+      'section': '숙제문항 DAY 1',
+      'links': ['숙제 1(중)'],
+      'body': '표준화부터 한다.',
+    },
+  ];
+  ((j['workbooks'] as List).first as Map<String, dynamic>)['concepts'] = [
+    'sample-type-01-c-intro',
+    'sample-type-01-c-seq',
+    'sample-type-01-c-hw',
+  ];
+  return gzip.encode(utf8.encode(jsonEncode(j)));
+}
 
 Future<AppState> _state({bool onboard = true}) async {
   final bank = await ProblemBank.load(fixtureBundle);
@@ -857,6 +890,82 @@ void main() {
     expect(one, hasLength(1));
     expect(one.single.$1, '');
     expect(one.single.$2, [0, 1]);
+  });
+
+  group('개념 교재', () {
+    test('개념은 유형이 맞는 문제와 이어지고, 목차 칸에 들어간다', () async {
+      final app = await _state();
+      await app.importBooks(_conceptBookFile());
+      final w = app.bank.workbook('sample-type-01')!;
+      final cs = app.bank.conceptsOf(w);
+      expect(cs.map((c) => c.id), ['sample-type-01-c-intro', 'sample-type-01-c-seq', 'sample-type-01-c-hw']);
+      expect(cs[2].kind, '실전개념');
+      final ps = app.bank.problemsOf(w);
+      // 연결: 문제 유형 토막이 같을 때만 (DAY 1 · 숙제 1(중) 의 "숙제 1(중)")
+      expect(app.bank.conceptsFor(ps[0]).map((c) => c.id), ['sample-type-01-c-seq']);
+      expect(app.bank.conceptsFor(ps[1]), isEmpty);
+      expect(app.bank.conceptsFor(ps[2]).map((c) => c.id), ['sample-type-01-c-hw']);
+      expect(app.bank.problemsExplainedBy(cs[1], within: ps).map((p) => p.id), [ps[0].id]);
+      // 목차: 같은 이름의 칸에 들어가고, 어느 칸과도 안 맞는 개념은 맨 앞 칸
+      final groups = tocGroups(ps, cs);
+      expect(groups.map((g) => g.name).toList(), ['책머리', '수업문항', '숙제문항 DAY 1']);
+      expect(groups[0].idx, isEmpty);
+      expect(groups[1].concepts.map((c) => c.id), ['sample-type-01-c-seq']);
+      expect(groups[2].concepts.map((c) => c.id), ['sample-type-01-c-hw']);
+      // 개념이 없는 교재는 예전 그대로
+      expect(tocGroups(ps, const []).map((g) => g.name).toList(), ['수업문항', '숙제문항 DAY 1']);
+      // 저장 → 다시 읽기에서도 그대로
+      expect(Subject.fromJson(app.bank.subject('math')!.toJson()).concepts, hasLength(3));
+    });
+
+    testWidgets('교재 화면: 목차마다 개념 카드, 필터, 개념 읽기(읽음 표시) 와 관련 개념', (tester) async {
+      _tabletSize(tester);
+      final app = (await tester.runAsync(_state))!;
+      await tester.runAsync(() => app.importBooks(_conceptBookFile()));
+      await tester.pumpWidget(_app(app, home: const WorkbookScreen(workbookId: 'sample-type-01')));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('개념 3편'), findsOneWidget);
+      expect(find.byKey(const Key('concept-sample-type-01-c-seq')), findsOneWidget);
+      expect(find.text('수열의 귀납적 정의'), findsOneWidget);
+      expect(find.byKey(const Key('wb-unit-수업문항')), findsOneWidget);
+
+      await tester.tap(find.text('문제만'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('concept-sample-type-01-c-seq')), findsNothing);
+      await tester.tap(find.text('개념만'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('concept-sample-type-01-c-seq')), findsOneWidget);
+      expect(find.byKey(const Key('wb-unit-수업문항')), findsOneWidget, reason: '문제가 있는 목차는 풀기 버튼이 남는다');
+      await tester.tap(find.text('전체'));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 개념을 열면 읽음, 이 개념의 문제 풀기 버튼
+      expect(app.isConceptRead('sample-type-01-c-seq'), isFalse);
+      await tester.tap(find.byKey(const Key('concept-sample-type-01-c-seq')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+      expect(find.byType(ConceptScreen), findsOneWidget);
+      expect(app.isConceptRead('sample-type-01-c-seq'), isTrue);
+      expect(find.byKey(const Key('concept-solve')), findsOneWidget);
+      expect(find.textContaining('1문항'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('풀이 시트에 관련 개념이 나오고 누르면 그 개념으로 간다', (tester) async {
+      _tabletSize(tester);
+      final app = (await tester.runAsync(_state))!;
+      await tester.runAsync(() => app.importBooks(_conceptBookFile()));
+      final p = app.bank.byId('sample-type-01-hw-1')!;
+      await tester.pumpWidget(_app(app,
+          home: Scaffold(body: Builder(builder: (ctx) => TextButton(onPressed: () => showSolutionSheet(ctx, p, null), child: const Text('해설'))))));
+      await tester.tap(find.text('해설'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+      expect(find.text('관련 개념'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('related-concept-sample-type-01-c-hw')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+      expect(find.byType(ConceptScreen), findsOneWidget);
+      expect(find.text('숙제 1 실전 스킬'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   testWidgets('내 교재: 시리즈로 묶고 → 회차 고르기 → 교재 목차', (tester) async {

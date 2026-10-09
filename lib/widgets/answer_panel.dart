@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/grader.dart';
 import '../core/problem.dart';
+import '../screens/concept_screen.dart';
 import 'math_text.dart';
 
 /// Result shown after grading.
@@ -288,8 +290,35 @@ Future<void> showSolutionSheet(BuildContext context, Problem p, GradedAnswer? g)
               ]),
             ),
           ],
+          ..._relatedConcepts(ctx, p),
         ],
       ),
     ),
   );
+}
+
+/// 틀린 문제 옆 "관련 개념" — 유형이 같은 개념 페이지로 바로 간다.
+List<Widget> _relatedConcepts(BuildContext context, Problem p) {
+  final app = AppScope.read(context);
+  final cs = app.bank.conceptsFor(p);
+  if (cs.isEmpty) return const <Widget>[];
+  final color = Color(app.bank.subject(p.subjectId)?.color ?? 0xFF2F6BFF);
+  return [
+    const SizedBox(height: 20),
+    const Text('관련 개념', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
+    const SizedBox(height: 8),
+    Wrap(spacing: 8, runSpacing: 8, children: [
+      for (var i = 0; i < cs.length; i++)
+        ActionChip(
+          key: Key('related-concept-${cs[i].id}'),
+          avatar: Icon(Icons.auto_stories_rounded, size: 18, color: color),
+          label: Text(cs[i].title.isEmpty ? cs[i].kind : cs[i].title),
+          onPressed: () {
+            final nav = Navigator.of(context);
+            nav.pop();
+            nav.push(MaterialPageRoute<void>(builder: (_) => ConceptScreen(concepts: cs, index: i, color: color)));
+          },
+        ),
+    ]),
+  ];
 }

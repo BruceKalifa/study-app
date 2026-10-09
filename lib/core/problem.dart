@@ -453,6 +453,81 @@ class Passage {
       };
 }
 
+/// 개념 종류 (교재의 읽는 쪽).
+const List<String> kConceptKinds = ['개념', '실전개념', '공식 정리'];
+
+/// 개념 페이지 — 문제 없이 읽는 쪽 (개념 정리, 실전개념, 공식 정리). 교재 목차(section) 안에 문제와 섞여 나온다.
+/// 본문은 문제와 같은 표기법($수식$, 표, 그림, 상자 …). 문제와는 [links] (또는 [topic]) 가 문제의 유형(topic)과 맞으면 이어진다.
+class Concept {
+  final String id;
+  final String title;
+
+  /// 개념 | 실전개념 | 공식 정리
+  final String kind;
+  final String unit;
+  final String topic;
+
+  /// 교재 목차 이름 (문항의 section 과 같게 쓰면 그 목차 안에 나온다).
+  final String section;
+  final String body;
+  final String? source;
+
+  /// 이 개념이 설명하는 문제 유형들. 문제의 유형(`·` 로 나눈 토막)과 같으면 "관련 개념" 으로 이어진다. 비면 [topic] 을 쓴다.
+  final List<String> links;
+  const Concept({
+    required this.id,
+    this.title = '',
+    this.kind = '개념',
+    this.unit = '',
+    this.topic = '',
+    this.section = '',
+    required this.body,
+    this.source,
+    this.links = const <String>[],
+  });
+
+  factory Concept.fromJson(Map<String, dynamic> j) {
+    final kind = _str(j['kind'], '개념');
+    return Concept(
+      id: _str(j['id']),
+      title: _str(j['title']),
+      kind: kind.isEmpty ? '개념' : kind,
+      unit: _str(j['unit']),
+      topic: _str(j['topic']),
+      section: _str(j['section']),
+      body: _str(j['body']),
+      source: _strOrNull(j['source']),
+      links: _strList(j['links']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        if (kind != '개념') 'kind': kind,
+        if (unit.isNotEmpty) 'unit': unit,
+        if (topic.isNotEmpty) 'topic': topic,
+        if (section.isNotEmpty) 'section': section,
+        'body': body,
+        if (source != null) 'source': source,
+        if (links.isNotEmpty) 'links': links,
+      };
+
+  /// 이 개념이 설명하는 문제인가 — 문제 유형을 `·` 로 나눈 토막이 연결 이름과 같으면.
+  bool explains(Problem p) {
+    final keys = <String>[
+      for (final l in (links.isNotEmpty ? links : <String>[topic])) if (l.trim().isNotEmpty) l.trim(),
+    ];
+    if (keys.isEmpty) return false;
+    final t = p.topic.trim();
+    final parts = [for (final x in t.split('·')) x.trim()];
+    for (final k in keys) {
+      if (t == k || parts.contains(k)) return true;
+    }
+    return false;
+  }
+}
+
 /// 교과군 (국어·수학·영어·사회·과학).
 class SubjectGroup {
   final String id;
@@ -494,6 +569,9 @@ class Subject {
   final List<Problem> twins;
   final List<Passage> passages;
 
+  /// 개념 페이지 (문제 없이 읽는 쪽).
+  final List<Concept> concepts;
+
   /// kor | math | eng | soc | sci ('' for 내 문제).
   final String group;
 
@@ -510,6 +588,7 @@ class Subject {
     required this.problems,
     this.twins = const <Problem>[],
     this.passages = const <Passage>[],
+    this.concepts = const <Concept>[],
     this.group = '',
     this.level = 'high',
     this.grades = const <String>[],
@@ -544,13 +623,16 @@ class Subject {
     return null;
   }
 
-  Subject copyWith({List<Problem>? problems, List<Problem>? twins, List<Passage>? passages}) => Subject(
+  Subject copyWith(
+          {List<Problem>? problems, List<Problem>? twins, List<Passage>? passages, List<Concept>? concepts}) =>
+      Subject(
         id: id,
         name: name,
         color: color,
         problems: problems ?? this.problems,
         twins: twins ?? this.twins,
         passages: passages ?? this.passages,
+        concepts: concepts ?? this.concepts,
         group: group,
         level: level,
         grades: grades,
@@ -580,6 +662,16 @@ class Subject {
         if (m != null) passages.add(Passage.fromJson(m));
       }
     }
+    final concepts = <Concept>[];
+    final rawC = j['concepts'];
+    if (rawC is List) {
+      for (final e in rawC) {
+        final m = _map(e);
+        if (m == null) continue;
+        final c = Concept.fromJson(m);
+        if (c.id.isNotEmpty) concepts.add(c);
+      }
+    }
     return Subject(
       id: id,
       name: name,
@@ -587,6 +679,7 @@ class Subject {
       problems: List<Problem>.unmodifiable(problems),
       twins: List<Problem>.unmodifiable(twins),
       passages: List<Passage>.unmodifiable(passages),
+      concepts: List<Concept>.unmodifiable(concepts),
       group: _str(j['group']),
       level: _str(j['level'], 'high'),
       grades: _strList(j['grades']),
@@ -605,6 +698,7 @@ class Subject {
         if (track.isNotEmpty) 'track': track,
         if (unitOrder.isNotEmpty) 'units': unitOrder,
         if (passages.isNotEmpty) 'passages': [for (final p in passages) p.toJson()],
+        if (concepts.isNotEmpty) 'concepts': [for (final c in concepts) c.toJson()],
         'problems': [for (final p in [...problems, ...twins]) p.toJson()],
       };
 }
@@ -627,6 +721,9 @@ class Workbook {
   final String desc;
   final List<String> problemIds;
 
+  /// 이 교재에 든 개념 페이지 id (읽는 순서). 문제와 같은 목차 안에 섞여 나온다.
+  final List<String> conceptIds;
+
   /// 시리즈 이름 (예: FLOW TYPE) — such workbooks may mix several courses.
   final String series;
 
@@ -646,6 +743,7 @@ class Workbook {
     this.level = '기본',
     this.desc = '',
     this.problemIds = const <String>[],
+    this.conceptIds = const <String>[],
     this.series = '',
     this.stage = '개념',
     this.scope = '',
@@ -667,6 +765,7 @@ class Workbook {
       level: level,
       desc: _str(j['desc']),
       problemIds: _strList(j['problems']),
+      conceptIds: _strList(j['concepts']),
       series: _str(j['series']),
       stage: kWorkbookStages.contains(stage) ? stage : _stageFromLevel(level),
       scope: _str(j['scope']),

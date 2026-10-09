@@ -99,6 +99,7 @@ class ProblemBank {
           problems: List<Problem>.unmodifiable([...e.problems, ...s.problems]),
           twins: List<Problem>.unmodifiable([...e.twins, ...s.twins]),
           passages: List<Passage>.unmodifiable([...e.passages, ...s.passages]),
+          concepts: List<Concept>.unmodifiable([...e.concepts, ...s.concepts]),
         );
       }
     }
@@ -156,6 +157,31 @@ class ProblemBank {
     }
     return null;
   }
+
+  /// 개념 페이지 한 장 (모든 과목에서 찾는다).
+  Concept? concept(String id) => _concepts[id];
+
+  late final Map<String, Concept> _concepts = {
+    for (final s in subjects)
+      for (final c in s.concepts) c.id: c,
+  };
+
+  /// 교재에 든 개념 페이지, 읽는 순서대로.
+  List<Concept> conceptsOf(Workbook w) => [
+        for (final id in w.conceptIds)
+          if (concept(id) case final c?) c,
+      ];
+
+  /// 이 문제를 설명하는 개념 (같은 과목 안에서 유형이 맞는 것). 틀린 문제 옆 "관련 개념" 에 쓴다.
+  List<Concept> conceptsFor(Problem p) {
+    final s = subject(p.subjectId);
+    if (s == null || s.concepts.isEmpty) return const <Concept>[];
+    return [for (final c in s.concepts) if (c.explains(p)) c];
+  }
+
+  /// 이 개념이 설명하는 문제들 ([within] 이 있으면 그 안에서만).
+  List<Problem> problemsExplainedBy(Concept c, {Iterable<Problem>? within}) =>
+      [for (final p in within ?? all) if (c.explains(p)) p];
 
   List<Problem> problemsOf(Workbook w) => [
         for (final id in w.problemIds)

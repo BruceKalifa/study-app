@@ -7,10 +7,12 @@ import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'answer_key_screen.dart';
+import 'concept_screen.dart';
 import 'solve_screen.dart';
 
 /// One 문제집: problems in order, progress, 이어 풀기 / 틀린 것만.
-class WorkbookScreen extends StatelessWidget {
+/// 개념 교재(CORE TYPE 처럼 개념·실전개념이 문제와 함께 든 책)는 목차마다 개념 카드가 문제 위에 나온다.
+class WorkbookScreen extends StatefulWidget {
   const WorkbookScreen({super.key, required this.workbookId});
   final String workbookId;
 
@@ -18,9 +20,17 @@ class WorkbookScreen extends StatelessWidget {
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WorkbookScreen(workbookId: id)));
 
   @override
+  State<WorkbookScreen> createState() => _WorkbookScreenState();
+}
+
+class _WorkbookScreenState extends State<WorkbookScreen> {
+  /// 전체 | 개념 | 문제
+  String _show = 'all';
+
+  @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
-    final w = app.bank.workbook(workbookId);
+    final w = app.bank.workbook(widget.workbookId);
     if (w == null) return Scaffold(appBar: AppBar(), body: const Center(child: Text('문제집을 찾을 수 없어요')));
     final course = app.bank.subject(w.course);
     final color = Color(course?.color ?? 0xFF5B6475);
@@ -39,6 +49,17 @@ class WorkbookScreen extends StatelessWidget {
       go();
     }
 
+    final concepts = app.bank.conceptsOf(w);
+    final groups = tocGroups(ps, concepts);
+    // 목차 순서대로 펼친 개념들 — 개념 화면에서 앞뒤로 넘기는 순서
+    final readOrder = [for (final g in groups) ...g.concepts];
+    final showConcepts = _show != 'problem';
+    final showProblems = _show != 'concept';
+    void openConcept(Concept c) {
+      final i = readOrder.indexWhere((x) => x.id == c.id);
+      ConceptScreen.open(context, concepts: readOrder, index: i < 0 ? 0 : i, workbookId: w.id, color: color);
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text(w.series.isNotEmpty ? w.series : (course?.name ?? '문제집'))),
       body: ListView(
@@ -52,6 +73,7 @@ class WorkbookScreen extends StatelessWidget {
                   Pill(w.level, color: workbookLevelColor(w.level)),
                   if (w.scope.isNotEmpty) Pill(w.scope, color: AppColors.inkSoft),
                   if (w.publisher.isNotEmpty) Pill(w.publisher, color: AppColors.inkSoft),
+                  if (concepts.isNotEmpty) Pill('개념 ${concepts.length}편', color: color),
                 ]),
                 const SizedBox(height: 10),
                 Text(w.title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.1)),
@@ -71,6 +93,17 @@ class WorkbookScreen extends StatelessWidget {
           ]),
           const SizedBox(height: 20),
           Wrap(spacing: 10, runSpacing: 10, children: [
+            if (concepts.isNotEmpty)
+              FilledButton.tonalIcon(
+                key: const Key('wb-concepts'),
+                onPressed: () {
+                  final next = readOrder.indexWhere((c) => !app.isConceptRead(c.id));
+                  openConcept(readOrder[next < 0 ? 0 : next]);
+                },
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+                icon: const Icon(Icons.auto_stories_rounded),
+                label: Text(readOrder.every((c) => app.isConceptRead(c.id)) ? '개념 다시 보기' : '개념 읽기'),
+              ),
             FilledButton.icon(
               key: const Key('wb-continue'),
               style: FilledButton.styleFrom(backgroundColor: color, minimumSize: const Size(0, 52)),
@@ -128,29 +161,97 @@ class WorkbookScreen extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 24),
-          // 단원이 여럿인 교재(FLOW·BRIDGE TYPE 처럼)는 단원별로 묶어서 — 번호는 교재 전체 번호 그대로
-          for (final (unit, idx) in byTableOfContents(ps)) ...[
-            if (unit.isNotEmpty) _SectionHeader(name: unit, color: color, count: idx.length, onSolve: () {
-              solve(() => SolveScreen.open(context, title: '${w.title} · $unit', problems: [for (final i in idx) ps[i]]));
-            }),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(children: [
-                for (var k = 0; k < idx.length; k++) ...[
-                  if (k > 0) const Divider(height: 1),
-                  _Row(n: idx[k] + 1, problem: ps[idx[k]], color: color, withUnit: usesTableOfContents(ps), onTap: () {
-                    final i = idx[k];
-                    solve(() => SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]));
-                  }),
-                ],
-              ]),
+          if (concepts.isNotEmpty) ...[
+            SegmentedButton<String>(
+              key: const Key('wb-show'),
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'all', label: Text('전체')),
+                ButtonSegment(value: 'concept', label: Text('개념만')),
+                ButtonSegment(value: 'problem', label: Text('문제만')),
+              ],
+              selected: {_show},
+              onSelectionChanged: (v) => setState(() => _show = v.first),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
           ],
+          // 단원이 여럿인 교재(FLOW·BRIDGE TYPE 처럼)는 단원별로 묶어서 — 번호는 교재 전체 번호 그대로
+          for (final g in groups)
+            if ((showConcepts && g.concepts.isNotEmpty) || (showProblems && g.idx.isNotEmpty)) ...[
+              if (g.name.isNotEmpty)
+                _SectionHeader(
+                  name: g.name,
+                  color: color,
+                  count: g.idx.length,
+                  concepts: g.concepts.length,
+                  onSolve: g.idx.isEmpty
+                      ? null
+                      : () => solve(() => SolveScreen.open(context,
+                          title: '${w.title} · ${g.name}', problems: [for (final i in g.idx) ps[i]])),
+                ),
+              if (showConcepts && g.concepts.isNotEmpty)
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(children: [
+                    for (var k = 0; k < g.concepts.length; k++) ...[
+                      if (k > 0) const Divider(height: 1),
+                      _ConceptRow(concept: g.concepts[k], color: color, onTap: () => openConcept(g.concepts[k])),
+                    ],
+                  ]),
+                ),
+              if (showConcepts && g.concepts.isNotEmpty && showProblems && g.idx.isNotEmpty) const SizedBox(height: 8),
+              if (showProblems && g.idx.isNotEmpty)
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(children: [
+                    for (var k = 0; k < g.idx.length; k++) ...[
+                      if (k > 0) const Divider(height: 1),
+                      _Row(n: g.idx[k] + 1, problem: ps[g.idx[k]], color: color, withUnit: usesTableOfContents(ps), onTap: () {
+                        final i = g.idx[k];
+                        solve(() => SolveScreen.open(context, title: w.title, problems: [...ps.sublist(i), ...ps.sublist(0, i)]));
+                      }),
+                    ],
+                  ]),
+                ),
+              const SizedBox(height: 14),
+            ],
         ],
       ),
     );
   }
+}
+
+/// 목차 한 칸: 이름, 그 안의 문제(자리번호), 그 안의 개념.
+class TocGroup {
+  final String name;
+  final List<int> idx;
+  final List<Concept> concepts;
+  const TocGroup(this.name, this.idx, this.concepts);
+}
+
+/// 교재의 목차 칸들 — 문제는 [byTableOfContents], 개념은 `section` 이 같은 목차 칸에 들어간다.
+/// 목차가 비어 있으면 첫 칸에, 어느 칸과도 안 맞으면 맨 앞에 개념만 있는 칸으로 둔다 (책머리 개념).
+List<TocGroup> tocGroups(List<Problem> ps, List<Concept> concepts) {
+  final base = byTableOfContents(ps);
+  if (concepts.isEmpty) return [for (final (name, idx) in base) TocGroup(name, idx, const <Concept>[])];
+  final names = [for (final (name, _) in base) name];
+  final byName = <String, List<Concept>>{for (final n in names) n: <Concept>[]};
+  final lead = <String, List<Concept>>{}; // 문제 칸이 없는 목차 이름 → 개념
+  final unnamedOnly = names.length == 1 && names.first.isEmpty; // 목차 없는 교재
+  for (final c in concepts) {
+    final key = c.section.trim();
+    if (!unnamedOnly && key.isNotEmpty && byName.containsKey(key)) {
+      byName[key]!.add(c);
+    } else if (key.isNotEmpty) {
+      lead.putIfAbsent(key, () => <Concept>[]).add(c);
+    } else {
+      (names.isEmpty ? lead.putIfAbsent('', () => <Concept>[]) : byName[names.first]!).add(c);
+    }
+  }
+  return [
+    for (final e in lead.entries) TocGroup(e.key, const <int>[], e.value),
+    for (final (name, idx) in base) TocGroup(name, idx, byName[name] ?? const <Concept>[]),
+  ];
 }
 
 final _dayRe = RegExp(r'DAY\s*(\d+)');
@@ -196,11 +297,13 @@ List<(String, List<int>)> byTableOfContents(List<Problem> ps) {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.name, required this.color, required this.count, required this.onSolve});
+  const _SectionHeader(
+      {required this.name, required this.color, required this.count, this.concepts = 0, required this.onSolve});
   final String name;
   final Color color;
   final int count;
-  final VoidCallback onSolve;
+  final int concepts;
+  final VoidCallback? onSolve;
 
   @override
   Widget build(BuildContext context) {
@@ -211,14 +314,16 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 10),
         Text(name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
         const SizedBox(width: 8),
-        Text('$count문항', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 13)),
+        Text([if (concepts > 0) '개념 $concepts', if (count > 0 || concepts == 0) '$count문항'].join(' · '),
+            style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 13)),
         const Spacer(),
-        TextButton.icon(
-          key: Key('wb-unit-$name'),
-          onPressed: onSolve,
-          icon: const Icon(Icons.play_arrow_rounded, size: 18),
-          label: const Text('이 목차 풀기'),
-        ),
+        if (onSolve != null)
+          TextButton.icon(
+            key: Key('wb-unit-$name'),
+            onPressed: onSolve,
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            label: const Text('이 목차 풀기'),
+          ),
       ]),
     );
   }
@@ -266,6 +371,42 @@ class _Row extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           DifficultyDots(problem.difficulty, color: color, size: 6),
+        ]),
+      ),
+    );
+  }
+}
+
+class _ConceptRow extends StatelessWidget {
+  const _ConceptRow({required this.concept, required this.color, required this.onTap});
+  final Concept concept;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final read = app.isConceptRead(concept.id);
+    return InkWell(
+      key: Key('concept-${concept.id}'),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+        child: Row(children: [
+          SizedBox(width: 36, child: Icon(Icons.auto_stories_rounded, size: 22, color: color)),
+          Icon(read ? Icons.check_circle_rounded : Icons.circle_outlined,
+              size: 24, color: read ? AppColors.correct : AppColors.lineStrong),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(concept.title.isEmpty ? '개념' : concept.title,
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          if (concept.topic.isNotEmpty) ...[
+            Text(concept.topic,
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkMuted)),
+            const SizedBox(width: 12),
+          ],
+          Pill(concept.kind, color: color, dense: true),
         ]),
       ),
     );

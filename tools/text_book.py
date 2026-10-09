@@ -99,6 +99,7 @@ def generic_course(name):
     return (stable_slug(name), name, color, group)
 
 STAGES = ('개념', '유형', '기출', 'N제', '모의고사')
+CONCEPT_KINDS = ('개념', '실전개념', '공식 정리')
 SECTIONS = ('문제', '선택지', '해설', '본문', '보기')
 CIRCLED = '①②③④⑤⑥⑦⑧⑨'
 # <보기> 항목 머리 (ㄱ. ㄴ. ㄷ. / 가. 나. / (가) (나))
@@ -118,13 +119,13 @@ def read_info(path):
 
 
 def parse_blocks(text):
-    """문항.txt → [{'kind': '문항'|'지문', 'no': …, 'head': {…}, 'body': {구역: 글}}]"""
+    """문항.txt → [{'kind': '문항'|'지문'|'개념', 'no': …, 'head': {…}, 'body': {구역: 글}}]"""
     out = []
     cur = None
     sec = None
     for raw in text.splitlines():
         line = raw.rstrip()
-        m = re.match(r'^#\s*(문항|지문)\s+(\S.*)$', line)
+        m = re.match(r'^#\s*(문항|지문|개념)\s+(\S.*)$', line)
         if m:
             cur = {'kind': m.group(1), 'no': m.group(2).strip(), 'head': {}, 'body': {}}
             out.append(cur)
@@ -304,13 +305,16 @@ def build(folder, outdir=None):
         or DEFAULT_GRADES.get(book_course[3], ['고2', '고3', 'N수'])
 
     problems = []
-    passages, items = [], []
+    passages, items, concept_blocks = [], [], []
     seen = set()
     for b in blocks:
         if b['no'] in seen:
             problems.append(f'{b["kind"]} {b["no"]}: 번호가 겹쳐요')
         seen.add(b['no'])
-        (passages if b['kind'] == '지문' else items).append(b)
+        if b['kind'] == '개념':
+            concept_blocks.append(b)
+        else:
+            (passages if b['kind'] == '지문' else items).append(b)
 
     used = set()
     pass_json = []
@@ -389,6 +393,45 @@ def build(folder, outdir=None):
         course['problems'].append(p)
         all_ids.append(p['id'])
 
+    # 개념 페이지 (#개념) — 과목은 문항과 같은 방식으로 고른다
+    concept_ids = []
+    for b in concept_blocks:
+        where = f'개념 {b["no"]}'
+        head = b['head']
+        text = clean(b['body'].get('본문', ''), figs, problems, where)
+        if not text:
+            problems.append(f'{where}: [본문] 이 비어 있어요')
+        kind = head.get('종류', '개념').strip() or '개념'
+        if kind not in CONCEPT_KINDS:
+            problems.append(f'{where}: 종류는 {" · ".join(CONCEPT_KINDS)} 중에서 골라 주세요 — 지금 "{kind}"')
+            kind = '개념'
+        area = head.get('영역', '')
+        cid, cname, color, group = course_of(head.get('과목', ''), area, meta.get('과목', ''),
+                                             generic=[head.get('과목', ''), meta.get('과목', '')])
+        course = courses.setdefault(cid, {
+            'subject': cname, 'subjectId': cid, 'color': color, 'group': group,
+            'level': 'mid' if grades and all(g.startswith('중') for g in grades) else 'high',
+            'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '수능'),
+            'passages': [], 'problems': []})
+        c = {
+            'id': f'{book_id}-c-{item_slug(b["no"], used)}',
+            'title': head.get('제목', '').strip(),
+            'kind': kind,
+            'unit': area or cname,
+            'topic': head.get('유형', ''),
+            'section': head.get('목차', '') or '',
+            'body': text,
+        }
+        if not c['title']:
+            problems.append(f'{where}: 제목이 비어 있어요')
+        links = [x.strip() for x in re.split(r'[,，/]', head.get('연결', '')) if x.strip()]
+        if links:
+            c['links'] = links
+        if head.get('출처'):
+            c['source'] = head['출처']
+        course.setdefault('concepts', []).append(c)
+        concept_ids.append(c['id'])
+
     for c in courses.values():
         c['units'] = list(dict.fromkeys(p['unit'] for p in c['problems']))
     if courses and pass_json:
@@ -405,9 +448,12 @@ def build(folder, outdir=None):
         'desc': ' — '.join(x for x in (meta.get('시리즈', ''), meta.get('범위', '').replace(' / ', ' · ')) if x),
         'problems': all_ids,
     }
+    if concept_ids:
+        wb['concepts'] = concept_ids
     bundle = {'format': 'pulinote-bundle', 'version': 1, 'id': book_id, 'title': title,
               'courses': list(courses.values()), 'workbooks': [wb]}
     report = {'book': title, 'id': book_id, 'problems': len(all_ids), 'passages': len(pass_json),
+              'concepts': len(concept_ids),
               'choice': sum(1 for c in courses.values() for p in c['problems'] if p['type'] == 'choice'),
               'box': sum(1 for c in courses.values() for p in c['problems'] if p.get('boxItems')),
               'figures': len(set(figs.values())), 'issues': problems}
@@ -509,7 +555,20 @@ SELFTEST_SCI_INFO = """- 교재명: 보기 과학 01회차
 - 문항 수: 2
 """
 
-SELFTEST_SCI_ITEMS = """#문항 고체-01
+SELFTEST_SCI_ITEMS = """#개념 C1
+제목: 판 구조론 핵심
+종류: 실전개념
+영역: 고체 지구
+유형: 판 구조론
+목차: 수업문항
+연결: 판 구조론, 맨틀 대류
+
+[본문]
+판의 경계는 세 가지이다.
+
+$$v = f\\lambda$$
+
+#문항 고체-01
 영역: 고체 지구
 유형: 판 구조론
 형식: 객관식
@@ -618,8 +677,11 @@ def selftest():
         rep = build(folder, os.path.join(tmp, 'out'))
         eq(rep['issues'], [], '과학 교재도 흠 없이 변환')
         eq(rep['box'], 1, '보기 합답형 수')
+        eq(rep['concepts'], 1, '개념 수')
         with gzip.open(rep['file']) as f:
-            c = json.loads(f.read().decode('utf-8'))['courses'][0]
+            sci_bundle = json.loads(f.read().decode('utf-8'))
+        c = sci_bundle['courses'][0]
+        wbs0 = sci_bundle['workbooks'][0]
         eq(c['subjectId'], 'earth1', '앱에 있는 지구과학Ⅰ 과목으로 들어간다')
         eq(c['group'], 'sci', '교과군')
         eq(c['grades'], ['고2', '고3', 'N수'], '대상 학년 (안 적으면 과학 기본값)')
@@ -633,6 +695,10 @@ def selftest():
         eq(solid['choices'][2], 'ㄱ, ㄷ', '합답형 선택지')
         eq(solid['answer'], '3', '정답은 번호')
         eq(solid['hint'], '순서대로 발전하였다.', '힌트')
+        cn = c['concepts'][0]
+        eq((cn['kind'], cn['title'], cn['section'], cn['links']), ('실전개념', '판 구조론 핵심', '수업문항', ['판 구조론', '맨틀 대류']), '개념 페이지')
+        assert '$$v = f' in cn['body'], '개념 본문 수식 줄'
+        eq(wbs0['concepts'], [cn['id']], '교재에 개념 id 목록')
         assert '<보기>' in solid['stem'], '문제 글은 그대로'
         # 한글이 떨어져 나가는 번호도 서로 갈린다 ('해양 지각-01' → sea-per-01 은 안 된다)
         sea = [i for i in ps if i.endswith('-01') and 'solid' not in i]

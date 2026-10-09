@@ -224,6 +224,10 @@ class ContentImport {
           problems: List<Problem>.unmodifiable([...e.problems.where((p) => !ids.contains(p.id)), ...c.problems]),
           twins: List<Problem>.unmodifiable([...e.twins.where((p) => !ids.contains(p.id)), ...c.twins]),
           passages: List<Passage>.unmodifiable([...e.passages, ...c.passages]),
+          concepts: List<Concept>.unmodifiable([
+            ...e.concepts.where((x) => !c.concepts.any((y) => y.id == x.id)),
+            ...c.concepts,
+          ]),
         );
       }
       for (final w in book.workbooks) {

@@ -148,6 +148,7 @@ class AppState extends ChangeNotifier {
     studyStartedAt = null;
     todos = [];
     scores = [];
+    readConcepts = <String>{};
     _syncedUpTo = 0;
     me = null;
     final raw = await storage.read(_pp('state.json'));
@@ -175,6 +176,7 @@ class AppState extends ChangeNotifier {
         studyStartedAt = (j['studyStart'] as num?)?.toInt();
         todos = [for (final x in (j['todos'] as List? ?? const [])) TodoItem.fromJson(m(x))];
         scores = [for (final x in (j['scores'] as List? ?? const [])) ExamScore.fromJson(m(x))];
+        readConcepts = {for (final x in (j['readConcepts'] as List? ?? const [])) '$x'};
         _syncedUpTo = (j['synced'] as num?)?.toInt() ?? 0;
       } catch (e) {
         debugPrint('state.json broken: $e');
@@ -374,6 +376,7 @@ class AppState extends ChangeNotifier {
       'studyStart': studyStartedAt,
       'todos': [for (final x in todos) x.toJson()],
       'scores': [for (final x in scores) x.toJson()],
+      if (readConcepts.isNotEmpty) 'readConcepts': readConcepts.toList(),
       'synced': _syncedUpTo,
     });
     await storage.write(_pp('state.json'), data);
@@ -604,6 +607,19 @@ class AppState extends ChangeNotifier {
     }
     _changed();
   }
+
+  /// 읽은 개념 페이지 id (교재 목차에 ✓ 로 보인다).
+  Set<String> readConcepts = <String>{};
+
+  bool isConceptRead(String id) => readConcepts.contains(id);
+
+  void setConceptRead(String id, bool read) {
+    if (read ? !readConcepts.add(id) : !readConcepts.remove(id)) return;
+    _changed();
+  }
+
+  /// 개념 페이지에 한 필기가 들어 있는 파일 (개념마다 하나).
+  String conceptNotePath(String conceptId) => 'concept_notes/${Uri.encodeComponent(conceptId)}.json';
 
   Future<String?> readProfileFile(String name) => storage.read(_pp(name));
   Future<void> writeProfileFile(String name, String data) => storage.write(_pp(name), data);
