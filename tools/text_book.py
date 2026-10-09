@@ -188,15 +188,21 @@ def course_of(*keys):
     return DEFAULT_COURSE
 
 
-# 흔한 한글 낱말 → 영문 (id 를 사람이 읽을 수 있게)
+# 흔한 한글 낱말 → 영문 (id 를 사람이 읽을 수 있게). 긴 낱말을 먼저 둔다.
 WORDS = (
-    ('자료해석', 'data'), ('언어이해', 'lang'), ('공간지각', 'sp'), ('모의고사', 'mock'),
+    # 영역·과목
+    ('자료해석', 'data'), ('언어이해', 'lang'), ('공간지각', 'sp'), ('창의수리', 'cre'),
+    ('언어추리', 'lrea'), ('수리추론', 'nrea'), ('수열추리', 'srea'), ('디지털역량', 'digi'),
     ('지구과학', 'earth'), ('통합과학', 'integ'), ('물리학', 'phy'), ('확률과 통계', 'prob'),
-    ('언어', 'lang'), ('수리', 'num'), ('자료', 'data'), ('추리', 'rea'), ('도식', 'dia'),
-    ('도형', 'fig'), ('공간', 'sp'), ('지각', 'per'), ('상식', 'gen'), ('인적성', 'apt'),
+    ('한국사', 'hist'), ('언어', 'lang'), ('수리', 'num'), ('수열', 'seq'), ('자료', 'data'),
+    ('추리', 'rea'), ('추론', 'rea'), ('도식', 'dia'), ('도형', 'fig'), ('공간', 'sp'),
+    ('지각', 'per'), ('상식', 'gen'), ('인적성', 'apt'), ('이해', 'comp'),
     ('고체 지구', 'solid'), ('고체', 'solid'), ('대기와 해양', 'air'), ('대기', 'air'),
     ('해양', 'sea'), ('우주', 'space'), ('지구', 'earth'), ('수학', 'math'), ('과학', 'sci'),
-    ('수업', 'cls'), ('숙제', 'hw'), ('기출', 'gc'), ('변형', 'var'), ('심화', 'adv'), ('예제', 'ex'),
+    # 교재 종류·목차
+    ('모의고사', 'mock'), ('유형', 'type'), ('연습', 'prac'), ('실전', 'real'), ('훈련', 'drill'),
+    ('수업', 'cls'), ('숙제', 'hw'), ('기출', 'gc'), ('변형', 'var'), ('심화', 'adv'),
+    ('예제', 'ex'), ('오답', 'wrong'), ('보기', 'ex'),
 )
 
 
@@ -245,8 +251,20 @@ def build(folder, outdir=None):
 
     title = re.sub(r'\s*문항.*$', '', meta.get('교재명', os.path.basename(folder))).strip()
     series = meta.get('시리즈', '').split('(')[0].strip() or title.split()[0]
-    num = re.search(r'(\d+)\s*회차', title)
-    book_id = stable_slug(series) + (f'-{int(num.group(1)):02d}' if num else '')
+    num = re.search(r'(\d+)\s*회(?:차)?', title)
+    # id: 시리즈 + 꼬리 (회차 번호, 없으면 교재명에서 시리즈를 뺀 나머지).
+    # 교재명이 시리즈로 시작하지 않으면 교재명만 쓴다 (이름이 겹쳐 쌓이지 않게).
+    if title.startswith(series):
+        rest = title[len(series):].strip()
+        head = stable_slug(series)
+    else:
+        rest = ''
+        head = stable_slug(title)
+    if num:
+        tail = f'-{int(num.group(1)):02d}'
+    else:
+        tail = f'-{stable_slug(rest)}' if rest else ''
+    book_id = head + tail
     book_course = course_of(meta.get('과목', ''))
     grades = [g.strip() for g in re.split(r'[,，·/]', meta.get('대상 학년', '')) if g.strip()] \
         or DEFAULT_GRADES.get(book_course[3], ['고2', '고3', 'N수'])
@@ -524,7 +542,7 @@ def selftest():
         eq(c['group'], 'apt', '교과군')
         eq(c['grades'], ['취준'], '대상 학년')
         eq(c['units'], ['언어이해', '자료해석', '추리'], '영역 목록')
-        eq([p['id'] for p in c['passages']], ['book-316d-01-p-p1'], '지문 id')
+        eq([p['id'] for p in c['passages']], [rep['id'] + '-p-p1'], '지문 id')
         ps = {p['id'].rsplit('-', 2)[-2] + '-' + p['id'].rsplit('-', 1)[-1]: p for p in c['problems']}
         eq(sorted(ps), ['data-01', 'lang-01', 'rea-01'], '문항 id')
         lang = ps['lang-01']
@@ -532,7 +550,7 @@ def selftest():
         eq(lang['answer'], '2', '정답')
         eq(len(lang['choices']), 5, '선택지 5개')
         eq(lang['choices'][1], '둘째', '선택지 글 (번호는 떼어 낸다)')
-        eq(lang['passageId'], 'book-316d-01-p-p1', '지문 연결')
+        eq(lang['passageId'], rep['id'] + '-p-p1', '지문 연결')
         eq(lang['label'], '유형 연습', '머리표')
         eq(lang['section'], '언어이해', '목차')
         data = ps['data-01']

@@ -477,10 +477,10 @@ class InkController extends ChangeNotifier {
   }
 
   // ---------------- 자리 고르기 (함수 그래프 놓기) ----------------
-  /// 자리를 고르는 중이면 캔버스가 그리기 대신 사각형을 끌게 한다.
+  /// 자리를 고르는 중이면 캔버스가 그리는 대신 누른 자리를 받는다.
   final ValueNotifier<PlaceRequest?> placing = ValueNotifier<PlaceRequest?>(null);
 
-  /// 지금 끌고 있는 사각형 (캔버스가 점선으로 그린다).
+  /// 손가락이 놓인 자리에 놓일 네모 (캔버스가 점선으로 미리 그린다).
   Rect? placePreview;
 
   void startPlacing(PlaceRequest r) {
@@ -496,15 +496,23 @@ class InkController extends ChangeNotifier {
     activeTick.value++;
   }
 
-  /// 캔버스가 부른다 — 손을 떼면 고른 자리로 [PlaceRequest.onPick] 을 부른다.
-  void finishPlacing(Rect rect) {
+  /// 누른 자리를 가운데로 한 네모 — 종이 밖으로 나가면 안으로 밀어 넣는다.
+  Rect placeRectAt(Offset center, PlaceRequest r) {
+    final w = math.min(r.defaultSize.width, kPageWidth - 16);
+    final h = math.min(r.defaultSize.height, math.max(40.0, pageHeight - 16));
+    final left = (center.dx - w / 2).clamp(8.0, math.max(8.0, kPageWidth - w - 8));
+    final top = (center.dy - h / 2).clamp(8.0, math.max(8.0, pageHeight - h - 8));
+    return Rect.fromLTWH(left, top, w, h);
+  }
+
+  /// 캔버스가 부른다 — 누른 자리를 가운데로 [PlaceRequest.onPick] 을 부른다.
+  void finishPlacing(Offset center) {
     final r = placing.value;
+    final rect = r == null ? null : placeRectAt(center, r);
     placing.value = null;
     placePreview = null;
     activeTick.value++;
-    if (r == null) return;
-    final small = rect.width < 40 || rect.height < 40;
-    r.onPick(small ? Rect.fromCenter(center: rect.center, width: r.defaultSize.width, height: r.defaultSize.height) : rect);
+    if (r != null) r.onPick(rect!);
   }
 
   // ---------------- 도형 맞추기 ----------------
@@ -804,10 +812,10 @@ class InkController extends ChangeNotifier {
 class PlaceRequest {
   const PlaceRequest({required this.hint, required this.defaultSize, required this.onPick});
 
-  /// 화면 위에 띄울 안내 ("그래프를 놓을 자리를 끌거나 톡 누르세요").
+  /// 화면 위에 띄울 안내 ("그래프를 놓을 자리를 한 번 누르세요").
   final String hint;
 
-  /// 끌지 않고 톡 눌렀을 때 쓸 크기.
+  /// 누른 자리를 가운데로 놓을 크기.
   final Size defaultSize;
   final void Function(Rect rect) onPick;
 }

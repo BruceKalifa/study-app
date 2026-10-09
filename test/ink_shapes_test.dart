@@ -192,27 +192,32 @@ void main() {
   });
 
   group('자리 고르기', () {
-    test('끌어서 고른 사각형이 그대로 온다', () {
+    test('한 번 누른 자리를 가운데로 놓는다', () {
       final c = InkController(settings: InkSettings());
       Rect? picked;
       c.startPlacing(PlaceRequest(
           hint: '자리', defaultSize: const Size(400, 300), onPick: (r) => picked = r));
       expect(c.placing.value, isNotNull);
-      c.finishPlacing(const Rect.fromLTRB(100, 200, 500, 440));
-      expect(picked, const Rect.fromLTRB(100, 200, 500, 440));
-      expect(c.placing.value, isNull, reason: '한 번 고르면 끝난다');
+      c.finishPlacing(const Offset(500, 600));
+      expect(picked!.width, 400);
+      expect(picked!.height, 300);
+      expect(picked!.center, const Offset(500, 600));
+      expect(c.placing.value, isNull, reason: '한 번 누르면 끝난다');
       c.dispose();
     });
 
-    test('톡 누르면(사각형이 작으면) 기본 크기로 가운데에 놓는다', () {
+    test('종이 밖으로 나가지 않게 안으로 밀어 넣는다', () {
       final c = InkController(settings: InkSettings());
-      Rect? picked;
-      c.startPlacing(PlaceRequest(
-          hint: '자리', defaultSize: const Size(400, 300), onPick: (r) => picked = r));
-      c.finishPlacing(const Rect.fromLTRB(300, 300, 302, 301));
-      expect(picked!.width, 400);
-      expect(picked!.height, 300);
-      expect(picked!.center.dx, closeTo(301, 1));
+      final r = PlaceRequest(hint: '자리', defaultSize: const Size(400, 300), onPick: (_) {});
+      // 왼쪽 위 끝을 눌러도 네모가 종이 안에 들어온다
+      final topLeft = c.placeRectAt(const Offset(4, 4), r);
+      expect(topLeft.left, greaterThanOrEqualTo(0));
+      expect(topLeft.top, greaterThanOrEqualTo(0));
+      expect(topLeft.width, 400);
+      // 오른쪽 끝도
+      final right = c.placeRectAt(const Offset(kPageWidth + 50, 500), r);
+      expect(right.right, lessThanOrEqualTo(kPageWidth));
+      expect(right.width, 400);
       c.dispose();
     });
 

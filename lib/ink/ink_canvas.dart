@@ -223,11 +223,11 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     final isStylus = _isStylus(e.kind);
     final isMouse = e.kind == PointerDeviceKind.mouse;
 
-    // 자리 고르기(함수 그래프 놓기) — 그리는 대신 사각형을 끈다
-    if (c.placing.value != null && _placePointer == null) {
+    // 자리 고르기(함수 그래프 놓기) — 그리는 대신 누른 자리를 받는다
+    final req = c.placing.value;
+    if (req != null && _placePointer == null) {
       _placePointer = e.pointer;
-      _placeStart = toPage(e.localPosition);
-      c.placePreview = Rect.fromPoints(_placeStart!, _placeStart!);
+      c.placePreview = c.placeRectAt(toPage(e.localPosition), req);
       c.activeTick.value++;
       return;
     }
@@ -281,27 +281,26 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
 
   // 자리 고르기
   int? _placePointer;
-  Offset? _placeStart;
 
+  /// 누른 채 움직이면 놓일 자리가 따라온다 (떼기 전에 고쳐 잡을 수 있게).
   bool _placeMove(PointerEvent e) {
     if (_placePointer != e.pointer) return false;
-    final a = _placeStart;
-    if (a == null) return true;
-    c.placePreview = Rect.fromPoints(a, toPage(e.localPosition));
-    c.activeTick.value++;
+    final req = c.placing.value;
+    if (req != null) {
+      c.placePreview = c.placeRectAt(toPage(e.localPosition), req);
+      c.activeTick.value++;
+    }
     return true;
   }
 
   bool _placeUp(PointerEvent e, {required bool cancelled}) {
     if (_placePointer != e.pointer) return false;
-    final a = _placeStart;
     _placePointer = null;
-    _placeStart = null;
-    if (cancelled || a == null) {
+    if (cancelled) {
       c.cancelPlacing();
       return true;
     }
-    c.finishPlacing(Rect.fromPoints(a, toPage(e.localPosition)));
+    c.finishPlacing(toPage(e.localPosition));
     return true;
   }
 

@@ -85,17 +85,7 @@ class _FunctionSheetState extends State<_FunctionSheet> {
     return Rect.fromLTWH(kPageWidth * 0.08, top, w, 300);
   }
 
-  void _draw({Rect? clip}) {
-    final (strokes, err) = _build(clip ?? _defaultClip);
-    if (strokes == null) {
-      setState(() => _error = err);
-      return;
-    }
-    widget.controller.addStrokes(strokes);
-    if (clip == null) Navigator.pop(context);
-  }
-
-  /// 캔버스에서 자리를 끌어 고른 뒤 거기에 그린다.
+  /// 식을 먼저 확인하고, 연습장에서 누른 자리에 그린다.
   void _place() {
     final (_, err) = _build(_defaultClip);
     if (err != null) {
@@ -105,7 +95,7 @@ class _FunctionSheetState extends State<_FunctionSheet> {
     final c = widget.controller;
     Navigator.pop(context);
     c.startPlacing(PlaceRequest(
-      hint: '그래프를 놓을 자리를 손가락으로 끌어 보세요 · 톡 누르면 기본 크기로',
+      hint: '그래프를 놓을 자리를 한 번 누르세요',
       defaultSize: Size(_defaultClip.width, _defaultClip.height),
       onPick: (rect) {
         final (strokes, _) = _build(rect);
@@ -137,7 +127,7 @@ class _FunctionSheetState extends State<_FunctionSheet> {
           const SizedBox(height: 14),
           const Text('함수 그리기', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
           const SizedBox(height: 4),
-          const Text('식을 적으면 연습장에 그래프를 그려요. 그린 뒤에는 펜으로 고치거나 지울 수 있어요.',
+          const Text('식을 적고 연습장에서 놓을 자리를 한 번 누르면 그려져요. 그린 뒤에는 펜으로 고치거나 지울 수 있어요.',
               style: TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
           const SizedBox(height: 16),
           TextField(
@@ -146,7 +136,7 @@ class _FunctionSheetState extends State<_FunctionSheet> {
             autofocus: true,
             autocorrect: false,
             onChanged: (_) => setState(() => _error = null),
-            onSubmitted: (_) => _draw(),
+            onSubmitted: (_) => _place(),
             decoration: InputDecoration(
               labelText: '함수',
               hintText: 'y = x^2 - 2x',
@@ -214,18 +204,11 @@ class _FunctionSheetState extends State<_FunctionSheet> {
               ),
             ),
             const SizedBox(width: 12),
-            OutlinedButton.icon(
+            FilledButton.icon(
               key: const Key('fn-place'),
               onPressed: _place,
-              icon: const Icon(Icons.crop_free_rounded),
-              label: const Text('자리 고르기'),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              key: const Key('fn-draw'),
-              onPressed: _draw,
-              icon: const Icon(Icons.show_chart_rounded),
-              label: const Text('바로 그리기'),
+              icon: const Icon(Icons.touch_app_rounded),
+              label: const Text('놓을 자리 누르기'),
             ),
           ]),
         ]),
