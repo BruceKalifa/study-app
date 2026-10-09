@@ -54,6 +54,12 @@
       <h2>올라와 있는 교재 <span class="count" id="count"></span></h2>
       <button class="ghost" type="button" id="refresh">다시 읽기</button>
     </section>
+    <section class="bulk" id="bulk" hidden>
+      <input type="search" id="filter" placeholder="이름으로 걸러 보기 (예: CORE TYPE)" autocomplete="off">
+      <span class="muted" id="shown"></span>
+      <button class="ghost" type="button" id="hideAll">보이는 교재 전부 학생에게서 내리기</button>
+      <button class="danger ghost" type="button" id="delAll">보이는 교재 전부 지우기</button>
+    </section>
     <section id="list" class="list"></section>
     <p class="empty" id="empty" hidden>아직 올린 교재가 없습니다.</p>
   </main>

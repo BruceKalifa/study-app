@@ -157,3 +157,6 @@ button { font: inherit; cursor: pointer; border-radius: 10px; }
   .row-side { justify-items: start; }
   .chips, .row-students { justify-content: flex-start; text-align: left; }
 }
+
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
+.bulk input[type="search"] { flex: 1 1 220px; min-width: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: #fff; }

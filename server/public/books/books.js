@@ -97,14 +97,48 @@ function fmtDate(ms) {
   return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+let allBooks = [];
+
 async function load() {
   const out = await api('/api/books');
-  const books = (out.books || []).filter((b) => b.mine);
-  $('count').textContent = books.length ? `${books.length}권` : '';
-  $('empty').hidden = books.length > 0;
+  allBooks = (out.books || []).filter((b) => b.mine);
+  $('count').textContent = allBooks.length ? `${allBooks.length}권` : '';
+  $('empty').hidden = allBooks.length > 0;
+  draw();
+}
+
+/** 걸러 낸(이름에 글자가 든) 교재만 그린다. 한꺼번에 내리기·지우기도 이 목록에만 적용된다. */
+function shownBooks() {
+  const q = $('filter').value.trim().toLowerCase();
+  return q ? allBooks.filter((b) => `${b.title} ${(b.titles || []).join(' ')}`.toLowerCase().includes(q)) : allBooks;
+}
+
+function draw() {
+  const books = shownBooks();
+  $('bulk').hidden = allBooks.length < 2;
+  $('shown').textContent = books.length === allBooks.length ? `${books.length}권 모두` : `${books.length}권 / ${allBooks.length}권`;
   const list = $('list');
   list.textContent = '';
   for (const b of books) list.append(row(b));
+}
+
+async function bulk(kind) {
+  const books = shownBooks();
+  if (!books.length) return;
+  const what = kind === 'delete' ? '서버에서 지웁니다 (학생 앱에 이미 받아 둔 교재는 그대로 남습니다)' : '학생에게서 내립니다 (서버에는 남아 있고, 다시 열 수 있습니다)';
+  if (!confirm(`지금 보이는 교재 ${books.length}권을 ${what}.\n\n${books.slice(0, 5).map((b) => '· ' + b.title).join('\n')}${books.length > 5 ? `\n… 외 ${books.length - 5}권` : ''}`)) return;
+  let done = 0;
+  for (const b of books) {
+    try {
+      if (kind === 'delete') await api(`/api/books/${encodeURIComponent(b.id)}`, { method: 'DELETE' });
+      else await api(`/api/books/${encodeURIComponent(b.id)}`, { method: 'POST', json: { open: false, students: [] } });
+      done++;
+    } catch (err) {
+      note(`${b.title}: ${err.message}`, false);
+    }
+  }
+  note(`${done}권을 ${kind === 'delete' ? '지웠습니다' : '학생에게서 내렸습니다'}`, done > 0);
+  await load();
 }
 
 function row(b) {
@@ -225,6 +259,9 @@ $('file').addEventListener('change', async () => {
   $('file').value = '';
   if (files.length) await upload(files);
 });
+$('filter').addEventListener('input', draw);
+$('hideAll').addEventListener('click', () => bulk('hide'));
+$('delAll').addEventListener('click', () => bulk('delete'));
 $('refresh').addEventListener('click', () => load().catch((e) => note(e.message, false)));
 
 const drop = $('drop');
