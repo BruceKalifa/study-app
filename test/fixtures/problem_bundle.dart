@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// 테스트용 문제 은행. 앱에는 싣지 않고 `test/fixtures/problems/` 에서 읽는다.
