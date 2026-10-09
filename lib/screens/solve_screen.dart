@@ -156,6 +156,25 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     if (_app.bank.passageOf(_p) != null) return _passagePageHeight;
     return math.max(620.0, kPageWidth * size.height / size.width);
   }
+  /// 문제가 종이보다 길면(그래프·〈보기〉가 있는 긴 문제, 좁은 가로 단) 아랫부분이 잘리지 않게
+  /// 종이를 문제 높이 + 여유만큼 늘린다 (줄이지는 않는다).
+  void _fitPageToProblem() {
+    final ink = _ink;
+    if (ink == null || !mounted) return;
+    final box = _sheet.root.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return;
+    final want = box.size.height + 120;
+    if (ink.pageHeight < want) {
+      setState(() => ink.pageHeight = want);
+      final live = _app.live;
+      if (live != null) live.sendPage(_p, pageHeight: ink.pageHeight, strokes: () => ink.strokes);
+    }
+  }
+
+  void _fitPageSoon() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fitPageToProblem());
+  }
+
   bool get _locked => !_exam && _graded.containsKey(_index);
 
   @override
@@ -300,6 +319,12 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _ink == ink) _scheduleRecognize(force: true);
     });
+    _fitPageSoon();
+    for (final ms in [300, 900, 2000]) {
+      Future<void>.delayed(Duration(milliseconds: ms), () {
+        if (mounted && _ink == ink) _fitPageToProblem();
+      });
+    }
   }
 
   void _onInkChanged() {
@@ -688,7 +713,13 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                   key: _canvasKey,
                   controller: ink,
                   onTapPage: _onTapPage,
-                  underlay: sheet,
+                  underlay: NotificationListener<SizeChangedLayoutNotification>(
+                    onNotification: (_) {
+                      _fitPageSoon();
+                      return false;
+                    },
+                    child: SizeChangedLayoutNotifier(child: sheet),
+                  ),
                   initialZoom: initialZoom,
                   columnRuleX: passage == null ? ruleX : null,
                 ),
