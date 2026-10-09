@@ -447,7 +447,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     setState(() => _recognizing = true);
     await Handwriting.instance.prepare();
     final local = [for (final s in strokes) s.translated(-r.left, -r.top)];
-    final cands = await Handwriting.instance.recognize(local, width: r.width, height: r.height);
+    final cands = await Handwriting.instance.recognize(local,
+        width: r.width, height: r.height, shape: Handwriting.shapeOf(_problems[i].answer));
     if (!mounted) return;
     setState(() {
       _recognizing = false;

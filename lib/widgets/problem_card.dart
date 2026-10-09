@@ -36,8 +36,12 @@ class ExamSheetKeys {
   }
 }
 
-/// 출처·교재 머리표(기출문제 · 학교 · 회차 …)는 문제를 올리는 선생님에게만 보인다 — 학생 화면에는 나오지 않는다.
-bool showsOrigin(BuildContext context) => context.getInheritedWidgetOfExactType<AppScope>()?.notifier?.isTeacher ?? false;
+/// 출처·교재 머리표(기출문제 · 학교 · 회차 · 변형(원: …) …)는 앱에서 기본으로 아무에게도 안 보인다 —
+/// 올릴 때(웹 교재 창고·변환 도구)만 보면 된다. 선생님이 설정에서 "출처 보기" 를 켠 경우에만 나온다.
+bool showsOrigin(BuildContext context) {
+  final app = context.getInheritedWidgetOfExactType<AppScope>()?.notifier;
+  return app != null && app.isTeacher && app.settings.showOrigin;
+}
 
 /// 배점 like a 모의고사 paper: easy 2점, normal 3점, hard 4점 (교재 문항은 [Problem.points], 0 = 없음).
 int problemPoints(Problem p) => p.points ?? (p.difficulty <= 2 ? 2 : (p.difficulty == 3 ? 3 : 4));

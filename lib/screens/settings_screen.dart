@@ -190,6 +190,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               (v) => app.updateSettings((x) => x.fullscreenSolve = v)),
           _switch('시험지 글꼴 (명조)', '문제를 모의고사 시험지처럼 명조체로 보여줘요', s.examFont,
               (v) => app.updateSettings((x) => x.examFont = v)),
+          if (app.isTeacher)
+            _switch('출처·머리표 보기 (선생님)', '문항 옆의 출처·변형(원: …)·기출 표시를 앱에서도 봐요 (학생에게는 항상 안 보여요)', s.showOrigin,
+                (v) => app.updateSettings((x) => x.showOrigin = v)),
           ValueListenableBuilder<HandwritingStatus>(
             valueListenable: Handwriting.instance.status,
             builder: (context, st, _) => ListTile(

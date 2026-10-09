@@ -219,6 +219,9 @@ class AppSettings {
   /// Problems printed in a 명조 (exam paper) face instead of the UI font.
   bool examFont;
 
+  /// 선생님만: 문항의 출처·머리표(기출 · 변형(원: …) 등)를 앱에서도 본다. 기본은 꺼짐 (올릴 때만 보면 되니까).
+  bool showOrigin;
+
   AppSettings({
     this.dailyGoal = 10,
     this.serverUrl = '',
@@ -229,6 +232,7 @@ class AppSettings {
     this.shuffleChoicesInVariants = true,
     this.fullscreenSolve = true,
     this.examFont = true,
+    this.showOrigin = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -240,6 +244,7 @@ class AppSettings {
         'autoAdvance': autoAdvance,
         'fullscreenSolve': fullscreenSolve,
         'examFont': examFont,
+        'showOrigin': showOrigin,
       };
 
   static AppSettings fromJson(Map<String, dynamic> j) => AppSettings(
@@ -251,5 +256,6 @@ class AppSettings {
         autoAdvance: j['autoAdvance'] == true,
         fullscreenSolve: j['fullscreenSolve'] != false,
         examFont: j['examFont'] != false,
+        showOrigin: j['showOrigin'] == true,
       );
 }
