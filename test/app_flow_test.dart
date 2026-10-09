@@ -791,7 +791,7 @@ void main() {
     await tester.tap(find.text('go'));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('예제'), findsWidgets);
+    expect(find.text('예제'), findsNothing, reason: '교재 머리표는 학생 화면에 나오지 않는다 (선생님만)');
     expect(find.text('Solvit 예시 문항'), findsNothing, reason: '출처는 학생 화면에 나오지 않는다 (선생님만)');
     expect(find.byType(Math), findsWidgets);
     bool hasPoints() => tester
@@ -803,8 +803,8 @@ void main() {
     await tester.tap(find.byKey(const Key('next')));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('심화'), findsWidgets);
     expect(find.byType(SvgPicture), findsOneWidget);
+    expect(find.text('심화'), findsNothing);
     expect(find.textContaining('<svg'), findsNothing);
     expect(tester.takeException(), isNull);
     // 나란히 (글 | 표) and a list inside the box
@@ -823,7 +823,6 @@ void main() {
             body: SingleChildScrollView(child: ProblemBrief(problem: ps[1], studentAnswer: '5', showSolution: true)))));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(SvgPicture), findsOneWidget);
-    expect(find.text('심화'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
