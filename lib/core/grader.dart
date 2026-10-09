@@ -216,7 +216,7 @@ class Grader {
     return evalComplex(n.replaceAllMapped(RegExp(r'\bI\b'), (_) => 'i'));
   }
 
-  static final RegExp _symbolicHint = RegExp(r'[\[\]{}∞∪∩≤≥<>∈∉⊂]');
+  static final RegExp _symbolicHint = RegExp(r'[\[\]{}∞∪∩≤≥≦≧<>∈∉⊂]');
 
   /// 구간·집합처럼 괄호 모양이 뜻을 가르는 답: 공백만 지우고 괄호·쉼표는 그대로 둔다.
   /// 그런 기호가 없으면 예전처럼 [normalize] 로 비교한다 (2x = 2*x).
