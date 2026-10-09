@@ -125,6 +125,8 @@ class AppState extends ChangeNotifier {
     await _loadProfileData();
     ready = true;
     notifyListeners();
+    // 교재는 서버가 본이다 — 켤 때마다 조용히 받아 온다 (못 받으면 지난번에 받아 둔 것으로 쓴다)
+    syncContentSoon();
     _afterSignIn(restore: false);
   }
 
@@ -201,71 +203,56 @@ class AppState extends ChangeNotifier {
       }
     }
     _changed();
-    // 선생님이 파일로 넣은 교재는 곧바로 서버에도 올라간다 (학생이 받을 수 있게)
-    if (isTeacher) syncBooksSoon();
     return added;
   }
 
   Future<BookBundle> importBook(List<int> bytes) async => (await importBooks(bytes)).first;
 
-  // ── 교재 자동 주고받기 (server/books.js) ──
+  // ── 교재 받기 (server/books.js) ──
+  //
+  // 앱은 교재를 올리지 않는다. 교재는 서버의 교재 창고(웹 /books/)에 올리고,
+  // 앱은 거기 있는 것을 받기만 한다. 선생님 태블릿도 똑같이 받기만 한다.
   bool bookSyncing = false;
 
-  /// 마지막 교재 동기화 결과 (설정 화면에 보여 준다).
+  /// 마지막 교재 받기 결과 (설정 화면에 보여 준다).
   String bookSyncMessage = '';
 
   Future<String> _bookChain = Future.value('');
 
-  /// 선생님: 이 기기에 있는 교재를 서버에 올린다. 학생: 선생님이 올린 교재를 받아서 넣는다.
+  /// 서버에 있는 교재 중 이 기기에 없거나 바뀐 것을 받는다.
   /// 로그인한 뒤·앱을 켤 때 저절로 돈다. 실패해도 앱은 그냥 쓰던 대로 쓴다.
   /// 여러 번 불러도 하나씩 차례로 돌고, 부른 쪽은 자기 차례의 결과를 받는다.
-  Future<String> syncBooks({bool force = false}) {
+  Future<String> syncBooks() {
     if (account == null) return Future.value('');
-    final next = _bookChain.then((_) => _runBookSync(force: force));
+    final next = _bookChain.then((_) => _runBookSync());
     _bookChain = next.catchError((Object _) => '');
     return next;
   }
 
-  Future<String> _runBookSync({bool force = false}) async {
+  Future<String> _runBookSync() async {
     final a = account;
     if (a == null) return '';
     bookSyncing = true;
-    bookSyncMessage = isTeacher ? '교재를 서버에 올리는 중…' : '선생님 교재를 받는 중…';
+    bookSyncMessage = '교재를 받는 중…';
     _changed(save: false);
     var msg = '';
     try {
       final api = AccountApi.of(a);
-      final remote = await api.books();
-      // 서버에만 있는 교재 → 이 기기로 (고친 교재를 올리는 중이면 받지 않는다 — 고친 내용이 덮이지 않게)
       var got = 0;
-      for (final r in force ? const <ServerBook>[] : remote) {
+      for (final r in await api.books()) {
         final have = {for (final b in importedBooks) b.id: b.sha};
-        // 다 있고 서버 파일도 그대로면 건너뛴다 (정답을 고치면 지문이 바뀌어 다시 받는다)
+        // 다 있고 서버 파일도 그대로면 건너뛴다 (교재를 다시 올리면 지문이 바뀌어 다시 받는다)
         final same = r.bookIds.isNotEmpty &&
             r.bookIds.every((id) => have.containsKey(id) && (r.sha.isEmpty || have[id] == r.sha));
         if (same) continue;
         got += (await importBooks(await api.bookBytes(r.id), sha: r.sha)).length;
       }
-      if (got > 0) msg = isTeacher ? '서버에서 교재 $got권을 받았어요' : '선생님 교재 $got권을 받았어요';
-      // 이 기기에만 있는 교재 → 서버로 (선생님만). force 면 고친 내용을 다시 올린다.
-      if (isTeacher) {
-        final onServer = {for (final r in remote) ...r.bookIds};
-        final missing = force
-            ? [for (final b in importedBooks) b.id]
-            : [for (final b in importedBooks) if (!onServer.contains(b.id)) b.id];
-        final file = missing.isEmpty ? null : await ContentImport(storage).fileFor(missing);
-        if (file != null) {
-          final up = await api.uploadBook(file);
-          await ContentImport(storage).markSha(missing, up.sha);
-          importedBooks = await ContentImport(storage).list();
-          msg = '「${up.title}」을 서버에 올렸어요 · 학생이 받을 수 있어요';
-        }
-      }
+      if (got > 0) msg = '교재 $got권을 받았어요';
     } on ApiError catch (e) {
       msg = e.message;
       debugPrint('book sync: ${e.message}');
     } catch (e) {
-      msg = '교재를 주고받지 못했어요';
+      msg = '교재를 받지 못했어요';
       debugPrint('book sync: $e');
     }
     bookSyncing = false;
@@ -275,9 +262,9 @@ class AppState extends ChangeNotifier {
   }
 
   /// 로그인 직후·앱 시작 때 (결과를 기다리지 않는다).
-  void syncBooksSoon({bool force = false}) {
+  void syncBooksSoon() {
     if (!autoSyncBooks || account == null) return;
-    unawaited(syncBooks(force: force));
+    unawaited(syncBooks());
   }
 
   /// 이 문제집이 들어 있는 교재 파일의 id (교재 파일로 넣은 것이 아니면 null).
@@ -297,8 +284,31 @@ class AppState extends ChangeNotifier {
     _composeContent();
     _rebuildBank();
     _changed();
-    if (isTeacher) syncBooksSoon(force: true);
+    // 선생님이 고친 정답은 그 교재만 서버에 다시 올린다 (학생 기기에서 지문이 달라져 다시 받아진다)
+    if (isTeacher) unawaited(_pushAnswers(bookId));
     return n;
+  }
+
+  /// 답안표에서 고친 정답을 그 교재 하나만 서버에 다시 올린다.
+  /// 서버 창고에 없던 교재는 올리지 않는다 — 교재를 올리는 곳은 웹 교재 창고다.
+  Future<void> _pushAnswers(String bookId) async {
+    final a = account;
+    if (a == null || !isTeacher) return;
+    try {
+      final api = AccountApi.of(a);
+      final on = (await api.books()).where((r) => r.mine && r.bookIds.contains(bookId));
+      if (on.isEmpty) return;
+      final imports = ContentImport(storage);
+      final file = await imports.fileFor([bookId]);
+      if (file == null) return;
+      final up = await api.uploadBook(file);
+      await imports.markSha([bookId], up.sha);
+      importedBooks = await imports.list();
+      bookSyncMessage = '고친 정답을 서버에 올렸어요';
+      _changed(save: false);
+    } catch (e) {
+      debugPrint('answer push: $e');
+    }
   }
 
   Future<void> removeImportedBook(String id) async {
@@ -1031,6 +1041,12 @@ class AppState extends ChangeNotifier {
   }
 
   // ------------------------------------------------------------ content server
+  /// 앱을 켤 때·로그인한 뒤 조용히 받아 온다 (결과를 기다리지 않는다).
+  void syncContentSoon() {
+    if (!autoSyncBooks || syncing) return;
+    unawaited(syncContent());
+  }
+
   Future<SyncResult> syncContent() async {
     if (syncing) return const SyncResult(false, 0, 0, '받는 중이에요');
     syncing = true;
@@ -1176,8 +1192,9 @@ class AppState extends ChangeNotifier {
     _meTimer?.cancel();
     if (a == null) return;
     _meTimer = Timer.periodic(const Duration(seconds: 90), (_) => refreshMe());
-    // 선생님 기기의 교재는 서버로, 학생 기기에는 선생님 교재를 — 주소를 묻지 않고 저절로
+    // 서버 교재 창고에 있는 교재를 받아 온다 — 주소를 묻지 않고 저절로
     syncBooksSoon();
+    syncContentSoon();
     if (a.isTeacher) return;
     if (restore && attempts.isEmpty) {
       try {

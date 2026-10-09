@@ -1,16 +1,12 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
 import '../app/theme.dart';
 import 'common.dart';
 import '../services/account_api.dart';
-import '../services/content_import.dart';
-import 'book_files_card.dart';
 
-/// 설정: 서버 교재 — 선생님은 올리고, 연결된 학생은 받아서 바로 푼다.
-/// 교재 내용은 서버에만 두고, 로그인한 사람만 받을 수 있다 (server/books.js).
+/// 설정: 서버 교재 — 서버 교재 창고에 있는 교재를 받아서 바로 푼다.
+/// 앱은 교재를 올리지 않는다. 올리는 곳은 웹 교재 창고(<서버>/books/)다 (server/books.js).
 class ServerBooksCard extends StatefulWidget {
   const ServerBooksCard({super.key});
 
@@ -27,7 +23,6 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
   String _msg = '';
   bool _error = false;
   String _busyId = ''; // 받는 중 · 지우는 중인 교재
-  bool _uploading = false;
 
   @override
   void initState() {
@@ -106,28 +101,6 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
     if (mounted) setState(() => _busyId = '');
   }
 
-  Future<void> _upload(AppState app) async {
-    final api = _api;
-    if (api == null) return;
-    final bytes = await BookFilesCard.picker();
-    if (!mounted || bytes == null) return;
-    setState(() {
-      _uploading = true;
-      _msg = '';
-    });
-    try {
-      ContentImport.decodeAll(bytes); // 올리기 전에 이 자리에서 확인
-      final b = await api.uploadBook(Uint8List.fromList(bytes));
-      _say('「${b.title}」을 서버에 올렸어요 · 학생이 받을 수 있어요');
-      await _load();
-    } on FormatException catch (e) {
-      _say(e.message, error: true);
-    } catch (e) {
-      _say(e is ApiError ? e.message : '교재를 올리지 못했어요', error: true);
-    }
-    if (mounted) setState(() => _uploading = false);
-  }
-
   Future<void> _remove(ServerBook b) async {
     final api = _api;
     if (api == null) return;
@@ -165,7 +138,7 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
     final books = _books ?? const <ServerBook>[];
     final have = {for (final b in app.importedBooks) b.id};
     final msg = _msg.isNotEmpty ? _msg : app.bookSyncMessage;
-    final busy = _uploading || app.bookSyncing || (_loading && _books == null);
+    final busy = app.bookSyncing || (_loading && _books == null);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
@@ -175,13 +148,6 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
             actions: [
               if (busy)
                 const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-              else if (teacher)
-                FilledButton.icon(
-                  key: const Key('server-books-upload'),
-                  onPressed: () => _upload(app),
-                  icon: const Icon(Icons.cloud_upload_rounded, size: 18),
-                  label: const Text('서버에 올리기'),
-                )
               else
                 IconButton(
                   key: const Key('server-books-refresh'),
@@ -196,7 +162,7 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
               const SizedBox(height: 2),
               Text(
                   teacher
-                      ? '이 태블릿에 넣은 교재는 저절로 올라가요 · 연결된 학생만 받을 수 있어요'
+                      ? '교재는 웹 교재 창고에서 올려요 · 여기서는 받기만 해요'
                       : '선생님이 올린 교재는 로그인하면 저절로 들어와요',
                   style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5)),
             ]),
@@ -207,9 +173,15 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
                 key: const Key('server-books-msg'),
                 style: TextStyle(fontWeight: FontWeight.w700, color: _error ? AppColors.wrong : AppColors.correct)),
           ],
-          if (_books != null && books.isEmpty) ...[
+          if (teacher) ...[
+            const SizedBox(height: 8),
+            SelectableText('교재 올리는 곳 — ${app.serverAddress}/books/',
+                key: const Key('server-books-web'),
+                style: const TextStyle(color: AppColors.inkMuted, fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+          if (_books != null && books.isEmpty) ...
             const SizedBox(height: 10),
-            Text(teacher ? '아직 올린 교재가 없어요' : '선생님이 올린 교재가 아직 없어요',
+            Text(teacher ? '교재 창고가 비어 있어요' : '선생님이 올린 교재가 아직 없어요',
                 key: const Key('server-books-empty'),
                 style: const TextStyle(color: AppColors.inkSoft)),
           ],

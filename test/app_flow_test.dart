@@ -854,48 +854,58 @@ void main() {
     expect(find.text('선생님 교재'), findsNothing);
   });
 
-  testWidgets('선생님이 교재를 서버에 올린다', (tester) async {
+  testWidgets('선생님 태블릿도 받기만 한다 (올리는 곳은 웹 교재 창고)', (tester) async {
     _tabletSize(tester);
     final app = (await tester.runAsync(_state))!;
     app.profile.account = Account(
         server: 'https://example.test', token: 't', userId: 'u_t', loginId: 'une.teacher', role: 'teacher', name: '선생님');
     final api = _FakeBooksApi(teacher: true);
+    api.shelf.add(ServerBook(
+        id: 'srv-1', title: '수학1 FLOW TYPE 1', bookIds: const ['sample-type-01'],
+        problems: 3, bytes: 1200, mine: true, open: true));
     ServerBooksCard.apiOf = (_) => api;
-    BookFilesCard.picker = () async => Uint8List.fromList(sampleBookFile());
-    addTearDown(() {
-      ServerBooksCard.apiOf = null;
-      BookFilesCard.picker = BookFiles.pick;
-    });
+    addTearDown(() => ServerBooksCard.apiOf = null);
 
     await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: ServerBooksCard()))));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('서버 교재'), findsOneWidget);
-    expect(find.byKey(const Key('server-books-empty')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('server-books-upload')));
+    // 올리는 단추는 없고, 올리는 곳이 어디인지 알려 준다
+    expect(find.byKey(const Key('server-books-upload')), findsNothing);
+    expect(find.byKey(const Key('server-books-web')), findsOneWidget);
+    expect(find.textContaining('/books/'), findsOneWidget);
+
+    // 받기는 된다
+    await tester.tap(find.byKey(const Key('server-book-get-srv-1')));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(api.uploaded.length, 1);
-    expect(find.byKey(const Key('server-books-msg')), findsOneWidget);
-    expect(find.byKey(const Key('server-book-srv-1')), findsOneWidget);
+    expect(api.downloads, 1);
+    expect(api.uploaded, isEmpty, reason: '앱은 교재를 올리지 않는다');
+    expect(app.importedBooks.any((b) => b.id == 'sample-type-01'), isTrue);
 
-    // 교재가 아닌 파일은 올리기 전에 막는다
-    BookFilesCard.picker = () async => Uint8List.fromList(utf8.encode('not a book'));
-    await tester.tap(find.byKey(const Key('server-books-upload')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(api.uploaded.length, 1);
-    expect(find.text('풀이노트 교재 파일이 아니에요'), findsOneWidget);
-
-    // 서버에서 빼기
+    // 서버에서 빼기는 그대로
     await tester.tap(find.byKey(const Key('server-book-remove-srv-1')));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('server-book-remove-ok')));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 150)));
     await tester.pump(const Duration(milliseconds: 400));
     expect(api.shelf, isEmpty);
-    expect(find.byKey(const Key('server-book-srv-1')), findsNothing);
+  });
+
+  testWidgets('선생님이 파일로 넣은 교재는 서버로 올라가지 않는다', (tester) async {
+    final app = (await tester.runAsync(_state))!;
+    app.profile.account = Account(
+        server: 'https://example.test', token: 't', userId: 'u_t', loginId: 'une.teacher', role: 'teacher', name: '선생님');
+    final api = _FakeBooksApi(teacher: true);
+    ServerBooksCard.apiOf = (_) => api;
+    addTearDown(() => ServerBooksCard.apiOf = null);
+
+    await tester.runAsync(() => app.importBooks(sampleBookFile()));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    expect(app.importedBooks.any((b) => b.id == 'sample-type-01'), isTrue, reason: '기기에는 들어간다');
+    expect(api.uploaded, isEmpty, reason: '서버로는 올라가지 않는다');
+    app.dispose();
   });
 
   testWidgets('문제 보기: 교재별이 기본, 교재 안에서는 단원별', (tester) async {
@@ -1308,18 +1318,21 @@ void main() {
       await st.refreshMe();
       expect(st.unreadAnswers, 0);
 
-      // 교재: 선생님 태블릿에 넣으면 저절로 서버에 올라가고, 학생은 저절로 받는다
+      // 교재: 웹 교재 창고(/books/)에 올라간 교재를 앱이 받기만 한다
       final tApp = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
       await tApp.init();
       await tApp.login(server: server, loginId: 't$stamp', password: 'teach-pass');
       expect(tApp.isTeacher, isTrue);
-      await tApp.importBooks(sampleBookFile()); // 설정 → 교재 파일 가져오기
-      expect(await tApp.syncBooks(), contains('올렸어요'));
+      await tApp.importBooks(sampleBookFile()); // 설정 → 교재 파일 가져오기 (기기에만)
+      expect(await tApp.api!.books(), isEmpty, reason: '앱은 교재를 올리지 않는다');
+      expect(await tApp.syncBooks(), '', reason: '올릴 것도 받을 것도 없다');
+
+      // 교재 창고가 하는 일 (웹페이지와 같은 요청)
+      await tApp.api!.uploadBook(Uint8List.fromList(sampleBookFile()));
       expect((await tApp.api!.books()).single.bookIds, ['sample-type-01']);
-      expect(await tApp.syncBooks(), isNot(contains('올렸어요')), reason: '이미 올린 교재는 다시 안 올린다');
 
       expect(st.importedBooks, isEmpty);
-      expect(await st.syncBooks(), '선생님 교재 1권을 받았어요');
+      expect(await st.syncBooks(), '교재 1권을 받았어요');
       expect(st.importedBooks.single.id, 'sample-type-01');
       expect(st.bank.workbook('sample-type-01'), isNotNull, reason: '학생 내 교재에 담긴다');
       expect(await st.syncBooks(), '', reason: '이미 받은 교재는 다시 안 받는다');
