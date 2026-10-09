@@ -179,7 +179,7 @@ class _ServerBooksCardState extends State<ServerBooksCard> {
                 key: const Key('server-books-web'),
                 style: const TextStyle(color: AppColors.inkMuted, fontSize: 13, fontWeight: FontWeight.w600)),
           ],
-          if (_books != null && books.isEmpty) ...
+          if (_books != null && books.isEmpty) ...[
             const SizedBox(height: 10),
             Text(teacher ? '교재 창고가 비어 있어요' : '선생님이 올린 교재가 아직 없어요',
                 key: const Key('server-books-empty'),

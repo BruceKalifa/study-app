@@ -500,8 +500,8 @@ class InkController extends ChangeNotifier {
   Rect placeRectAt(Offset center, PlaceRequest r) {
     final w = math.min(r.defaultSize.width, kPageWidth - 16);
     final h = math.min(r.defaultSize.height, math.max(40.0, pageHeight - 16));
-    final left = (center.dx - w / 2).clamp(8.0, math.max(8.0, kPageWidth - w - 8));
-    final top = (center.dy - h / 2).clamp(8.0, math.max(8.0, pageHeight - h - 8));
+    final left = (center.dx - w / 2).clamp(8.0, math.max(8.0, kPageWidth - w - 8)).toDouble();
+    final top = (center.dy - h / 2).clamp(8.0, math.max(8.0, pageHeight - h - 8)).toDouble();
     return Rect.fromLTWH(left, top, w, h);
   }
 
