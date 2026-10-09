@@ -145,6 +145,20 @@ async function main() {
   ok(r.status === 200 && r.json.user.grade === '고2', '학년 바꾸기');
   await post('/api/me', { grade: '고3' }, S.token);
 
+  section('학년·과정 복수 선택');
+  r = await post('/api/auth/signup', { role: 'student', loginId: 'hyu.multi', password: 'multi-pass', name: '한양대생', grades: ['한양대', 'N수', '편입', 'N수'] });
+  ok(r.status === 200 && r.json.user.grade === '한양대' && JSON.stringify(r.json.user.grades) === '["한양대","N수","편입"]', '여러 개로 가입 (대표 = 첫 번째, 중복 제거)', r.json.user);
+  const M = { token: r.json.token };
+  r = await post('/api/auth/signup', { role: 'student', loginId: 'hyu.bad', password: 'multi-pass', name: '잘못', grades: ['한양대', '중3'] });
+  ok(r.status === 400, '없는 학년이 섞이면 400');
+  r = await post('/api/auth/signup', { role: 'student', loginId: 'old.client', password: 'multi-pass', name: '옛앱', grade: '취준' });
+  ok(r.status === 200 && r.json.user.grade === '취준' && JSON.stringify(r.json.user.grades) === '["취준"]', '옛 앱(grade 하나)도 가입된다');
+  r = await post('/api/me', { grades: ['편입', '한양대'] }, M.token);
+  ok(r.status === 200 && r.json.user.grade === '편입' && r.json.user.grades.length === 2, '정보 수정으로 복수 학년 바꾸기', r.json.user);
+  r = await post('/api/student/sync', { attempts: [], learner: { grade: '고3', grades: ['고3', '한양대'], goal: '수능' } }, M.token);
+  r = await get('/api/me', M.token);
+  ok(r.json.user.grade === '고3' && JSON.stringify(r.json.user.grades) === '["고3","한양대"]', '풀이 기록 동기화로도 반영', r.json.user);
+
   // ───────── 연결 ─────────
   section('선생님 ⇄ 학생 연결');
   r = await post('/api/student/teachers', { code: 'ZZZZZZ' }, S.token);

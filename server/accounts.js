@@ -74,8 +74,23 @@ function needName(v) {
 function needGrade(v) {
   const g = typeof v === 'string' ? v.trim() : '';
   if (g === '') return '';
-  if (!GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준·한양대 중 하나여야 합니다');
+  if (!GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준·한양대·편입 중에서 골라야 합니다');
   return g;
+}
+/** 학년·과정 여러 개 (복수 선택). 첫 번째가 대표 학년이다. 옛 앱은 `grade` 하나만 보낸다. */
+function needGrades(list, single) {
+  const raw = Array.isArray(list) ? list : (single !== undefined && single !== null ? [single] : []);
+  if (raw.length > 12) throw new HttpError(400, '학년을 너무 많이 골랐습니다');
+  const out = [];
+  for (const x of raw) {
+    const g = needGrade(x);
+    if (g && !out.includes(g)) out.push(g);
+  }
+  return out;
+}
+function gradesOf(u) {
+  if (Array.isArray(u.grades) && u.grades.length) return u.grades.filter((g) => GRADES.includes(g));
+  return u.grade ? [u.grade] : [];
 }
 function needPassword(v, label = '비밀번호') {
   const p = typeof v === 'string' ? v : '';
@@ -145,7 +160,11 @@ function createAccountsApi({ dataDir, log, seedFile }) {
         const nu = { id: u.id, role: u.role, loginId: u.loginId, name: lineText(u.name) || u.loginId, salt: u.salt,
           passHash: u.passHash, createdAt: Date.now() };
         if (u.role === 'teacher') nu.inviteCode = typeof u.inviteCode === 'string' ? u.inviteCode : randomCode();
-        if (u.role === 'student') { nu.grade = u.grade || '고3'; nu.teachers = Array.isArray(u.teachers) ? u.teachers : []; }
+        if (u.role === 'student') {
+          nu.grade = u.grade || '고3';
+          if (Array.isArray(u.grades) && u.grades.length) nu.grades = u.grades.filter((g) => GRADES.includes(g));
+          nu.teachers = Array.isArray(u.teachers) ? u.teachers : [];
+        }
         users().push(nu);
       }
       accounts.save().catch((e) => log(`seed accounts: ${e.message}`));
@@ -195,12 +214,12 @@ function createAccountsApi({ dataDir, log, seedFile }) {
   // ── 응답 모양 ──
   function publicUser(u) {
     const out = { id: u.id, role: u.role, loginId: u.loginId, name: u.name, createdAt: u.createdAt };
-    if (u.role === 'student') out.grade = u.grade || '';
+    if (u.role === 'student') { out.grade = u.grade || ''; out.grades = gradesOf(u); }
     if (u.school) out.school = u.school;
     return out;
   }
   function brief(u) {
-    return u ? { id: u.id, name: u.name, ...(u.role === 'student' ? { grade: u.grade || '' } : {}) } : null;
+    return u ? { id: u.id, name: u.name, ...(u.role === 'student' ? { grade: gradesOf(u).join(' · ') } : {}) } : null;
   }
 
   // ── 세션 ──
@@ -268,7 +287,8 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     if (!LOGIN_RE.test(loginId)) throw new HttpError(400, '아이디는 영문 소문자·숫자로 시작하는 4~20자(영문·숫자·. _ -)여야 합니다');
     const password = needPassword(b.password);
     const name = needName(b.name);
-    const grade = role === 'student' ? needGrade(b.grade) : '';
+    const grades = role === 'student' ? needGrades(b.grades, b.grade) : [];
+    const grade = grades[0] || '';
     const school = charLen(lineText(b.school)) <= LIMITS.school ? lineText(b.school) : '';
     checkSignupRate(req.socket.remoteAddress || '');
     if (byLogin.has(loginId)) throw new HttpError(409, '이미 쓰고 있는 아이디입니다');
@@ -284,7 +304,7 @@ function createAccountsApi({ dataDir, log, seedFile }) {
       createdAt: Date.now(),
     };
     if (school) u.school = school;
-    if (role === 'student') { u.grade = grade; u.teachers = []; }
+    if (role === 'student') { u.grade = grade; u.grades = grades; u.teachers = []; }
     if (role === 'teacher') u.inviteCode = uniqueInvite();
     if (byLogin.has(loginId)) throw new HttpError(409, '이미 쓰고 있는 아이디입니다'); // scrypt 기다리는 사이 같은 아이디
     users().push(u);
@@ -324,7 +344,16 @@ function createAccountsApi({ dataDir, log, seedFile }) {
   async function updateMe(req, u) {
     const b = await readJson(req, 16 * 1024);
     if (b.name !== undefined) u.name = needName(b.name);
-    if (b.grade !== undefined && u.role === 'student') u.grade = needGrade(b.grade);
+    if (u.role === 'student') {
+      if (b.grades !== undefined) {
+        const gs = needGrades(b.grades);
+        if (gs.length) { u.grades = gs; u.grade = gs[0]; }
+      } else if (b.grade !== undefined) {
+        const g = needGrade(b.grade);
+        u.grade = g;
+        if (g) u.grades = [g, ...gradesOf(u).filter((x) => x !== g)];
+      }
+    }
     await persist();
     return meView(u);
   }
@@ -408,7 +437,11 @@ function createAccountsApi({ dataDir, log, seedFile }) {
       if (b.learner !== null && (typeof b.learner !== 'object' || Array.isArray(b.learner))) throw new HttpError(400, 'learner 는 객체여야 합니다');
       if (JSON.stringify(b.learner || {}).length > MAX_LEARNER_BYTES) throw new HttpError(413, 'learner 가 너무 큽니다');
       r.learner = b.learner;
-      if (b.learner && typeof b.learner.grade === 'string' && GRADES.includes(b.learner.grade)) u.grade = b.learner.grade;
+      if (b.learner && Array.isArray(b.learner.grades)) {
+        const gs = b.learner.grades.filter((g) => typeof g === 'string' && GRADES.includes(g));
+        const uniq = gs.filter((g, i) => gs.indexOf(g) === i);
+        if (uniq.length) { u.grades = uniq; u.grade = uniq[0]; }
+      } else if (b.learner && typeof b.learner.grade === 'string' && GRADES.includes(b.learner.grade)) u.grade = b.learner.grade;
     }
     if (b.wrongNote !== undefined) {
       if (!Array.isArray(b.wrongNote)) throw new HttpError(400, 'wrongNote 는 배열이어야 합니다');
@@ -481,7 +514,7 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     return {
       id: st.id,
       name: st.name,
-      grade: st.grade || '',
+      grade: gradesOf(st).join(' · '),
       joinedAt: (st.joinedAt && st.joinedAt[teacherId]) || null,
       syncedAt: r.syncedAt || null,
       lastActiveAt: r.attempts.length ? r.attempts[r.attempts.length - 1].at : null,
@@ -532,7 +565,7 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     return {
       student: summaryOf(st, u.id),
       learner: {
-        grade: typeof L.grade === 'string' ? L.grade : st.grade || '',
+        grade: Array.isArray(L.grades) && L.grades.length ? L.grades.filter((g) => typeof g === 'string').join(' · ') : typeof L.grade === 'string' ? L.grade : gradesOf(st).join(' · '),
         goal: typeof L.goal === 'string' ? L.goal : '',
         workbooks: Array.isArray(L.workbooks) ? L.workbooks.map((x) => s(x, 120)) : [],
         examName: typeof L.examName === 'string' ? L.examName : '',

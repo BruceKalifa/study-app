@@ -25,8 +25,11 @@ DateTime defaultSuneungDate(DateTime now) {
 class Learner {
   bool onboarded;
 
-  /// 고1 … 고3, N수
+  /// 대표 학년 (커뮤니티·순위에 보이는 값) — [grades] 의 첫 번째.
   String grade;
+
+  /// 고른 학년·과정 전부 (복수 선택: 한양대 + N수 + 편입 …). 과목·교재 목록이 이걸로 걸러진다.
+  List<String> grades;
 
   /// 수능 | 내신 | 둘 다
   String goal;
@@ -52,6 +55,7 @@ class Learner {
   Learner({
     this.onboarded = false,
     this.grade = '고2',
+    List<String>? grades,
     this.goal = '수능',
     List<String>? courses,
     List<String>? workbooks,
@@ -62,13 +66,29 @@ class Learner {
     this.subscribedAt = 0,
     this.nickname = '',
     this.rankingOptIn = true,
-  })  : courses = courses ?? <String>[],
+  })  : grades = (grades == null || grades.isEmpty) ? <String>[grade] : List<String>.of(grades),
+        courses = courses ?? <String>[],
         workbooks = workbooks ?? <String>[];
 
+
+  /// 학년·과정을 한꺼번에 바꾼다 (첫 번째가 대표). 빈 목록은 무시한다.
+  void setGrades(List<String> gs) {
+    final l = <String>[];
+    for (final g in gs) {
+      if (g.isNotEmpty && !l.contains(g)) l.add(g);
+    }
+    if (l.isEmpty) return;
+    grades = l;
+    grade = l.first;
+  }
+
+  /// 화면에 보여 줄 이름: "한양대 · N수 · 편입"
+  String get gradeLabel => grades.isEmpty ? grade : grades.join(' · ');
 
   Map<String, dynamic> toJson() => {
         'onboarded': onboarded,
         'grade': grade,
+        'grades': grades,
         'goal': goal,
         'courses': courses,
         'workbooks': workbooks,
@@ -81,9 +101,12 @@ class Learner {
         'rank': rankingOptIn,
       };
 
-  static Learner fromJson(Map<String, dynamic> j) => Learner(
+  static Learner fromJson(Map<String, dynamic> j) {
+    final gs = _ls(j['grades']);
+    return Learner(
         onboarded: j['onboarded'] == true,
-        grade: _s(j['grade'], '고2'),
+        grade: gs.isNotEmpty ? gs.first : _s(j['grade'], '고2'),
+        grades: gs,
         goal: _s(j['goal'], '수능'),
         courses: _ls(j['courses']),
         workbooks: _ls(j['workbooks']),
@@ -94,7 +117,8 @@ class Learner {
         subscribedAt: _i(j['subAt']),
         nickname: _s(j['nick']),
         rankingOptIn: j['rank'] != false,
-      );
+    );
+  }
 }
 
 /// 매일 오답 변형 세트 — generated once per day.

@@ -687,9 +687,12 @@ class AppState extends ChangeNotifier {
   bool get needsOnboarding => !learner.onboarded;
 
   /// Courses meant for [grade] (내 문제 excluded).
-  List<Subject> coursesForGrade(String grade) => [
+  List<Subject> coursesForGrade(String grade) => coursesForGrades([grade]);
+
+  /// 여러 학년·과정을 함께 고른 경우: 하나라도 겹치는 과목이 보인다.
+  List<Subject> coursesForGrades(List<String> grades) => [
         for (final s in bank.subjects)
-          if (s.id != ProblemBank.customSubjectId && (s.grades.isEmpty || s.grades.contains(grade))) s
+          if (s.id != ProblemBank.customSubjectId && (s.grades.isEmpty || s.grades.any(grades.contains))) s
       ];
 
   /// 내 교재: the workbooks the student put on the shelf (in the order they were added).
@@ -763,6 +766,7 @@ class AppState extends ChangeNotifier {
   void completeOnboarding({
     required String name,
     required String grade,
+    List<String>? grades,
     required String goal,
     required List<String> courses,
     required List<String> workbooks,
@@ -771,8 +775,8 @@ class AppState extends ChangeNotifier {
       profile.name = name.trim();
       _saveProfiles();
     }
+    learner.setGrades(grades != null && grades.isNotEmpty ? grades : [grade]);
     learner
-      ..grade = grade
       ..goal = goal
       ..courses = courses
       ..workbooks = [for (final w in workbooks) if (bank.workbook(w) != null) w]
@@ -1138,10 +1142,11 @@ class AppState extends ChangeNotifier {
     required String password,
     required String name,
     String grade = '',
+    List<String> grades = const <String>[],
   }) async {
     final (token, info) = await AccountApi(server)
-        .signup(role: role, loginId: loginId.trim(), password: password, name: name.trim(), grade: grade);
-    await _signIn(server: server, token: token, info: info, fresh: true, grade: grade);
+        .signup(role: role, loginId: loginId.trim(), password: password, name: name.trim(), grade: grade, grades: grades);
+    await _signIn(server: server, token: token, info: info, fresh: true, grade: grade, grades: grades);
   }
 
   Future<void> _signIn({
@@ -1150,6 +1155,7 @@ class AppState extends ChangeNotifier {
     required MeInfo info,
     bool fresh = false,
     String grade = '',
+    List<String> grades = const <String>[],
   }) async {
     final acc = Account(
       server: server.trim(),
@@ -1159,6 +1165,7 @@ class AppState extends ChangeNotifier {
       role: info.role,
       name: info.name,
       grade: info.grade,
+      grades: info.grades,
       communityKey: info.communityKey,
     );
     if (ready) await saveNow();
@@ -1178,7 +1185,10 @@ class AppState extends ChangeNotifier {
     await _loadProfileData();
     // the account's server is also where problems, community and live view live
     if (settings.serverUrl.trim().isEmpty) settings.serverUrl = acc.server;
-    if (fresh && !acc.isTeacher && grade.isNotEmpty) learner.grade = grade;
+    if (fresh && !acc.isTeacher) {
+      final gs = grades.isNotEmpty ? grades : (grade.isNotEmpty ? [grade] : const <String>[]);
+      if (gs.isNotEmpty) learner.setGrades(gs);
+    }
     me = info;
     await _saveProfiles();
     await saveNow();

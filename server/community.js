@@ -91,7 +91,7 @@ function needText(value, label, max, isBody) {
 function needGrade(v) {
   const g = typeof v === 'string' ? v.trim() : v == null ? '' : null;
   if (g === '') return '';
-  if (g == null || !GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수 중 하나이거나 비워 두어야 합니다');
+  if (g == null || !GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준·한양대·편입 중 하나이거나 비워 두어야 합니다');
   return g;
 }
 function newId(prefix) {

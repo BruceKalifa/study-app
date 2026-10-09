@@ -33,7 +33,7 @@ class WorkbookStoreScreen extends StatelessWidget {
         ],
       ),
       body: WorkbookCatalog(
-        grade: app.learner.grade,
+        grades: app.learner.grades,
         initialCourse: initialCourse,
         isSelected: app.hasWorkbook,
         onToggle: (w) {
@@ -61,7 +61,7 @@ class WorkbookStoreScreen extends StatelessWidget {
 class WorkbookCatalog extends StatefulWidget {
   const WorkbookCatalog({
     super.key,
-    required this.grade,
+    required this.grades,
     required this.isSelected,
     required this.onToggle,
     this.onOpen,
@@ -70,7 +70,7 @@ class WorkbookCatalog extends StatefulWidget {
     this.shrinkWrap = false,
   });
 
-  final String grade;
+  final List<String> grades;
   final bool Function(String workbookId) isSelected;
   final ValueChanged<Workbook> onToggle;
   final ValueChanged<Workbook>? onOpen;
@@ -93,7 +93,7 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
     final withBooks = {for (final w in app.bank.workbooks) ...app.bank.coursesOf(w)};
     return [
       for (final s in app.bank.subjects)
-        if (withBooks.contains(s.id) && (_allGrades || s.grades.isEmpty || s.grades.contains(widget.grade))) s
+        if (withBooks.contains(s.id) && (_allGrades || s.grades.isEmpty || s.grades.any(widget.grades.contains))) s
     ];
   }
 
@@ -132,7 +132,7 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
           ),
         TextButton(
           onPressed: () => setState(() => _allGrades = !_allGrades),
-          child: Text(_allGrades ? '${widget.grade} 과목만 보기' : '다른 학년 과목도 보기'),
+          child: Text(_allGrades ? '${widget.grades.join(' · ')} 과목만 보기' : '다른 학년 과목도 보기'),
         ),
       ]),
       const SizedBox(height: 22),

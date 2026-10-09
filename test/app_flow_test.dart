@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:study_app/app/app_state.dart';
+import 'package:study_app/app/learner.dart';
 import 'package:study_app/app/storage.dart';
 import 'package:study_app/app/theme.dart';
 import 'package:study_app/core/problem.dart';
@@ -1391,6 +1392,73 @@ void _aptTests() {
 
 void _univTests() {
   group('한양대 과정', () {
+    test('학년·과정은 여러 개를 함께 고를 수 있다 (대표는 첫 번째)', () {
+      final l = Learner();
+      expect(l.grades, ['고2'], reason: '처음엔 대표 학년 하나');
+      l.setGrades(['한양대', 'N수', '편입', 'N수', '']);
+      expect(l.grades, ['한양대', 'N수', '편입'], reason: '중복·빈 값 제거');
+      expect(l.grade, '한양대');
+      expect(l.gradeLabel, '한양대 · N수 · 편입');
+      l.setGrades(const []);
+      expect(l.grades, ['한양대', 'N수', '편입'], reason: '빈 목록은 무시');
+
+      // 저장했다 읽어도 그대로, 옛 저장본(grade 하나)도 읽힌다
+      final back = Learner.fromJson(l.toJson());
+      expect(back.grades, ['한양대', 'N수', '편입']);
+      expect(back.grade, '한양대');
+      final old = Learner.fromJson({'grade': '고3', 'goal': '수능'});
+      expect(old.grades, ['고3']);
+    });
+
+    testWidgets('여러 학년·과정을 고르면 겹치는 과목이 모두 보인다', (tester) async {
+      final app = (await tester.runAsync(() => _state(onboard: false)))!;
+      await tester.runAsync(() => app.importBooks(aptBookFile()));
+      String ids(List<String> gs) => app.coursesForGrades(gs).map((s) => s.id).toSet().join(',');
+      expect(ids(['고3']).split(','), isNot(contains('apt')));
+      expect(ids(['취준']), 'apt');
+      final both = ids(['고3', '취준']).split(',');
+      expect(both, contains('apt'));
+      expect(both, contains('phy1'), reason: '고3 과목도 그대로');
+      app.dispose();
+    });
+
+    testWidgets('회원가입: 학년·과정을 여러 개 고를 수 있고, 하나도 없으면 막는다', (tester) async {
+      _tabletSize(tester);
+      final s = (await tester.runAsync(() => _state(onboard: false)))!;
+      await tester.pumpWidget(_app(s, home: const AppRoot()));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('welcome-student')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('회원가입'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.enterText(find.byKey(const Key('auth-id')), 'multi.test');
+      await tester.enterText(find.byKey(const Key('auth-pw')), 'secret-1');
+      await tester.enterText(find.byKey(const Key('auth-pw2')), 'secret-1');
+      await tester.enterText(find.byKey(const Key('auth-name')), '한양대생');
+
+      bool on(String g) => tester.widget<FilterChip>(find.byKey(Key('auth-grade-$g'))).selected;
+      expect([for (final g in kGrades) if (on(g)) g], isEmpty, reason: '처음엔 아무것도 고르지 않는다');
+
+      await tester.ensureVisible(find.byKey(const Key('auth-submit')));
+      await tester.tap(find.byKey(const Key('auth-submit')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('하나 이상'), findsOneWidget, reason: '학년·과정이 없으면 가입하지 않는다');
+
+      for (final g in ['한양대', 'N수', '편입']) {
+        await tester.ensureVisible(find.byKey(Key('auth-grade-$g')));
+        await tester.tap(find.byKey(Key('auth-grade-$g')));
+        await tester.pump();
+      }
+      expect([for (final g in kGrades) if (on(g)) g], ['N수', '한양대', '편입'], reason: '세 개 모두 선택');
+      await tester.tap(find.byKey(const Key('auth-grade-N수')));
+      await tester.pump();
+      expect(on('N수'), isFalse, reason: '다시 누르면 해제');
+      expect(on('한양대'), isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('앱에는 과목 이름만 실려 있고 한양대 학생에게만 보인다', (tester) async {
       final bank = (await tester.runAsync(() => ProblemBank.load(rootBundle)))!;
       // 문제는 앱에 싣지 않는다 — 교재는 서버에서 받는다

@@ -18,7 +18,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _signup = false;
   bool _busy = false;
   String? _error;
-  String _grade = '고2';
+  /// 고른 학년·과정 (복수 선택, 고른 순서대로 — 첫 번째가 대표)
+  final List<String> _grades = [];
   final _id = TextEditingController();
   final _pw = TextEditingController();
   final _pw2 = TextEditingController();
@@ -42,6 +43,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       err = '이름을 입력하세요';
     } else if (_signup && _pw.text != _pw2.text) {
       err = '비밀번호 확인이 맞지 않아요';
+    } else if (_signup && _role == 'student' && _grades.isEmpty) {
+      err = '학년·과정을 하나 이상 골라 주세요';
     }
     if (err != null) {
       setState(() => _error = err);
@@ -59,7 +62,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           loginId: _id.text,
           password: _pw.text,
           name: _name.text,
-          grade: _role == 'student' ? _grade : '',
+          grade: _role == 'student' ? (_grades.firstOrNull ?? '') : '',
+          grades: _role == 'student' ? List<String>.of(_grades) : const <String>[],
         );
       } else {
         await app.login(server: server, loginId: _id.text, password: _pw.text);
@@ -238,15 +242,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ),
         if (!teacher) ...[
           const SizedBox(height: 16),
-          const Text('학년', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
+          const Text('학년·과정', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
+          const SizedBox(height: 4),
+          const Text('여러 개 골라도 돼요 (예: 한양대 + N수 + 편입)',
+              style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Wrap(spacing: 8, children: [
+          Wrap(spacing: 8, runSpacing: 4, children: [
             for (final g in kGrades)
-              ChoiceChip(
+              FilterChip(
                 key: Key('auth-grade-$g'),
                 label: Text(g),
-                selected: _grade == g,
-                onSelected: (_) => setState(() => _grade = g),
+                selected: _grades.contains(g),
+                onSelected: (on) => setState(() {
+                  if (on) {
+                    _grades.add(g);
+                  } else {
+                    _grades.remove(g);
+                  }
+                }),
               ),
           ]),
         ],

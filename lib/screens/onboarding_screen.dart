@@ -19,7 +19,8 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
   late final TextEditingController _name;
-  String _grade = '고2';
+  /// 고른 학년·과정 (복수 선택, 고른 순서대로 — 첫 번째가 대표)
+  final List<String> _grades = [];
   String _goal = '수능';
   final List<String> _workbooks = [];
 
@@ -29,13 +30,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final app = AppScope.read(context);
     final acc = app.account;
     _name = TextEditingController(text: acc != null ? acc.name : (app.profile.name == '학생' ? '' : app.profile.name));
-    if (acc != null && acc.grade.isNotEmpty) _grade = acc.grade;
+    if (acc != null && acc.grades.isNotEmpty) {
+      _grades.addAll(acc.grades);
+    } else if (acc != null && acc.grade.isNotEmpty) {
+      _grades.add(acc.grade);
+    }
     if (widget.editing || app.learner.onboarded) {
-      _grade = app.learner.grade;
+      _grades
+        ..clear()
+        ..addAll(app.learner.grades);
       _goal = app.learner.goal;
       _workbooks.addAll(app.learner.workbooks);
     } else if (kGrades.contains(app.learner.grade) && acc != null && acc.grade.isEmpty) {
-      _grade = app.learner.grade;
+      _grades.add(app.learner.grade);
     }
   }
 
@@ -48,7 +55,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _finish(AppState app) {
     app.completeOnboarding(
       name: _name.text,
-      grade: _grade,
+      grade: _grades.first,
+      grades: List<String>.of(_grades),
       goal: _goal,
       courses: const <String>[],
       workbooks: List<String>.of(_workbooks),
@@ -142,7 +150,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const SizedBox(width: 12),
                   FilledButton.icon(
                     key: Key(last ? 'onb-start' : 'onb-next'),
-                    onPressed: last ? () => _finish(app) : () => setState(() => _step++),
+                    onPressed: _grades.isEmpty
+                        ? null // 학년·과정을 하나 이상 골라야 시작할 수 있다
+                        : (last ? () => _finish(app) : () => setState(() => _step++)),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(220, 58),
                       backgroundColor: last ? AppColors.accent : AppColors.ink,
@@ -176,14 +186,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             decoration: const InputDecoration(hintText: '이름 또는 닉네임'),
           ),
           const SizedBox(height: 26),
-          const _Label('학년'),
+          const _Label('학년·과정'),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text('여러 개 골라도 돼요 (예: 한양대 + N수 + 편입)',
+                style: TextStyle(fontSize: 13.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+          ),
           Wrap(spacing: 10, runSpacing: 10, children: [
             for (final g in kGrades)
               _BigChoice(
                 key: Key('grade-$g'),
                 label: g,
-                selected: _grade == g,
-                onTap: () => setState(() => _grade = g),
+                selected: _grades.contains(g),
+                onTap: () => setState(() {
+                  if (!_grades.remove(g)) _grades.add(g);
+                }),
                 width: 120,
               ),
           ]),
@@ -210,7 +227,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ]);
       default:
         return WorkbookCatalog(
-          grade: _grade,
+          grades: _grades,
           shrinkWrap: true,
           isSelected: _workbooks.contains,
           onToggle: (w) => setState(() {

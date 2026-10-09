@@ -16,7 +16,7 @@
   const GROUPS = { kor: '국어', math: '수학', eng: '영어', soc: '사회', sci: '과학', apt: '인적성', univ: '대학' };
   const GROUP_ORDER = ['kor', 'math', 'eng', 'soc', 'sci', 'apt', 'univ'];
   const LEVELS = { mid: '중등', high: '고등', univ: '대학' };
-  const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '취준', '한양대'];
+  const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
   const TRACKS = ['수능', '내신', '공통', '대학'];
   const WB_LEVELS = ['기본', '실전', '심화', '모의고사'];
   const WB_STAGES = ['개념', '유형', '기출', 'N제', '모의고사'];

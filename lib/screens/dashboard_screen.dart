@@ -42,7 +42,7 @@ class DashboardScreen extends StatelessWidget {
             style: TextStyle(fontSize: narrow ? 23 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
         const SizedBox(height: 6),
         Text(
-          '${l.grade} · ${l.goal} 목표 · ${books.isEmpty ? '내 교재 없음' : '내 교재 ${books.length}권'}',
+          '${l.gradeLabel} · ${l.goal} 목표 · ${books.isEmpty ? '내 교재 없음' : '내 교재 ${books.length}권'}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: narrow ? 14 : 15.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600),

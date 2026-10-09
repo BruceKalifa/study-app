@@ -31,6 +31,9 @@ class Account {
   final String role; // student | teacher
   String name;
   String grade;
+
+  /// 고른 학년·과정 전부 (복수). [grade] 는 그중 대표.
+  List<String> grades;
   final String communityKey;
 
   Account({
@@ -41,6 +44,7 @@ class Account {
     required this.role,
     required this.name,
     this.grade = '',
+    this.grades = const <String>[],
     this.communityKey = '',
   });
 
@@ -55,6 +59,7 @@ class Account {
         'role': role,
         'name': name,
         'grade': grade,
+        'grades': grades,
         'ck': communityKey,
       };
 
@@ -69,6 +74,7 @@ class Account {
       role: _s(j['role']) == 'teacher' ? 'teacher' : 'student',
       name: _s(j['name']),
       grade: _s(j['grade']),
+      grades: [if (j['grades'] is List) for (final x in j['grades'] as List) '$x'],
       communityKey: _s(j['ck']),
     );
   }
@@ -86,6 +92,7 @@ class PersonRef {
 /// GET /api/me
 class MeInfo {
   final String userId, loginId, role, name, grade, communityKey;
+  final List<String> grades;
   final String? inviteCode;
   final int studentCount;
   final List<PersonRef> teachers;
@@ -97,6 +104,7 @@ class MeInfo {
     required this.role,
     required this.name,
     required this.grade,
+    this.grades = const <String>[],
     required this.communityKey,
     this.inviteCode,
     this.studentCount = 0,
@@ -114,6 +122,7 @@ class MeInfo {
       role: _s(u['role']) == 'teacher' ? 'teacher' : 'student',
       name: _s(u['name']),
       grade: _s(u['grade']),
+      grades: [if (u['grades'] is List) for (final x in u['grades'] as List) '$x'],
       communityKey: _s(j['communityKey']),
       inviteCode: j['inviteCode'] as String?,
       studentCount: _i(j['studentCount']),
@@ -467,9 +476,16 @@ class AccountApi {
     required String password,
     required String name,
     String grade = '',
+    List<String> grades = const <String>[],
   }) async {
-    final d = await _req('POST', '/api/auth/signup',
-        body: {'role': role, 'loginId': loginId, 'password': password, 'name': name, 'grade': grade});
+    final d = await _req('POST', '/api/auth/signup', body: {
+      'role': role,
+      'loginId': loginId,
+      'password': password,
+      'name': name,
+      'grade': grades.isNotEmpty ? grades.first : grade,
+      if (grades.isNotEmpty) 'grades': grades,
+    });
     return (_s(d['token']), MeInfo.fromJson(d));
   }
 
@@ -480,8 +496,8 @@ class AccountApi {
 
   Future<void> logout() => _req('POST', '/api/auth/logout', body: const {});
   Future<MeInfo> me() async => MeInfo.fromJson(await _req('GET', '/api/me'));
-  Future<MeInfo> updateMe({String? name, String? grade}) async => MeInfo.fromJson(
-      await _req('POST', '/api/me', body: {if (name != null) 'name': name, if (grade != null) 'grade': grade}));
+  Future<MeInfo> updateMe({String? name, String? grade, List<String>? grades}) async => MeInfo.fromJson(await _req('POST', '/api/me',
+      body: {if (name != null) 'name': name, if (grade != null) 'grade': grade, if (grades != null) 'grades': grades}));
   Future<void> changePassword(String current, String next) =>
       _req('POST', '/api/me/password', body: {'current': current, 'next': next});
 

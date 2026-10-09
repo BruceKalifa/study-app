@@ -127,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.school_outlined),
-            title: Text('${app.learner.grade} · ${app.learner.goal} 목표',
+            title: Text('${app.learner.gradeLabel} · ${app.learner.goal} 목표',
                 style: const TextStyle(fontWeight: FontWeight.w800)),
             subtitle: Text(app.myWorkbooks.isEmpty
                 ? '내 교재가 비어 있어요'

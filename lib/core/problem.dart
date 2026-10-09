@@ -478,8 +478,8 @@ class SubjectGroup {
   }
 }
 
-/// 학년 값 (schema `grades`). 고등 수험생 + 인적성(취준) + 한양대(대학 전공 기초) 과정.
-const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준', '한양대'];
+/// 학년 값 (schema `grades`). 고등 수험생 + 인적성(취준) + 한양대(대학 전공 기초) + 편입 과정. 학생은 여러 개를 함께 고를 수 있다.
+const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
 
 /// A course (과목): 물리학Ⅰ, 수학Ⅰ, 국어(독서)… — one JSON file.
 class Subject {

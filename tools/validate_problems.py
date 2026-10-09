@@ -724,7 +724,7 @@ KNOWN_PROBLEM_KEYS = set(REQUIRED) | {
 # course metadata
 GROUPS = ("kor", "math", "eng", "soc", "sci", "apt", "univ")
 LEVELS = ("mid", "high", "univ")
-GRADES = ("중1", "중2", "중3", "고1", "고2", "고3", "N수", "취준", "한양대")
+GRADES = ("중1", "중2", "중3", "고1", "고2", "고3", "N수", "취준", "한양대", "편입")
 TRACKS = ("수능", "내신", "공통", "대학")
 SUBJECT_ID_RE = re.compile(r"^[a-z0-9-]+$")
 
