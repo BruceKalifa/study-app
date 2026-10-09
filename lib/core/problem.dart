@@ -558,7 +558,14 @@ const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준', '한양�
 
 /// 과목 이름 정리: 고등학교 수학 과목(`math`)은 "수학" 이 아니라 "고등수학" 으로 보인다
 /// (편입수학·대학수학·공업수학 등과 헷갈리지 않게). 이미 올라가 있는 교재 파일에도 똑같이 적용된다.
-String canonicalSubjectName(String id, String name) => id == 'math' && name.trim() == '수학' ? '고등수학' : name;
+String canonicalSubjectName(String id, String name) {
+  final n = name.trim();
+  if (id == 'math' && n == '수학') return '고등수학';
+  // 대학 미적분 과목은 "미분적분학1·2" (예전에 올린 교재 파일의 "미적분학1·2" 도 똑같이 보인다)
+  if (id == 'calc1' && n == '미적분학1') return '미분적분학1';
+  if (id == 'calc2' && n == '미적분학2') return '미분적분학2';
+  return name;
+}
 
 /// A course (과목): 물리학Ⅰ, 수학Ⅰ, 국어(독서)… — one JSON file.
 class Subject {

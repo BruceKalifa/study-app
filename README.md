@@ -78,7 +78,7 @@
 - 앱 기본 문항: 국어(독서·문법) · 수학 · 영어 · 통합사회 · 물리학Ⅰ·Ⅱ · 지구과학Ⅰ · 통합과학 · 중2 수학 · 중등 과학 — 원본 197 + 쌍둥이 14, 지문 6, 문제집 13권 (예시 콘텐츠)
 - **출제 도구**: 선생님 PC에서 `cd server && npm start` → 브라우저로 `http://<PC IP>:8080/admin` (관리자 키는 서버 화면에 표시). 텍스트+LaTeX로 문항·쌍둥이·지문·문제집을 만들고 시험지 미리보기로 확인
 - **앱으로 공급**: 앱 설정 → 서버 주소 입력 → "새 문항 받기". 바뀐 과목만 내려받고, 오프라인에서도 마지막으로 받은 문항을 씁니다
-- 앱에 실린 `assets/problems/` 는 과목 이름만 있는 골격(공업수학1·2, 미적분학1·2)이고, 문제는 교재 창고에서 받는다. 테스트용 문제 은행은 `test/fixtures/problems/`.
+- 앱에 실린 `assets/problems/` 는 과목 이름만 있는 골격(공업수학1·2, 미분적분학1·2)이고, 문제는 교재 창고에서 받는다. 테스트용 문제 은행은 `test/fixtures/problems/`.
 - 형식: `assets/problems/*.json` — 스키마 [docs/problem-schema.md](docs/problem-schema.md), API [docs/content-api.md](docs/content-api.md)
 - 검증: `python3 tools/validate_problems.py` (CI에서도 자동 실행)
 

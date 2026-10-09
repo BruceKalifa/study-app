@@ -51,7 +51,7 @@ const BOARDS = [
   { id: 'apt', name: '인적성·NCS', desc: '인적성·NCS 후기와 유형 공유', tracks: ['취준'] },
   { id: 'job', name: '취업정보', desc: '채용 일정·자소서·면접 정보', tracks: ['취준'] },
   { id: 'hyu', name: '한양대 라운지', desc: '학교 생활·수강·시험 이야기', tracks: ['한양대'] },
-  { id: 'univmath', name: '공업수학·미적분학', desc: '공업수학1·2, 미적분학1·2 질문', tracks: ['한양대'] },
+  { id: 'univmath', name: '공업수학·미분적분학', desc: '공업수학1·2, 미분적분학1·2 질문', tracks: ['한양대'] },
   { id: 'univexam', name: '시험·학점', desc: '중간·기말 대비와 학점 관리', tracks: ['한양대'] },
   { id: 'transfer', name: '편입정보', desc: '대학별 일정·기출·합격 후기', tracks: ['편입'] },
   { id: 'trmath', name: '편입수학', desc: '편입수학 개념과 기출 질문', tracks: ['편입'] },

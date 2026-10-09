@@ -68,11 +68,14 @@ COURSES = {
 }
 EMATH1 = ('emath1', '공업수학1', '#6D4AFF', 'univ')
 EMATH2 = ('emath2', '공업수학2', '#5B3FD6', 'univ')
-CALC1 = ('calc1', '미적분학1', '#C2410C', 'univ')
-CALC2 = ('calc2', '미적분학2', '#9A3412', 'univ')
+CALC1 = ('calc1', '미분적분학1', '#C2410C', 'univ')
+CALC2 = ('calc2', '미분적분학2', '#9A3412', 'univ')
 COURSES.update({
     '공업수학1': EMATH1, '공업수학Ⅰ': EMATH1, '공업수학 1': EMATH1,
     '공업수학2': EMATH2, '공업수학Ⅱ': EMATH2, '공업수학 2': EMATH2,
+    '미분적분학1': CALC1, '미분적분학Ⅰ': CALC1, '미분적분학 1': CALC1,
+    '미분적분학2': CALC2, '미분적분학Ⅱ': CALC2, '미분적분학 2': CALC2,
+    # 예전 이름도 같은 과목으로 받는다
     '미적분학1': CALC1, '미적분학Ⅰ': CALC1, '미적분학 1': CALC1,
     '미적분학2': CALC2, '미적분학Ⅱ': CALC2, '미적분학 2': CALC2,
 })
@@ -211,7 +214,7 @@ def course_of(*keys, generic=()):
         key = (key or '').strip()
         if not key:
             continue
-        # 긴 이름을 먼저 본다 ('미적분학1' 이 고등 '미적분' 으로 가지 않게)
+        # 긴 이름을 먼저 본다 ('미분적분학1' 이 고등 '미적분' 으로 가지 않게)
         for name, c in sorted(COURSES.items(), key=lambda kv: -len(kv[0])):
             if key == name or key.startswith(name):
                 return c
@@ -224,7 +227,7 @@ def course_of(*keys, generic=()):
 
 # 흔한 한글 낱말 → 영문 (id 를 사람이 읽을 수 있게). 긴 낱말을 먼저 둔다.
 WORDS = (
-    ('공업수학', 'emath'), ('미적분학', 'calc'),
+    ('공업수학', 'emath'), ('미분적분학', 'calc'), ('미적분학', 'calc'),
     # 영역·과목
     ('자료해석', 'data'), ('언어이해', 'lang'), ('공간지각', 'sp'), ('창의수리', 'cre'),
     ('언어추리', 'lrea'), ('수리추론', 'nrea'), ('수열추리', 'srea'), ('디지털역량', 'digi'),

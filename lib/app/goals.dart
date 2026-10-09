@@ -66,7 +66,7 @@ const Map<String, List<GoalOption>> goalsByGrade = {
   '한양대': [
     GoalOption('중간고사 대비', Icons.edit_calendar_rounded, '중간고사 범위를 단원별로 정리하고 기출 유형을 풀어요', exam: '중간고사'),
     GoalOption('기말고사 대비', Icons.edit_calendar_rounded, '기말고사 파이널 자료로 시험 직전까지 정리해요', exam: '기말고사'),
-    GoalOption('전공 기초 다지기', Icons.functions_rounded, '공업수학·미적분학 기본 개념과 계산력을 쌓아요'),
+    GoalOption('전공 기초 다지기', Icons.functions_rounded, '공업수학·미분적분학 기본 개념과 계산력을 쌓아요'),
     GoalOption('학점 올리기', Icons.trending_up_rounded, '재수강·학점 관리를 위해 약한 단원을 보완해요'),
   ],
   '편입': [

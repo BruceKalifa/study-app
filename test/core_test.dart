@@ -306,7 +306,8 @@ void main() {
     test('고등학교 수학 과목은 고등수학으로 보인다', () {
       expect(canonicalSubjectName('math', '수학'), '고등수학');
       expect(canonicalSubjectName('math', '고등수학'), '고등수학');
-      expect(canonicalSubjectName('calc1', '미적분학1'), '미적분학1');
+      expect(canonicalSubjectName('calc1', '미적분학1'), '미분적분학1');
+      expect(canonicalSubjectName('calc2', '미적분학2'), '미분적분학2');
       final s = Subject.fromJson({
         'subject': '수학',
         'subjectId': 'math',

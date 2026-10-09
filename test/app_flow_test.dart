@@ -1532,7 +1532,7 @@ void _univTests() {
       // 문제는 앱에 싣지 않는다 — 교재는 서버에서 받는다
       expect(bank.all, isEmpty);
       expect(bank.workbooks, isEmpty);
-      expect([for (final s in bank.subjects) s.name], ['공업수학1', '공업수학2', '미적분학1', '미적분학2']);
+      expect([for (final s in bank.subjects) s.name], ['공업수학1', '공업수학2', '미분적분학1', '미분적분학2']);
 
       expect(kGrades, contains('한양대'));
       expect(SubjectGroup.byId('univ')?.name, '대학');
