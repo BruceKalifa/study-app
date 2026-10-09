@@ -79,7 +79,24 @@ COURSES.update({
 DEFAULT_COURSE = APT
 
 # 교과군별 기본 대상 학년 (정보.txt 에 '대상 학년' 이 없을 때)
-DEFAULT_GRADES = {'apt': ['취준'], 'univ': ['한양대'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수']}
+DEFAULT_GRADES = {'apt': ['취준'], 'univ': ['한양대'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수'],
+                  'kor': ['고1', '고2', '고3', 'N수'], 'eng': ['고1', '고2', '고3', 'N수'], 'soc': ['고1', '고2', '고3', 'N수']}
+
+# 목록에 없는 과목 이름(국어·영어·화학·한국사·중등 …)은 이름으로 교과군을 짐작해 새 과목으로 만든다.
+GROUP_HINTS = (
+    ('kor', ('국어', '문학', '독서', '화법', '작문', '언어와 매체', '비문학')),
+    ('eng', ('영어', '영문', 'English', 'TOEIC', '토익')),
+    ('math', ('수학', '대수', '기하', '미적', '확률', '통계')),
+    ('sci', ('물리', '화학', '생명', '지구', '과학', '생물')),
+    ('soc', ('사회', '역사', '한국사', '세계사', '지리', '윤리', '경제', '정치', '법')),
+)
+GENERIC_COLORS = ('#C2410C', '#7C3AED', '#0F766E', '#BE185D', '#4D7C0F', '#B45309', '#1D4ED8', '#9D174D')
+
+
+def generic_course(name):
+    group = next((g for g, keys in GROUP_HINTS if any(k in name for k in keys)), 'univ')
+    color = GENERIC_COLORS[int(hashlib.md5(name.encode()).hexdigest(), 16) % len(GENERIC_COLORS)]
+    return (stable_slug(name), name, color, group)
 
 STAGES = ('개념', '유형', '기출', 'N제', '모의고사')
 SECTIONS = ('문제', '선택지', '해설', '본문', '보기')
@@ -183,10 +200,11 @@ def split_box(text):
     return [c for c in items if c]
 
 
-def course_of(*keys):
+def course_of(*keys, generic=()):
     """과목 → 영역 → 정보.txt 과목 순으로 먼저 맞는 과목을 쓴다.
 
     이름의 앞머리만 본다 ('해양 지각' 이 인적성 '지각' 으로 가지 않게).
+    목록에 하나도 없으면 generic 이름(과목 칸) 중 첫 번째로 새 과목을 만든다.
     """
     for key in keys:
         key = (key or '').strip()
@@ -196,6 +214,10 @@ def course_of(*keys):
         for name, c in sorted(COURSES.items(), key=lambda kv: -len(kv[0])):
             if key == name or key.startswith(name):
                 return c
+    for name in generic:
+        name = (name or '').strip()
+        if name:
+            return generic_course(name)
     return DEFAULT_COURSE
 
 
@@ -277,7 +299,7 @@ def build(folder, outdir=None):
     else:
         tail = f'-{stable_slug(rest)}' if rest else ''
     book_id = head + tail
-    book_course = course_of(meta.get('과목', ''))
+    book_course = course_of(meta.get('과목', ''), generic=[meta.get('과목', '')])
     grades = [g.strip() for g in re.split(r'[,，·/]', meta.get('대상 학년', '')) if g.strip()] \
         or DEFAULT_GRADES.get(book_course[3], ['고2', '고3', 'N수'])
 
@@ -327,9 +349,11 @@ def build(folder, outdir=None):
             diff = max(1, min(5, int(re.sub(r'[^0-9]', '', head.get('난이도', '3')) or 3)))
         except ValueError:
             diff = 3
-        cid, cname, color, group = course_of(head.get('과목', ''), area, meta.get('과목', ''))
+        cid, cname, color, group = course_of(head.get('과목', ''), area, meta.get('과목', ''),
+                                            generic=[head.get('과목', ''), meta.get('과목', '')])
         course = courses.setdefault(cid, {
-            'subject': cname, 'subjectId': cid, 'color': color, 'group': group, 'level': 'high',
+            'subject': cname, 'subjectId': cid, 'color': color, 'group': group,
+            'level': 'mid' if grades and all(g.startswith('중') for g in grades) else 'high',
             'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '수능'),
             'passages': [], 'problems': []})
         p = {
@@ -613,6 +637,20 @@ def selftest():
         # 한글이 떨어져 나가는 번호도 서로 갈린다 ('해양 지각-01' → sea-per-01 은 안 된다)
         sea = [i for i in ps if i.endswith('-01') and 'solid' not in i]
         eq(len(sea), 1, '둘째 문항 id')
+
+    # 목록에 없는 과목 (국어·중등 수학 …) → 이름으로 새 과목을 만든다
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, '보기 국어 01회차')
+        os.makedirs(folder)
+        with open(os.path.join(folder, '정보.txt'), 'w', encoding='utf-8') as f:
+            f.write('- 교재명: 보기 국어 01회차\n- 과목: 국어\n- 대상 학년: 중3\n')
+        with open(os.path.join(folder, '문항.txt'), 'w', encoding='utf-8') as f:
+            f.write('#문항 1\n영역: 문학\n형식: 단답형\n정답: 3\n[문제]\n가\n[해설]\n나\n')
+        rep = build(folder, os.path.join(tmp, 'out'))
+        eq(rep['issues'], [], '국어 교재도 흠 없이 변환')
+        with gzip.open(rep['file']) as f:
+            c = json.loads(f.read().decode('utf-8'))['courses'][0]
+        eq((c['subject'], c['group'], c['level'], c['grades']), ('국어', 'kor', 'mid', ['중3']), '새 과목 (교과군·중등)')
 
     print('\n'.join(fails) if fails else 'text_book selftest ok (인적성 3문항 · 지문 1 / 과학 2문항 · 보기 1)')
     return 1 if fails else 0
