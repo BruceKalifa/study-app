@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
+import '../app/goals.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
 import 'workbook_store_screen.dart' show WorkbookCatalog;
@@ -21,7 +22,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late final TextEditingController _name;
   /// 고른 학년·과정 (복수 선택, 고른 순서대로 — 첫 번째가 대표)
   final List<String> _grades = [];
-  String _goal = '수능';
+  /// 고른 목표 (복수 선택) — 고른 과정에 맞는 목록에서 고른다 (lib/app/goals.dart)
+  final List<String> _goals = [];
   final List<String> _workbooks = [];
 
   @override
@@ -39,7 +41,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _grades
         ..clear()
         ..addAll(app.learner.grades);
-      _goal = app.learner.goal;
+      _goals.addAll(app.learner.goals);
       _workbooks.addAll(app.learner.workbooks);
     } else if (kGrades.contains(app.learner.grade) && acc != null && acc.grade.isEmpty) {
       _grades.add(app.learner.grade);
@@ -52,12 +54,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
+  /// 과정을 다시 골랐을 수 있으니 목록에 없는 목표는 빼고, 하나도 없으면 맨 위 것을 미리 골라 둔다.
+  void _syncGoals() {
+    final valid = goalLabels(_grades);
+    _goals.removeWhere((g) => !valid.contains(g));
+    if (_goals.isEmpty && valid.isNotEmpty) _goals.add(valid.first);
+  }
+
   void _finish(AppState app) {
     app.completeOnboarding(
       name: _name.text,
       grade: _grades.first,
       grades: List<String>.of(_grades),
-      goal: _goal,
+      goals: List<String>.of(_goals),
       courses: const <String>[],
       workbooks: List<String>.of(_workbooks),
     );
@@ -70,7 +79,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     const titles = ['반가워요!', '목표가 무엇인가요?', '풀 문제집을 골라요'];
     const subs = [
       '학년에 맞는 과목과 문제집을 보여 드릴게요.',
-      '목표에 맞춰 D-day와 오늘의 세트를 짜 드려요.',
+      '고른 과정에 맞는 목표예요. 여러 개 골라도 돼요. 목표에 맞춰 D-day와 오늘의 세트를 짜 드려요.',
       '과목별로 개념서부터 유형·기출·N제·모의고사까지 있어요. 고른 문제집이 "내 교재"에 담기고, 내 교재의 문제로 오늘의 세트와 무한 풀기가 만들어져요. 나중에 언제든 더 담을 수 있어요.',
     ];
     final last = _step == 2;
@@ -150,9 +159,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const SizedBox(width: 12),
                   FilledButton.icon(
                     key: Key(last ? 'onb-start' : 'onb-next'),
-                    onPressed: _grades.isEmpty
-                        ? null // 학년·과정을 하나 이상 골라야 시작할 수 있다
-                        : (last ? () => _finish(app) : () => setState(() => _step++)),
+                    onPressed: _grades.isEmpty || (_step == 1 && _goals.isEmpty)
+                        ? null // 학년·과정, 목표를 하나 이상 골라야 넘어간다
+                        : (last
+                            ? () => _finish(app)
+                            : () => setState(() {
+                                  _step++;
+                                  if (_step == 1) _syncGoals();
+                                })),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(220, 58),
                       backgroundColor: last ? AppColors.accent : AppColors.ink,
@@ -206,24 +220,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ]),
         ]);
       case 1:
-        const goals = [
-          ('수능', Icons.flag_rounded, '수능 D-day에 맞춰 실전 감각과 약점 유형을 관리해요'),
-          ('내신', Icons.school_rounded, '학교 진도에 맞춰 단원별로 다지고 시험 기간을 대비해요'),
-          ('둘 다', Icons.all_inclusive_rounded, '내신과 수능을 함께 챙겨요'),
-        ];
-        return Column(children: [
-          for (final (g, icon, d) in goals)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _GoalCard(
-                key: Key('goal-$g'),
-                title: g,
-                desc: d,
-                icon: icon,
-                selected: _goal == g,
-                onTap: () => setState(() => _goal = g),
+        final sections = goalSections(_grades);
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final (grade, options) in sections) ...[
+            // 과정을 둘 이상 골랐을 때만 과정 이름으로 나눠 보여 준다
+            if (sections.length > 1) _Label(grade),
+            for (final o in options)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _GoalCard(
+                  key: Key('goal-${o.label}'),
+                  title: o.label,
+                  desc: o.desc,
+                  icon: o.icon,
+                  selected: _goals.contains(o.label),
+                  onTap: () => setState(() {
+                    if (!_goals.remove(o.label)) _goals.add(o.label);
+                  }),
+                ),
               ),
-            ),
+            const SizedBox(height: 6),
+          ],
         ]);
       default:
         return WorkbookCatalog(

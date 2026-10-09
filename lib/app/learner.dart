@@ -2,6 +2,8 @@
 /// 순공 시간, 할 일, 모의고사 성적). Stored per profile in state.json under "learner".
 library;
 
+import 'goals.dart';
+
 int _i(Object? v, [int d = 0]) => v is num ? v.toInt() : d;
 String _s(Object? v, [String d = '']) => v is String ? v : d;
 List<String> _ls(Object? v) => v is List ? [for (final e in v) '$e'] : <String>[];
@@ -31,8 +33,21 @@ class Learner {
   /// 고른 학년·과정 전부 (복수 선택: 한양대 + N수 + 편입 …). 과목·교재 목록이 이걸로 걸러진다.
   List<String> grades;
 
-  /// 수능 | 내신 | 둘 다
+  /// 고른 목표를 " · " 로 이은 글자 ("수능 · 내신"). 옛 값 "수능" "내신" "둘 다" 도 읽힌다. [goals] 와 늘 같이 바뀐다.
   String goal;
+
+  /// 고른 목표 전부 (복수 선택, 과정마다 고를 수 있는 목록이 다르다 — lib/app/goals.dart)
+  List<String> get goals => parseGoals(goal);
+
+  /// 목표를 한꺼번에 바꾼다. 빈 목록은 무시한다.
+  void setGoals(List<String> gs) {
+    final l = <String>[];
+    for (final g in gs) {
+      if (g.trim().isNotEmpty && !l.contains(g.trim())) l.add(g.trim());
+    }
+    if (l.isEmpty) return;
+    goal = l.join(' · ');
+  }
 
   /// Selected course ids (empty = every course for the grade).
   List<String> courses;

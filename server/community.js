@@ -29,12 +29,32 @@ const crypto = require('crypto');
 const { JsonStore } = require('./json-store');
 const { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, GRADES } = require('./http-util');
 
+// tracks: 이 게시판이 맞는 학년·과정 (앱이 가입 때 고른 과정에 맞는 게시판만 칩으로 보여 준다). 빈 배열 = 모두.
+// 앱의 lib/services/community_api.dart 의 Board.defaults 와 id·이름이 같아야 한다.
+const HIGH = ['고1', '고2', '고3', 'N수'];
 const BOARDS = [
-  { id: 'free', name: '자유', desc: '수험생활 이야기' },
-  { id: 'qna', name: '질문', desc: '과목·문제 질문' },
-  { id: 'proof', name: '공부인증', desc: '오늘 공부한 것 인증' },
-  { id: 'info', name: '입시정보', desc: '입시·모의고사 정보' },
-  { id: 'mind', name: '고민·멘탈', desc: '털어놓고 응원받기' },
+  { id: 'free', name: '자유', desc: '수험생활 이야기', tracks: [] },
+  { id: 'qna', name: '질문', desc: '과목·문제 질문', tracks: [] },
+  { id: 'proof', name: '공부인증', desc: '오늘 공부한 것 인증', tracks: [] },
+  { id: 'info', name: '입시정보', desc: '입시·모의고사 정보', tracks: HIGH },
+  { id: 'mind', name: '고민·멘탈', desc: '털어놓고 응원받기', tracks: [] },
+  { id: 'tips', name: '공부법·꿀팁', desc: '시간표·암기·오답 정리 노하우', tracks: [] },
+  { id: 'study', name: '스터디 모집', desc: '같이 공부할 사람 찾기', tracks: [] },
+  { id: 'naesin', name: '내신', desc: '학교 시험·수행평가·내신 전략', tracks: ['고1', '고2', '고3'] },
+  { id: 'suneung', name: '수능·모의고사', desc: '학평·모평·수능 후기와 분석', tracks: ['고2', '고3', 'N수'] },
+  { id: 'math', name: '수학', desc: '수학 개념·풀이·킬러 문항', tracks: HIGH },
+  { id: 'sci', name: '과학', desc: '물리·화학·생명·지구과학', tracks: HIGH },
+  { id: 'lang', name: '국어·영어', desc: '국어·영어 공부법과 질문', tracks: HIGH },
+  { id: 'soc', name: '사회탐구', desc: '사탐 과목 공부법과 질문', tracks: HIGH },
+  { id: 'sisi', name: '수시·정시', desc: '수시 최저·정시 지원 전략', tracks: ['고3', 'N수'] },
+  { id: 'nsu', name: 'N수·재수', desc: '반수·재수 생활과 계획', tracks: ['N수'] },
+  { id: 'apt', name: '인적성·NCS', desc: '인적성·NCS 후기와 유형 공유', tracks: ['취준'] },
+  { id: 'job', name: '취업정보', desc: '채용 일정·자소서·면접 정보', tracks: ['취준'] },
+  { id: 'hyu', name: '한양대 라운지', desc: '학교 생활·수강·시험 이야기', tracks: ['한양대'] },
+  { id: 'univmath', name: '공업수학·미적분학', desc: '공업수학1·2, 미적분학1·2 질문', tracks: ['한양대'] },
+  { id: 'univexam', name: '시험·학점', desc: '중간·기말 대비와 학점 관리', tracks: ['한양대'] },
+  { id: 'transfer', name: '편입정보', desc: '대학별 일정·기출·합격 후기', tracks: ['편입'] },
+  { id: 'trmath', name: '편입수학', desc: '편입수학 개념과 기출 질문', tracks: ['편입'] },
 ];
 const BOARD_IDS = new Set(BOARDS.map((b) => b.id));
 

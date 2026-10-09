@@ -19,10 +19,12 @@ String relTime(int ms) {
 }
 
 Color boardColor(String id) => switch (id) {
-      'qna' => AppColors.blue,
-      'proof' => AppColors.correct,
-      'info' => const Color(0xFF8C5BD6),
-      'mind' => AppColors.accent,
+      'qna' || 'math' || 'univmath' || 'trmath' => AppColors.blue,
+      'proof' || 'study' || 'naesin' || 'univexam' => AppColors.correct,
+      'info' || 'suneung' || 'sisi' || 'transfer' => const Color(0xFF8C5BD6),
+      'mind' || 'nsu' => AppColors.accent,
+      'sci' || 'lang' || 'soc' || 'tips' => const Color(0xFF0E7C86),
+      'apt' || 'job' || 'hyu' => const Color(0xFFC7791F),
       _ => AppColors.inkSoft,
     };
 
@@ -42,6 +44,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
   bool _loading = false;
   bool _more = true;
   String? _error;
+
+  /// 가입 때 고른 학년·과정에 맞는 게시판 (공통 + 과정별). 전체 보기는 모든 글.
+  List<Board> get _boards => Board.forGrades(AppScope.read(context).learner.grades);
 
   @override
   void initState() {
@@ -156,7 +161,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     _load();
                   },
                 ),
-                for (final b in Board.defaults) ...[
+                for (final b in _boards) ...[
                   const SizedBox(width: 8),
                   ChoiceChip(
                     key: Key('board-${b.id}'),
@@ -624,8 +629,9 @@ class _WritePostScreenState extends State<WritePostScreen> {
           constraints: const BoxConstraints(maxWidth: 820),
           child: ListView(padding: const EdgeInsets.all(28), children: [
             Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final b in Board.defaults)
+              for (final b in Board.forGrades(AppScope.read(context).learner.grades))
                 ChoiceChip(
+                  key: Key('write-board-${b.id}'),
                   label: Text(b.name),
                   selected: _board == b.id,
                   onSelected: (_) => setState(() => _board = b.id),

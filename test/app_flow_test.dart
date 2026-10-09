@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:study_app/app/app_state.dart';
+import 'package:study_app/app/goals.dart';
 import 'package:study_app/app/learner.dart';
 import 'package:study_app/app/storage.dart';
 import 'package:study_app/app/theme.dart';
@@ -360,6 +361,40 @@ void main() {
     expect(app.resolvedWrong.length, 1);
     expect(app.totalSolved, 4);
     expect(app.streak, 1);
+  });
+
+  testWidgets('onboarding: 목표 목록이 고른 과정에 따라 다르고 복수 선택된다', (tester) async {
+    _tabletSize(tester);
+    final s = (await tester.runAsync(() => _state(onboard: false)))!;
+    await tester.pumpWidget(_app(s));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.enterText(find.byKey(const Key('onb-name')), '취준생');
+    await tester.tap(find.byKey(const Key('grade-취준')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('onb-next')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('goal-인적성 실전 대비')), findsOneWidget);
+    expect(find.byKey(const Key('goal-NCS 대비')), findsOneWidget);
+    expect(find.byKey(const Key('goal-수능')), findsNothing, reason: '취준에는 수능 목표가 없다');
+    expect(find.byKey(const Key('goal-내신')), findsNothing);
+    // 맨 위 목표는 미리 골라져 있다 → 하나 더 골라 복수 선택
+    await tester.ensureVisible(find.byKey(const Key('goal-NCS 대비')));
+    await tester.tap(find.byKey(const Key('goal-NCS 대비')));
+    await tester.pump();
+    // 뒤로 가서 한양대를 더하면 한양대 목표가 과정 이름과 함께 나온다
+    await tester.tap(find.text('이전'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('grade-한양대')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('onb-next')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('goal-기말고사 대비')), findsOneWidget);
+    expect(find.byKey(const Key('goal-인적성 실전 대비')), findsOneWidget, reason: '취준 목표도 그대로');
+    expect(find.text('한양대'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('onboarding: name, grade, goal, then pick books from the catalog → 내 교재 → home', (tester) async {
@@ -1244,6 +1279,67 @@ void _aptTests() {
 }
 
 void _univTests() {
+  group('학습 목표', () {
+    test('과정마다 목표 목록이 다르고, 여러 과정을 고르면 겹치는 것은 한 번만 나온다', () {
+      expect(goalLabels(['취준']), ['인적성 실전 대비', 'NCS 대비', '영역별 약점 보완', '시간 단축 연습']);
+      expect(goalLabels(['한양대']), contains('기말고사 대비'));
+      expect(goalLabels(['한양대']), isNot(contains('수능')));
+      expect(goalLabels(['고3']).first, '수능');
+      final both = goalLabels(['고3', 'N수']);
+      expect(both.where((g) => g == '수능'), hasLength(1));
+      expect(both.where((g) => g == '정시 준비'), hasLength(1));
+      expect([for (final s in goalSections(['한양대', '편입'])) s.$1], ['한양대', '편입']);
+      for (final g in kGrades) {
+        expect(goalsByGrade[g], isNotEmpty, reason: '$g 목표 목록');
+      }
+    });
+
+    test('Learner 목표: 복수 선택·저장·옛 값', () {
+      final l = Learner();
+      l.setGoals(['기말고사 대비', '전공 기초 다지기', '기말고사 대비']);
+      expect(l.goal, '기말고사 대비 · 전공 기초 다지기');
+      expect(l.goals, ['기말고사 대비', '전공 기초 다지기']);
+      l.setGoals(const []);
+      expect(l.goals, hasLength(2), reason: '빈 목록은 무시');
+      expect(Learner.fromJson(l.toJson()).goals, ['기말고사 대비', '전공 기초 다지기']);
+      expect(parseGoals('둘 다'), ['수능', '내신']);
+      expect(parseGoals('수능'), ['수능']);
+      expect(parseGoals('6·9월 모의평가 · 수시 준비'), ['6·9월 모의평가', '수시 준비'], reason: '이름 안의 · 는 쪼개지 않는다');
+    });
+
+    test('커뮤니티 게시판은 고른 과정에 맞게 나온다', () {
+      List<String> ids(List<String> gs) => [for (final b in Board.forGrades(gs)) b.id];
+      expect(Board.defaults.map((b) => b.id).toSet(), hasLength(Board.defaults.length), reason: 'id 중복 없음');
+      expect(ids(['취준']), containsAll(['free', 'qna', 'apt', 'job']));
+      expect(ids(['취준']), isNot(contains('naesin')));
+      expect(ids(['한양대']), containsAll(['univmath', 'univexam', 'hyu']));
+      expect(ids(['편입']), containsAll(['transfer', 'trmath']));
+      expect(ids(['고1']), containsAll(['naesin', 'math']));
+      expect(ids(['고1']), isNot(contains('sisi')));
+      expect(ids(['한양대', 'N수']), containsAll(['univmath', 'nsu', 'sisi']), reason: '복수 과정은 합쳐서');
+      expect(ids(const []), hasLength(Board.defaults.length), reason: '과정을 모르면 전부');
+      expect(Board.nameOf('trmath'), '편입수학');
+    });
+
+    test('온보딩을 마치면 D-day 카드에 고른 목표의 시험이 오른다 (날짜는 수능만 미리 채움)', () async {
+      final a = (await _state(onboard: false));
+      a.completeOnboarding(name: '학생', grade: '취준', goals: const ['NCS 대비'], courses: const [], workbooks: const []);
+      expect(a.learner.examName, 'NCS');
+      expect(a.learner.examDate, 0, reason: '수능이 아니면 날짜를 직접 정한다');
+      final b = (await _state(onboard: false));
+      b.completeOnboarding(name: '학생', grade: '고3', goals: const ['수능', '내신 마무리'], courses: const [], workbooks: const []);
+      expect(b.learner.examName, '수능');
+      expect(b.learner.examDate, greaterThan(0));
+      expect(b.learner.goal, '수능 · 내신 마무리');
+      final c = (await _state(onboard: false));
+      c.completeOnboarding(name: '학생', grade: '고1', goals: const ['선행 학습'], courses: const [], workbooks: const []);
+      expect(c.learner.examName, '시험');
+      a.dispose();
+      b.dispose();
+      c.dispose();
+    });
+  });
+
   group('한양대 과정', () {
     test('학년·과정은 여러 개를 함께 고를 수 있다 (대표는 첫 번째)', () {
       final l = Learner();

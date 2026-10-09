@@ -108,8 +108,12 @@ async function main() {
   // ───────── 게시판 ─────────
   section('게시판');
   let r = await get('/api/community/boards');
-  ok(r.status === 200 && Array.isArray(r.json.boards) && r.json.boards.length === 5, 'GET /api/community/boards → 5개', r.json);
-  ok(JSON.stringify(r.json.boards.map((b) => b.id)) === '["free","qna","proof","info","mind"]' && r.json.boards.every((b) => b.name && b.desc), '게시판 id·이름·설명');
+  ok(r.status === 200 && Array.isArray(r.json.boards) && r.json.boards.length === 22, 'GET /api/community/boards → 22개', r.json);
+  ok(JSON.stringify(r.json.boards.map((b) => b.id).slice(0, 5)) === '["free","qna","proof","info","mind"]' && r.json.boards.every((b) => b.name && b.desc && Array.isArray(b.tracks)), '게시판 id·이름·설명·과정');
+  ok(new Set(r.json.boards.map((b) => b.id)).size === r.json.boards.length, '게시판 id 중복 없음');
+  const forTrack = (t) => r.json.boards.filter((b) => !b.tracks.length || b.tracks.includes(t)).map((b) => b.id);
+  ok(forTrack('취준').includes('apt') && !forTrack('취준').includes('naesin'), '취준: 인적성·NCS 게시판이 있고 내신은 없다');
+  ok(forTrack('한양대').includes('univmath') && forTrack('편입').includes('trmath') && !forTrack('고1').includes('sisi'), '과정별 게시판');
   ok(r.headers.get('access-control-allow-origin') === '*', 'CORS 헤더 *');
   r = await req('OPTIONS', '/api/community/posts');
   ok(r.status === 204 && /DELETE/.test(r.headers.get('access-control-allow-methods') || ''), 'OPTIONS 사전 요청 204');

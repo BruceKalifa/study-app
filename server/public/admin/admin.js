@@ -1632,7 +1632,12 @@
 
   // ───────────────────────── 커뮤니티 관리 ─────────────────────────
   // API: docs/community-api.md (관리: /api/admin/community/…). 학생 userId 는 서버가 내보내지 않는다.
-  const BOARD_NAMES = { free: '자유', qna: '질문', proof: '공부인증', info: '입시정보', mind: '고민·멘탈' };
+  const BOARD_NAMES = {
+    free: '자유', qna: '질문', proof: '공부인증', info: '입시정보', mind: '고민·멘탈', tips: '공부법·꿀팁', study: '스터디 모집',
+    naesin: '내신', suneung: '수능·모의고사', math: '수학', sci: '과학', lang: '국어·영어', soc: '사회탐구', sisi: '수시·정시',
+    nsu: 'N수·재수', apt: '인적성·NCS', job: '취업정보', hyu: '한양대 라운지', univmath: '공업수학·미적분학', univexam: '시험·학점',
+    transfer: '편입정보', trmath: '편입수학',
+  };
   const CM_PAGE = 50;
   const cm = { reports: [], posts: [], q: '', open: new Set(), more: false, loaded: false };
 

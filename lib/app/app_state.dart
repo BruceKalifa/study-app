@@ -15,6 +15,7 @@ import '../services/community_api.dart';
 import '../services/content_import.dart';
 import '../services/content_sync.dart';
 import '../services/live_sync.dart';
+import 'goals.dart';
 import 'learner.dart';
 import 'records.dart';
 import 'storage.dart';
@@ -768,7 +769,8 @@ class AppState extends ChangeNotifier {
     required String name,
     required String grade,
     List<String>? grades,
-    required String goal,
+    String goal = '',
+    List<String>? goals,
     required List<String> courses,
     required List<String> workbooks,
   }) {
@@ -777,15 +779,28 @@ class AppState extends ChangeNotifier {
       _saveProfiles();
     }
     learner.setGrades(grades != null && grades.isNotEmpty ? grades : [grade]);
+    learner.setGoals(goals != null && goals.isNotEmpty ? goals : parseGoals(goal));
+    if (learner.goal.isEmpty) learner.goal = '수능';
     learner
-      ..goal = goal
       ..courses = courses
       ..workbooks = [for (final w in workbooks) if (bank.workbook(w) != null) w]
       ..onboarded = true;
     if (learner.examDate == 0) {
-      final d = defaultSuneungDate(DateTime.now());
-      learner.examDate = d.millisecondsSinceEpoch;
-      learner.examName = goal == '내신' ? '기말고사' : '수능';
+      // 고른 목표 중 처음으로 시험이 있는 것을 D-day 카드에 올린다. 날짜는 수능만 미리 채운다 (나머지는 직접 정함).
+      GoalOption? first;
+      for (final g in learner.goals) {
+        final o = goalOption(g);
+        if (o != null && o.exam.isNotEmpty) {
+          first = o;
+          break;
+        }
+      }
+      if (first != null) {
+        learner.examName = first.exam;
+        if (first.suneung) learner.examDate = defaultSuneungDate(DateTime.now()).millisecondsSinceEpoch;
+      } else {
+        learner.examName = '시험';
+      }
     }
     _daily = null; // rebuild today's set for the new books
     _configureLive();

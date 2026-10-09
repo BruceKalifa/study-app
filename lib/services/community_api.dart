@@ -14,15 +14,47 @@ class CommunityError implements Exception {
 
 class Board {
   final String id, name, desc;
-  const Board(this.id, this.name, this.desc);
+
+  /// 이 게시판이 맞는 학년·과정 (비면 모두). server/community.js 의 BOARDS 와 같아야 한다.
+  final List<String> tracks;
+  const Board(this.id, this.name, this.desc, [this.tracks = const <String>[]]);
+
+  static const _high = ['고1', '고2', '고3', 'N수'];
 
   static const defaults = [
     Board('free', '자유', '수험생활 이야기'),
     Board('qna', '질문', '과목·문제 질문'),
     Board('proof', '공부인증', '오늘 공부한 것 인증'),
-    Board('info', '입시정보', '입시·모의고사 정보'),
+    Board('info', '입시정보', '입시·모의고사 정보', _high),
     Board('mind', '고민·멘탈', '털어놓고 응원받기'),
+    Board('tips', '공부법·꿀팁', '시간표·암기·오답 정리 노하우'),
+    Board('study', '스터디 모집', '같이 공부할 사람 찾기'),
+    Board('naesin', '내신', '학교 시험·수행평가·내신 전략', ['고1', '고2', '고3']),
+    Board('suneung', '수능·모의고사', '학평·모평·수능 후기와 분석', ['고2', '고3', 'N수']),
+    Board('math', '수학', '수학 개념·풀이·킬러 문항', _high),
+    Board('sci', '과학', '물리·화학·생명·지구과학', _high),
+    Board('lang', '국어·영어', '국어·영어 공부법과 질문', _high),
+    Board('soc', '사회탐구', '사탐 과목 공부법과 질문', _high),
+    Board('sisi', '수시·정시', '수시 최저·정시 지원 전략', ['고3', 'N수']),
+    Board('nsu', 'N수·재수', '반수·재수 생활과 계획', ['N수']),
+    Board('apt', '인적성·NCS', '인적성·NCS 후기와 유형 공유', ['취준']),
+    Board('job', '취업정보', '채용 일정·자소서·면접 정보', ['취준']),
+    Board('hyu', '한양대 라운지', '학교 생활·수강·시험 이야기', ['한양대']),
+    Board('univmath', '공업수학·미적분학', '공업수학1·2, 미적분학1·2 질문', ['한양대']),
+    Board('univexam', '시험·학점', '중간·기말 대비와 학점 관리', ['한양대']),
+    Board('transfer', '편입정보', '대학별 일정·기출·합격 후기', ['편입']),
+    Board('trmath', '편입수학', '편입수학 개념과 기출 질문', ['편입']),
   ];
+
+  /// 고른 학년·과정에 맞는 게시판 (공통 게시판 + 과정별). 과정을 모르면 전부.
+  static List<Board> forGrades(Iterable<String> grades) {
+    final gs = grades.toSet();
+    if (gs.isEmpty) return defaults;
+    return [
+      for (final b in defaults)
+        if (b.tracks.isEmpty || b.tracks.any(gs.contains)) b,
+    ];
+  }
 
   static String nameOf(String id) {
     for (final b in defaults) {
