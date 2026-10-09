@@ -44,12 +44,43 @@ class ContentStore {
   // ───────────── 시작 ─────────────
   init() {
     fs.mkdirSync(this.dir, { recursive: true });
+    this.purgeLegacySamples();
     const hasCourse = fs.readdirSync(this.dir).some(isCourseFile);
     // .seeded 표시가 있으면(예전에 채운 뒤 선생님이 과목을 모두 지운 경우) 다시 채우지 않는다
     if (!hasCourse && !fs.existsSync(path.join(this.dir, '.seeded'))) this.seed();
     else this.seedWorkbooksIfMissing();
     this.loadAll();
     return this;
+  }
+
+  /**
+   * 예전에 기본으로 넣었던 샘플 문제 파일을 지운다. legacy-samples.json 의 지문(sha256)과
+   * 바이트까지 똑같은 파일만 지우므로, 선생님이 고치거나 새로 만든 과목·문제집은 그대로 남는다.
+   * (교재는 별도 저장소(books)에 있어 건드리지 않는다.)
+   */
+  purgeLegacySamples() {
+    let legacy;
+    try {
+      legacy = JSON.parse(fs.readFileSync(path.join(__dirname, 'legacy-samples.json'), 'utf8')).files || {};
+    } catch (_) {
+      return;
+    }
+    let n = 0;
+    for (const [name, hashes] of Object.entries(legacy)) {
+      if (!name.endsWith('.json') || name !== path.basename(name)) continue;
+      const full = path.join(this.dir, name);
+      let buf;
+      try { buf = fs.readFileSync(full); } catch (_) { continue; }
+      const h = crypto.createHash('sha256').update(buf).digest('hex');
+      if (!Array.isArray(hashes) || !hashes.includes(h)) continue;
+      try { fs.unlinkSync(full); n++; } catch (e) { this.log(`샘플 문제 ${name} 을(를) 지우지 못했습니다: ${e.message}`); }
+    }
+    if (n) {
+      const mark = path.join(this.dir, '.seeded');
+      // 다시 채우지 않도록 표시
+      try { if (!fs.existsSync(mark)) fs.writeFileSync(mark, new Date().toISOString() + '\n'); } catch (_) { /* ignore */ }
+      this.log(`예전 샘플 문제 파일 ${n}개를 지웠습니다 → ${this.dir}`);
+    }
   }
 
   seed() {

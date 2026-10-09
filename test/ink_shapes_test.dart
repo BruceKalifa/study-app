@@ -90,6 +90,95 @@ void main() {
       expect(ys.toSet(), hasLength(2), reason: '가로변이 수평');
     });
 
+    // 닫힌 획을 [f] 지점(0~1)에서 시작해 그린 것처럼 돌린다. [over] 는 끝을 덧그린 점 수.
+    List<Offset> startAt(List<Offset> closedPath, double f, {int over = 0}) {
+      final body = closedPath.sublist(0, closedPath.length - 1);
+      final s = (body.length * f).floor();
+      return [
+        ...body.sublist(s),
+        ...body.sublist(0, s),
+        body[s],
+        for (var k = 1; k <= over; k++) body[(s + k) % body.length],
+      ];
+    }
+
+    bool hasNear(List<InkPoint> pts, Offset o, double r) => pts.any((p) => _dist(p.offset, o) < r);
+
+    test('삼각형은 어디서 그리기 시작해도 삼각형이다', () {
+      const tri = [Offset(100, 240), Offset(220, 60), Offset(330, 240)];
+      for (final f in [0.0, 0.1, 0.37, 0.6, 0.85]) {
+        final s = snapShape(_stroke(startAt(_polyPath(tri), f, over: 3), jitter: 4));
+        expect(s, isNotNull, reason: 'f=$f');
+        expect(s!.kind, ShapeKind.triangle, reason: 'f=$f');
+        expect(s.points, hasLength(4), reason: 'f=$f');
+        for (final c in tri) {
+          expect(hasNear(s.points, c, 14), isTrue, reason: 'f=$f 꼭짓점 $c');
+        }
+      }
+    });
+
+    test('네모는 어디서 그리기 시작해도 사각형이다 (삼각형이 되지 않는다)', () {
+      const sq = [Offset(100, 100), Offset(300, 100), Offset(300, 300), Offset(100, 300)];
+      for (final f in [0.0, 0.13, 0.4, 0.7]) {
+        final s = snapShape(_stroke(startAt(_polyPath(sq), f, over: 3), jitter: 4));
+        expect(s, isNotNull, reason: 'f=$f');
+        expect(s!.kind, ShapeKind.rectangle, reason: 'f=$f');
+        for (final c in sq) {
+          expect(hasNear(s.points, c, 14), isTrue, reason: 'f=$f 꼭짓점 $c');
+        }
+      }
+    });
+
+    test('비슷한 길이의 네모는 정사각형이 된다', () {
+      final s = snapShape(_stroke(_polyPath(const [Offset(100, 100), Offset(310, 104), Offset(306, 304), Offset(96, 300)]), jitter: 3));
+      expect(s!.kind, ShapeKind.rectangle);
+      final w = (s.points[1].offset - s.points[0].offset).distance;
+      final h = (s.points[2].offset - s.points[1].offset).distance;
+      expect((w - h).abs(), lessThan(0.01));
+    });
+
+    test('기울어진 네모는 기울어진 채로 반듯한 직사각형이 된다', () {
+      const tilted = [Offset(120, 100), Offset(300, 160), Offset(260, 280), Offset(80, 220)];
+      final s = snapShape(_stroke(startAt(_polyPath(tilted), 0.2), jitter: 3));
+      expect(s, isNotNull);
+      expect(s!.kind, ShapeKind.rectangle);
+      final e0 = s.points[1].offset - s.points[0].offset;
+      final e1 = s.points[2].offset - s.points[1].offset;
+      expect((e0.dx * e1.dx + e0.dy * e1.dy).abs(), lessThan(1.0), reason: '이웃한 변이 수직');
+      expect(e0.dy.abs() > 5 || e0.dx.abs() < 5, isTrue, reason: '수평으로 눕히지 않는다');
+      for (final c in tilted) {
+        expect(hasNear(s.points, c, 16), isTrue, reason: '꼭짓점 $c');
+      }
+    });
+
+    test('평행사변형·사다리꼴은 손으로 그린 꼭짓점을 따라 사각형이 된다', () {
+      for (final quad in const [
+        [Offset(100, 250), Offset(330, 250), Offset(400, 100), Offset(170, 100)],
+        [Offset(100, 250), Offset(330, 250), Offset(280, 100), Offset(150, 100)],
+      ]) {
+        final s = snapShape(_stroke(startAt(_polyPath(quad), 0.3), jitter: 3));
+        expect(s, isNotNull);
+        expect(s!.kind, ShapeKind.quadrilateral);
+        expect(s.points, hasLength(5));
+        for (final c in quad) {
+          expect(hasNear(s.points, c, 18), isTrue, reason: '꼭짓점 $c');
+        }
+      }
+    });
+
+    test('직각삼각형은 직각으로 맞춘다', () {
+      final s = snapShape(_stroke(_polyPath(const [Offset(100, 100), Offset(100, 300), Offset(330, 306)]), jitter: 2));
+      expect(s!.kind, ShapeKind.triangle);
+      // 직각 꼭짓점 찾기: 이웃한 두 변의 내적이 0
+      var found = false;
+      for (var i = 0; i < 3; i++) {
+        final p = s.points[i].offset;
+        final a = s.points[(i + 2) % 3].offset - p, b = s.points[(i + 1) % 3].offset - p;
+        if ((a.dx * b.dx + a.dy * b.dy).abs() < 1.0) found = true;
+      }
+      expect(found, isTrue);
+    });
+
     test('반원은 호가 된다', () {
       final s = snapShape(_stroke(_circlePath(const Offset(200, 200), 90, sweep: math.pi), jitter: 4));
       expect(s, isNotNull);

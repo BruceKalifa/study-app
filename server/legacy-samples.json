@@ -1,0 +1,48 @@
+{
+ "_설명": "예전에 앱·서버에 기본으로 넣었던 샘플 문제 파일의 지문(sha256). 서버를 시작할 때 이 지문과 똑같은 파일만 지운다 (선생님이 고치거나 새로 올린 것은 지문이 달라 그대로 남는다).",
+ "files": {
+  "earth1.json": [
+   "377f9f41cac345ef48c865b3b09a07b59bf957eb9968451ad08448e0af90068b",
+   "690996508e59eca041382184a3b18f023900ce6113cfa9e8170995eecfc84b5d"
+  ],
+  "eng.json": [
+   "2077c52ee54c11ca436ef5882ee0a776adba516ad5b14ab9bd1b052fb97a19f3"
+  ],
+  "integ.json": [
+   "4492797d954d7107eb6179c5f79d0e7a69d158600040ee10a6a288f0294b726f",
+   "479ae6f6d2adf76b5a302c94881185bcdbe3fce1a0b0f812ba3e453fff5dff62",
+   "7512ffb021fffe5b74ad33ff45d4a9ed940c791d5a1ef2decfb11bf1770999a1"
+  ],
+  "kor-read.json": [
+   "8189f55c9c75c18bb16acc816db055884784b0576e9973cc61242c908269e7d7"
+  ],
+  "math.json": [
+   "aa1209fb892305082be33a7af5832f60147ae9ca9323520b15472600308b8fb2",
+   "e5514b2046c33981b78834fa2aae2762f0ecd746506a3d1a6a3d3046e3eec813"
+  ],
+  "mid-math2.json": [
+   "6ffece042751df8bb685cb1af4ea4b72add2667aa6f881d577c421dd743163fc"
+  ],
+  "mid-sci.json": [
+   "81dbbee4752675f86e921ec635a9d630afa60afefe66450f377e729344ba6344"
+  ],
+  "phy1.json": [
+   "7ca29686648a1947e24bf57f072813fe0861a424ac3d6b24ae24eb523c283faf",
+   "90eef7ca7bee3d261448662b6c90bd6c21288d97722c1c91a60daaca116ae755",
+   "ded026171fa7faea111b29777a16c5e5f33433a761bf344ed62aeff771ad526b"
+  ],
+  "phy2.json": [
+   "a571ad6546e6d37226689d37026f996b2096cdd6b77aad9309e4eb1c9b169846",
+   "ce0cb7e8a232c40f11cb49a055266377b4713fc02f23d7a4a96d31bc46fc8e45",
+   "f4621915790ab6a12ee2c931ae238643bf1f81b54a05377aa83547f14c528ace"
+  ],
+  "soc-int.json": [
+   "4e3a2353c299ee546b21b16acdd306f1e7470f370a19e62f1d24f0893d7fddfe"
+  ],
+  "workbooks.json": [
+   "268fcab9e414775c7ce7bf8b152d83ba4a752fd2da973b19a80770f22510854d",
+   "b83692d3217af00622838c482fcbdf9619d146a3647dd963d31e1f2a0b3f6bf6",
+   "cab33aef210302b1f71a41717174a281405c9cfe88a86f4158bdc00b32460cd4"
+  ]
+ }
+}

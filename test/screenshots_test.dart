@@ -17,6 +17,7 @@ import 'package:study_app/app/records.dart';
 import 'package:study_app/app/storage.dart';
 import 'package:study_app/app/theme.dart';
 import 'package:study_app/core/problem_bank.dart';
+import 'fixtures/problem_bundle.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/ink/ink_model.dart';
 import 'package:study_app/screens/app_root.dart';
@@ -70,7 +71,7 @@ Widget _wrap(AppState s, Widget home) => RepaintBoundary(
     );
 
 Future<AppState> _seeded() async {
-  final bank = await ProblemBank.load(rootBundle);
+  final bank = await ProblemBank.load(fixtureBundle);
   final s = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
   await s.init();
   await s.renameProfile('선주');
@@ -168,7 +169,7 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
   HttpOverrides.global = _RealHttp();
   final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
   final png = (await tester.runAsync(_samplePagePng))!;
-  final bank = (await tester.runAsync(() => ProblemBank.load(rootBundle)))!;
+  final bank = (await tester.runAsync(() => ProblemBank.load(fixtureBundle)))!;
   final setup = await tester.runAsync(() async {
     final (tToken, tMe) = await AccountApi(server).signup(role: 'teacher', loginId: 'shot$stamp', password: 'teach-pass', name: '우네');
     final students = <(String, String)>[];
@@ -434,7 +435,7 @@ void main() {
 
     // onboarding (fresh learner)
     final fresh = (await tester.runAsync(() async {
-      final bank = await ProblemBank.load(rootBundle);
+      final bank = await ProblemBank.load(fixtureBundle);
       final f = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
       await f.init();
       return f;
@@ -455,7 +456,7 @@ void main() {
 
     // welcome (login)
     final fresh2 = (await tester.runAsync(() async {
-      final bank = await ProblemBank.load(rootBundle);
+      final bank = await ProblemBank.load(fixtureBundle);
       final f = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);
       await f.init();
       return f;

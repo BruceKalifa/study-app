@@ -33,7 +33,9 @@ jobs:
         run: mkdir -p ci-out && flutter --version | tee ci-out/flutter-version.txt
 
       - name: Validate problem bank
-        run: python3 tools/validate_problems.py | tail -15
+        run: |
+          python3 tools/validate_problems.py | tail -8
+          python3 tools/validate_problems.py --dir test/fixtures/problems | tail -4
 
       - name: Text book converter selftest
         run: python3 tools/text_book.py selftest
@@ -65,6 +67,7 @@ jobs:
           node tools/test-community.js 2>&1 | tail -3
           node tools/test-accounts.js 2>&1 | grep -v '  ✔' | tail -30
           node tools/test-seed.js
+          node tools/test-purge.js
           node tools/test-books.js 2>&1 | grep -v '  ✔' | tail -20
 
       - name: Start server for app integration tests

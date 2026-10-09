@@ -23,9 +23,9 @@
 | `subject` | string | 과목 이름(화면 표시) |
 | `subjectId` | string | 과목 id(전체에서 유일, 영문 소문자·숫자·`-`) |
 | `color` | `#RRGGBB` | 과목 색 |
-| `group` | `kor` `math` `eng` `soc` `sci` `apt` | 교과군: 국어·수학·영어·사회·과학·인적성 |
+| `group` | `kor` `math` `eng` `soc` `sci` `apt` `univ` | 교과군: 국어·수학·영어·사회·과학·인적성·대학 |
 | `level` | `mid` `high` | 중등 / 고등 |
-| `grades` | string[] | 대상 학년. 값: `중1 중2 중3 고1 고2 고3 N수 취준`. `취준` 과정은 고등 학생 화면에 나오지 않는다 |
+| `grades` | string[] | 대상 학년. 값: `중1 중2 중3 고1 고2 고3 N수 취준 한양대`. `취준`·`한양대` 과정은 고등 학생 화면에 나오지 않는다 |
 | `track` | string (선택) | `수능` `내신` `공통` |
 | `units` | string[] (선택) | 대단원 순서(문제집·무한 풀기 목록 순서). 없으면 문제에 나온 순서 |
 | `passages` | Passage[] (선택) | 지문(국어·영어 지문형 문항용) |

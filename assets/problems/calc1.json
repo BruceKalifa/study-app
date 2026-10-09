@@ -1,0 +1,12 @@
+{
+  "subject": "미적분학1",
+  "subjectId": "calc1",
+  "color": "#C2410C",
+  "group": "univ",
+  "level": "univ",
+  "grades": [
+    "한양대"
+  ],
+  "track": "대학",
+  "problems": []
+}

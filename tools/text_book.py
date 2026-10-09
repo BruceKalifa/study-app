@@ -66,10 +66,20 @@ COURSES = {
     '미적분': ('math', '수학', '#E0703B', 'math'),
     '기하': ('math', '수학', '#E0703B', 'math'),
 }
+EMATH1 = ('emath1', '공업수학1', '#6D4AFF', 'univ')
+EMATH2 = ('emath2', '공업수학2', '#5B3FD6', 'univ')
+CALC1 = ('calc1', '미적분학1', '#C2410C', 'univ')
+CALC2 = ('calc2', '미적분학2', '#9A3412', 'univ')
+COURSES.update({
+    '공업수학1': EMATH1, '공업수학Ⅰ': EMATH1, '공업수학 1': EMATH1,
+    '공업수학2': EMATH2, '공업수학Ⅱ': EMATH2, '공업수학 2': EMATH2,
+    '미적분학1': CALC1, '미적분학Ⅰ': CALC1, '미적분학 1': CALC1,
+    '미적분학2': CALC2, '미적분학Ⅱ': CALC2, '미적분학 2': CALC2,
+})
 DEFAULT_COURSE = APT
 
 # 교과군별 기본 대상 학년 (정보.txt 에 '대상 학년' 이 없을 때)
-DEFAULT_GRADES = {'apt': ['취준'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수']}
+DEFAULT_GRADES = {'apt': ['취준'], 'univ': ['한양대'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수']}
 
 STAGES = ('개념', '유형', '기출', 'N제', '모의고사')
 SECTIONS = ('문제', '선택지', '해설', '본문', '보기')
@@ -182,7 +192,8 @@ def course_of(*keys):
         key = (key or '').strip()
         if not key:
             continue
-        for name, c in COURSES.items():
+        # 긴 이름을 먼저 본다 ('미적분학1' 이 고등 '미적분' 으로 가지 않게)
+        for name, c in sorted(COURSES.items(), key=lambda kv: -len(kv[0])):
             if key == name or key.startswith(name):
                 return c
     return DEFAULT_COURSE
@@ -190,6 +201,7 @@ def course_of(*keys):
 
 # 흔한 한글 낱말 → 영문 (id 를 사람이 읽을 수 있게). 긴 낱말을 먼저 둔다.
 WORDS = (
+    ('공업수학', 'emath'), ('미적분학', 'calc'),
     # 영역·과목
     ('자료해석', 'data'), ('언어이해', 'lang'), ('공간지각', 'sp'), ('창의수리', 'cre'),
     ('언어추리', 'lrea'), ('수리추론', 'nrea'), ('수열추리', 'srea'), ('디지털역량', 'digi'),

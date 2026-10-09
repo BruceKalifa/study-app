@@ -16,6 +16,7 @@
 | `server/content/.seeded` | 기본 문제를 복사했다는 표시 |
 
 - 서버를 켤 때 과목 파일이 하나도 없고 `.seeded` 도 없으면 `assets/problems/_index.json` 에 적힌 파일과 `assets/problems/workbooks.json` 을 그대로 복사한다. (과목은 있는데 `workbooks.json` 만 없으면 그것만 복사)
+- 시작할 때 `server/legacy-samples.json` 의 지문(sha256)과 바이트까지 똑같은 파일(예전에 기본으로 넣었던 샘플 문제)은 지운다. 고치거나 새로 만든 과목·문제집은 그대로 남는다. 지운 뒤에는 `.seeded` 를 남겨 다시 채우지 않는다.
 - 모든 쓰기는 한 줄로 세워(직렬화) 처리하고, 임시 파일에 쓴 뒤 이름을 바꾸는(rename) 방식이라 쓰다가 꺼져도 파일이 깨지지 않는다.
 - 환경변수: `CONTENT_DIR`(기본 `server/content`), `SEED_DIR`(기본 `assets/problems`), `ADMIN_KEY`.
 

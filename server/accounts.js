@@ -74,7 +74,7 @@ function needName(v) {
 function needGrade(v) {
   const g = typeof v === 'string' ? v.trim() : '';
   if (g === '') return '';
-  if (!GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준 중 하나여야 합니다');
+  if (!GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준·한양대 중 하나여야 합니다');
   return g;
 }
 function needPassword(v, label = '비밀번호') {

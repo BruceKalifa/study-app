@@ -13,6 +13,7 @@ import 'package:study_app/app/theme.dart';
 import 'package:study_app/core/problem.dart';
 import 'package:study_app/core/grader.dart';
 import 'package:study_app/core/problem_bank.dart';
+import 'fixtures/problem_bundle.dart';
 import 'package:study_app/core/variants.dart';
 import 'package:study_app/screens/app_root.dart';
 import 'package:study_app/screens/home_shell.dart';
@@ -70,7 +71,7 @@ class _FakeBooksApi extends AccountApi {
 }
 
 Future<AppState> _state({bool onboard = true}) async {
-  final bank = await ProblemBank.load(rootBundle);
+  final bank = await ProblemBank.load(fixtureBundle);
   final s = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
   await s.init();
   if (onboard) {
@@ -101,9 +102,10 @@ Future<void> _penRest(WidgetTester tester) =>
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   _aptTests();
+  _univTests();
 
-  test('problem bank loads every subject from assets', () async {
-    final bank = await ProblemBank.load(rootBundle);
+  test('problem bank loads every subject (테스트용 문제 은행)', () async {
+    final bank = await ProblemBank.load(fixtureBundle);
     expect(bank.subjects.length, greaterThanOrEqualTo(5));
     expect(bank.all.length, greaterThan(100));
     // every template generates
@@ -115,7 +117,7 @@ void main() {
   });
 
   testWidgets('every LaTeX snippet in the bank renders with flutter_math', (tester) async {
-    final bank = (await tester.runAsync(() => ProblemBank.load(rootBundle)))!;
+    final bank = (await tester.runAsync(() => ProblemBank.load(fixtureBundle)))!;
     final failures = <String>[];
     final snippets = <(String, String)>[];
     void collect(String id, String s) {
@@ -666,7 +668,7 @@ void main() {
 
   test('교재 파일: .pulinote import joins the bank, goes on the shelf, survives restart and can be removed', () async {
     final storage = MemoryStorage();
-    final bank = await ProblemBank.load(rootBundle);
+    final bank = await ProblemBank.load(fixtureBundle);
     final app = AppState(storage: storage, baseBank: bank, enableLive: false);
     await app.init();
     app.completeOnboarding(name: '학생', grade: '고3', goal: '수능', courses: const [], workbooks: const ['wb-math1-concept']);
@@ -1058,7 +1060,7 @@ void main() {
 
     // 앱을 다시 켜도 고친 정답이 남는다
     final again = (await tester.runAsync(() async {
-      final bank = await ProblemBank.load(rootBundle);
+      final bank = await ProblemBank.load(fixtureBundle);
       final a = AppState(storage: app.storage, baseBank: bank, enableLive: false, autoSyncBooks: false);
       await a.init();
       return a;
@@ -1109,7 +1111,7 @@ void main() {
     expect(ContentSync.httpBase('192.168.0.12'), 'http://192.168.0.12:8080');
     await HttpOverrides.runWithHttpOverrides(() async {
       final storage = MemoryStorage();
-      final bank = await ProblemBank.load(rootBundle);
+      final bank = await ProblemBank.load(fixtureBundle);
       final app = AppState(storage: storage, baseBank: bank, enableLive: false, autoSyncBooks: false);
       await app.init();
       final pack = {
@@ -1250,7 +1252,7 @@ void main() {
 
   test('accounts: student syncs records, asks the teacher with a picture, teacher answers; new tablet restores', () async {
     await HttpOverrides.runWithHttpOverrides(() async {
-      final bank = await ProblemBank.load(rootBundle);
+      final bank = await ProblemBank.load(fixtureBundle);
       final stamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
       // 선생님 (API 로 바로 가입)
       final (tToken, tMe) = await AccountApi(server!)
@@ -1382,6 +1384,29 @@ void _aptTests() {
 
       // 자료해석 표는 본문에 그대로 남는다
       expect(app.bank.byId('apt-mock-01-data-01')!.stem, contains('| 갑국 | 30 | 45 |'));
+      app.dispose();
+    });
+  });
+}
+
+void _univTests() {
+  group('한양대 과정', () {
+    testWidgets('앱에는 과목 이름만 실려 있고 한양대 학생에게만 보인다', (tester) async {
+      final bank = (await tester.runAsync(() => ProblemBank.load(rootBundle)))!;
+      // 문제는 앱에 싣지 않는다 — 교재는 서버에서 받는다
+      expect(bank.all, isEmpty);
+      expect(bank.workbooks, isEmpty);
+      expect([for (final s in bank.subjects) s.name], ['공업수학1', '공업수학2', '미적분학1', '미적분학2']);
+
+      expect(kGrades, contains('한양대'));
+      expect(SubjectGroup.byId('univ')?.name, '대학');
+
+      final app = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
+      await tester.runAsync(app.init);
+      String ids(String grade) => app.coursesForGrade(grade).map((s) => s.id).join(',');
+      expect(ids('한양대'), 'emath1,emath2,calc1,calc2');
+      expect(ids('고3'), '');
+      expect(ids('취준'), '');
       app.dispose();
     });
   });

@@ -35,7 +35,7 @@ import re
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-PROB_DIR = os.path.join(ROOT, "assets", "problems")
+PROB_DIR = os.path.join(ROOT, "assets", "problems")  # --dir 로 바꿀 수 있다
 
 VARIANTS_PER_TEMPLATE = 30
 MAX_TRIES = 200
@@ -722,10 +722,10 @@ KNOWN_PROBLEM_KEYS = set(REQUIRED) | {
 }
 
 # course metadata
-GROUPS = ("kor", "math", "eng", "soc", "sci", "apt")
-LEVELS = ("mid", "high")
-GRADES = ("중1", "중2", "중3", "고1", "고2", "고3", "N수", "취준")
-TRACKS = ("수능", "내신", "공통")
+GROUPS = ("kor", "math", "eng", "soc", "sci", "apt", "univ")
+LEVELS = ("mid", "high", "univ")
+GRADES = ("중1", "중2", "중3", "고1", "고2", "고3", "N수", "취준", "한양대")
+TRACKS = ("수능", "내신", "공통", "대학")
 SUBJECT_ID_RE = re.compile(r"^[a-z0-9-]+$")
 
 # workbooks.json
@@ -902,9 +902,11 @@ def validate_file(fname: str, ctx: dict, errs, warns, rng):
     validate_course_meta(fname, data, errs, warns)
     passage_ids = validate_passages(fname, data, ctx["passages"], errs, warns)
     probs = data.get("problems") or []
-    if not isinstance(probs, list) or not probs:
-        errs.append(f"{fname}: problems must be a non-empty list")
-        probs = probs if isinstance(probs, list) else []
+    if not isinstance(probs, list):
+        errs.append(f"{fname}: problems must be a list")
+        probs = []
+    elif not probs:
+        warns.append(f"{fname}: 문제가 없는 과목 (이름만 만들어 둔 골격 — 교재는 서버에서 받는다)")
     used_passages = set()
     for i, p in enumerate(probs):
         if not isinstance(p, dict):
@@ -973,9 +975,11 @@ def validate_workbooks(ctx: dict, courses: dict, errs, warns):
         errs.append(f"{WORKBOOK_FILE}: cannot load: {ex}")
         return None
     wbs = data.get("workbooks") if isinstance(data, dict) else None
-    if not isinstance(wbs, list) or not wbs:
-        errs.append(f"{WORKBOOK_FILE}: 'workbooks' must be a non-empty list")
+    if not isinstance(wbs, list):
+        errs.append(f"{WORKBOOK_FILE}: 'workbooks' must be a list")
         return None
+    if not wbs:
+        return []  # 문제집이 하나도 없는 것도 괜찮다 (교재는 서버에서 받는다)
     seen = set()
     probs, files = ctx["probs"], ctx["ids"]
     for i, wb in enumerate(wbs):
@@ -1059,8 +1063,12 @@ def main():
     ap.add_argument("--samples", type=int, default=0, help="print N sample variants per template")
     ap.add_argument("--only", default="", help="limit --samples output to ids with this prefix")
     ap.add_argument("--seed", type=int, default=12345)
+    ap.add_argument("--dir", default="", help="problem folder to check (default: assets/problems)")
     ap.add_argument("-v", "--verbose", action="store_true", help="print every warning")
     args = ap.parse_args()
+    if args.dir:
+        global PROB_DIR
+        PROB_DIR = os.path.abspath(args.dir)
 
     errs, warns = [], []
     st = self_test()

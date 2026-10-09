@@ -17,7 +17,17 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const SERVER_DIR = path.join(__dirname, '..');
-const SEED_DIR = path.join(SERVER_DIR, '..', 'assets', 'problems');
+// 앱에 싣는 assets/problems 는 골격뿐이라 테스트 문제 은행을 쓴다.
+// (예전 샘플과 바이트까지 같으면 서버가 시작할 때 지우므로, 다시 직렬화해서 바이트를 다르게 만든다)
+const SEED_DIR = (() => {
+  const src = path.join(SERVER_DIR, '..', 'test', 'fixtures', 'problems');
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'pulinote-seed-'));
+  for (const f of fs.readdirSync(src)) {
+    const raw = fs.readFileSync(path.join(src, f), 'utf8');
+    fs.writeFileSync(path.join(d, f), f.endsWith('.json') ? JSON.stringify(JSON.parse(raw)) : raw);
+  }
+  return d;
+})();
 const KEY = 'test-key-4821';
 const KEEP = process.argv.includes('--keep');
 
