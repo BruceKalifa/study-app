@@ -1331,7 +1331,7 @@ void _seriesTests() {
     testWidgets('교재 고르기: 시리즈는 한 권으로 보이고, 담으면 회차가 전부 담긴다', (tester) async {
       _tabletSize(tester);
       final app = (await tester.runAsync(_state))!;
-      await tester.runAsync(() => app.importBooks(sampleBookFile()));
+      await tester.runAsync(() => app.importBooks(sampleCollectionFile()));
       for (final id in ['sample-type-01', 'sample-type-02']) {
         app.removeWorkbook(id);
       }
