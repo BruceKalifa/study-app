@@ -25,6 +25,7 @@ class InkCanvas extends StatefulWidget {
     this.readOnly = false,
     this.paper,
     this.paperColor,
+    this.columnRuleX,
     this.onStylusDown,
     this.onTapPage,
     this.minZoom = 0.6,
