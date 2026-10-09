@@ -336,6 +336,7 @@ class AppState extends ChangeNotifier {
     if (account != null) {
       refreshMe();
       syncRecords();
+      syncBooksSoon(); // 선생님이 새 교재를 올렸을 수 있다
     }
   }
 

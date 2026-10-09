@@ -558,7 +558,7 @@ class LibraryScreen extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 // 같은 시리즈(FLOW TYPE…)는 한 칸으로 묶고, 누르면 회차를 고른다
                 children: [
-                  for (final g in _bySeries(e.value))
+                  for (final g in groupBySeries(e.value))
                     g.length == 1 ? WorkbookCard(workbook: g.first) : _SeriesCard(books: g),
                 ],
               ),
@@ -568,21 +568,6 @@ class LibraryScreen extends StatelessWidget {
       );
     });
   }
-}
-
-/// 같은 시리즈끼리 (회차가 둘 이상인 것만 묶는다). 담은 순서를 지킨다.
-List<List<Workbook>> _bySeries(List<Workbook> books) {
-  final order = <String>[];
-  final by = <String, List<Workbook>>{};
-  for (final w in books) {
-    final k = w.series.trim().isEmpty ? 'id:${w.id}' : 'series:${w.series.trim()}';
-    if (!by.containsKey(k)) {
-      order.add(k);
-      by[k] = [];
-    }
-    by[k]!.add(w);
-  }
-  return [for (final k in order) by[k]!];
 }
 
 /// 시리즈 한 칸 — "FLOW TYPE · 11회차". 누르면 회차 고르기로.

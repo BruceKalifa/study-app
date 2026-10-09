@@ -20,6 +20,7 @@ import 'package:study_app/screens/app_root.dart';
 import 'package:study_app/screens/home_shell.dart';
 import 'package:study_app/screens/library_screen.dart';
 import 'package:study_app/screens/workbook_screen.dart';
+import 'package:study_app/screens/workbook_store_screen.dart';
 import 'package:study_app/screens/answer_key_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
@@ -28,48 +29,10 @@ import 'package:study_app/services/account_api.dart';
 import 'package:study_app/services/community_api.dart';
 import 'package:study_app/services/content_import.dart';
 import 'package:study_app/services/content_sync.dart';
-import 'package:study_app/widgets/book_files_card.dart';
-import 'package:study_app/widgets/server_books_card.dart';
 import 'package:study_app/widgets/problem_brief.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'fixtures/sample_book.dart';
-
-/// A stand-in for the server's 교재 창고 (server/books.js) — no network in tests.
-class _FakeBooksApi extends AccountApi {
-  _FakeBooksApi({this.teacher = false}) : super('https://example.test', 'token');
-  final bool teacher;
-  final List<ServerBook> shelf = [];
-  final List<Uint8List> uploaded = [];
-  int downloads = 0;
-  bool fail = false;
-
-  @override
-  Future<List<ServerBook>> books() async {
-    if (fail) throw const ApiError('서버에 연결할 수 없어요');
-    return List.of(shelf);
-  }
-
-  @override
-  Future<Uint8List> bookBytes(String id) async {
-    downloads++;
-    if (!shelf.any((b) => b.id == id)) throw const ApiError('없는 교재입니다', 404);
-    return Uint8List.fromList(sampleBookFile());
-  }
-
-  @override
-  Future<ServerBook> uploadBook(Uint8List file, {String title = '', bool open = true}) async {
-    uploaded.add(file);
-    final b = ServerBook(
-        id: 'srv-${shelf.length + 1}', title: title.isEmpty ? '올린 교재' : title,
-        bookIds: const ['sample-type-01'], problems: 3, bytes: file.length, mine: true, open: open);
-    shelf.add(b);
-    return b;
-  }
-
-  @override
-  Future<void> deleteBook(String id) async => shelf.removeWhere((b) => b.id == id);
-}
 
 Future<AppState> _state({bool onboard = true}) async {
   final bank = await ProblemBank.load(fixtureBundle);
@@ -104,6 +67,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   _aptTests();
   _univTests();
+  _seriesTests();
 
   test('problem bank loads every subject (테스트용 문제 은행)', () async {
     final bank = await ProblemBank.load(fixtureBundle);
@@ -788,124 +752,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('설정 → 넣어 둔 교재 목록 → 빼기 (가져오기 단추는 없다)', (tester) async {
-    _tabletSize(tester);
-    final app = (await tester.runAsync(_state))!;
-    await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: BookFilesCard()))));
-    await tester.pump(const Duration(milliseconds: 300));
-    // 파일로 가져오는 길은 없앴다 — 교재는 서버 교재 창고에서만 들어온다
-    expect(find.byKey(const Key('books-import')), findsNothing);
-    expect(find.text('파일 가져오기'), findsNothing);
-    expect(find.byKey(const Key('books-empty')), findsOneWidget);
-
-    // 서버에서 받은 교재는 목록에 뜨고, 여기서 뺄 수 있다
-    await tester.runAsync(() => app.importBooks(sampleBookFile()));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('book-sample-type-01')), findsOneWidget);
-    expect(find.textContaining('3문항'), findsWidgets);
-
-    await tester.tap(find.byKey(const Key('book-remove-sample-type-01')));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.byKey(const Key('books-remove-ok')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.byKey(const Key('book-sample-type-01')), findsNothing);
-    expect(app.bank.workbook('sample-type-01'), isNull);
-  });
-
-  testWidgets('설정 → 선생님 교재 받기 (서버 교재 창고)', (tester) async {
-    _tabletSize(tester);
-    final app = (await tester.runAsync(_state))!;
-    app.profile.account = Account(
-        server: 'https://example.test', token: 't', userId: 'u_s', loginId: 'une.student', role: 'student', name: '학생');
-    final api = _FakeBooksApi();
-    api.shelf.add(const ServerBook(
-        id: 'srv-1', title: '수학1 FLOW TYPE 1', bookIds: ['sample-type-01'], problems: 3, bytes: 2048,
-        teacherName: 'Une 선생님'));
-    ServerBooksCard.apiOf = (_) => api;
-    addTearDown(() => ServerBooksCard.apiOf = null);
-
-    await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: ServerBooksCard()))));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('선생님 교재'), findsOneWidget);
-    expect(find.text('수학1 FLOW TYPE 1'), findsOneWidget);
-    expect(find.textContaining('Une 선생님'), findsOneWidget);
-
-    // 받기 → 앱에 교재가 들어가고 내 교재에 담긴다
-    await tester.tap(find.byKey(const Key('server-book-get-srv-1')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(api.downloads, 1);
-    expect(find.byKey(const Key('server-books-msg')), findsOneWidget);
-    expect(app.importedBooks.any((b) => b.id == 'sample-type-01'), isTrue);
-    expect(app.hasWorkbook('sample-type-01'), isTrue);
-    // 이미 받은 교재는 '다시 받기' 로 바뀐다
-    expect(find.byKey(const Key('server-book-again-srv-1')), findsOneWidget);
-
-    // 로그아웃 상태면 카드가 아예 안 보인다 (기록 보내기 예약도 여기서 흘려보낸다)
-    await tester.pumpWidget(const SizedBox());
-    app.profile.account = null;
-    await tester.pump(const Duration(seconds: 5));
-    await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: ServerBooksCard()))));
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(find.text('선생님 교재'), findsNothing);
-  });
-
-  testWidgets('선생님 태블릿도 받기만 한다 (올리는 곳은 웹 교재 창고)', (tester) async {
-    _tabletSize(tester);
-    final app = (await tester.runAsync(_state))!;
-    app.profile.account = Account(
-        server: 'https://example.test', token: 't', userId: 'u_t', loginId: 'une.teacher', role: 'teacher', name: '선생님');
-    final api = _FakeBooksApi(teacher: true);
-    api.shelf.add(ServerBook(
-        id: 'srv-1', title: '수학1 FLOW TYPE 1', bookIds: const ['sample-type-01'],
-        problems: 3, bytes: 1200, mine: true, open: true));
-    ServerBooksCard.apiOf = (_) => api;
-    addTearDown(() => ServerBooksCard.apiOf = null);
-
-    await tester.pumpWidget(_app(app, home: const Scaffold(body: SingleChildScrollView(child: ServerBooksCard()))));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('서버 교재'), findsOneWidget);
-
-    // 올리는 단추는 없고, 올리는 곳이 어디인지 알려 준다
-    expect(find.byKey(const Key('server-books-upload')), findsNothing);
-    expect(find.byKey(const Key('server-books-web')), findsOneWidget);
-    expect(find.textContaining('/books/'), findsOneWidget);
-
-    // 받기는 된다
-    await tester.tap(find.byKey(const Key('server-book-get-srv-1')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(api.downloads, 1);
-    expect(api.uploaded, isEmpty, reason: '앱은 교재를 올리지 않는다');
-    expect(app.importedBooks.any((b) => b.id == 'sample-type-01'), isTrue);
-
-    // 서버에서 빼기는 그대로
-    await tester.tap(find.byKey(const Key('server-book-remove-srv-1')));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.byKey(const Key('server-book-remove-ok')));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 150)));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(api.shelf, isEmpty);
-  });
-
-  testWidgets('선생님이 파일로 넣은 교재는 서버로 올라가지 않는다', (tester) async {
-    final app = (await tester.runAsync(_state))!;
-    app.profile.account = Account(
-        server: 'https://example.test', token: 't', userId: 'u_t', loginId: 'une.teacher', role: 'teacher', name: '선생님');
-    final api = _FakeBooksApi(teacher: true);
-    ServerBooksCard.apiOf = (_) => api;
-    addTearDown(() => ServerBooksCard.apiOf = null);
-
-    await tester.runAsync(() => app.importBooks(sampleBookFile()));
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
-    expect(app.importedBooks.any((b) => b.id == 'sample-type-01'), isTrue, reason: '기기에는 들어간다');
-    expect(api.uploaded, isEmpty, reason: '서버로는 올라가지 않는다');
-    app.dispose();
-  });
-
   testWidgets('문제 보기: 교재별이 기본, 교재 안에서는 단원별', (tester) async {
     _tabletSize(tester);
     final app = (await tester.runAsync(_state))!;
@@ -1476,6 +1322,51 @@ void _univTests() {
       expect(ids('고3'), '');
       expect(ids('취준'), '');
       app.dispose();
+    });
+  });
+}
+
+void _seriesTests() {
+  group('시리즈 교재', () {
+    testWidgets('교재 고르기: 시리즈는 한 권으로 보이고, 담으면 회차가 전부 담긴다', (tester) async {
+      _tabletSize(tester);
+      final app = (await tester.runAsync(_state))!;
+      await tester.runAsync(() => app.importBooks(sampleBookFile()));
+      for (final id in ['sample-type-01', 'sample-type-02']) {
+        app.removeWorkbook(id);
+      }
+      await tester.pumpWidget(_app(app, home: const WorkbookStoreScreen(initialCourse: 'math')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      const tile = Key('store-book-series-SAMPLE TYPE');
+      await tester.scrollUntilVisible(find.byKey(tile), 300, scrollable: find.byType(Scrollable).first);
+      expect(find.byKey(tile), findsOneWidget);
+      expect(find.byKey(const Key('store-book-sample-type-01')), findsNothing, reason: '회차마다 따로 보이지 않는다');
+      expect(find.byKey(const Key('store-book-sample-type-02')), findsNothing);
+      expect(find.textContaining('2회차'), findsWidgets);
+
+      // 한 번 담으면 회차가 모두 내 교재에 들어간다
+      const add = Key('store-add-series-SAMPLE TYPE');
+      await tester.ensureVisible(find.byKey(add));
+      await tester.tap(find.byKey(add));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(app.hasWorkbook('sample-type-01'), isTrue);
+      expect(app.hasWorkbook('sample-type-02'), isTrue);
+      expect(find.text('담김'), findsWidgets);
+
+      // 다시 누르면 모두 빠진다
+      await tester.tap(find.byKey(add));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(app.hasWorkbook('sample-type-01'), isFalse);
+      expect(app.hasWorkbook('sample-type-02'), isFalse);
+
+      // 한 권 칸을 누르면 회차 목록이 열린다
+      await tester.tap(find.byKey(tile));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('round-sample-type-01')), findsOneWidget);
+      expect(find.byKey(const Key('round-sample-type-02')), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

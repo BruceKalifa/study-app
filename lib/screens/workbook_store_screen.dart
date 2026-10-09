@@ -6,6 +6,7 @@ import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'dashboard_screen.dart' show courseIcon;
+import 'series_screen.dart';
 import 'workbook_screen.dart';
 
 /// 문제집 고르기: 과목 → 커리큘럼 단계(개념 → 유형 → 기출 → N제 → 모의고사) → 내 교재에 담기.
@@ -50,6 +51,22 @@ class WorkbookStoreScreen extends StatelessWidget {
               content: Text(had ? '「${w.title}」을(를) 내 교재에서 뺐어요' : '「${w.title}」을(를) 내 교재에 담았어요'),
             ));
         },
+        onToggleGroup: (books, add) {
+          for (final w in books) {
+            if (add) {
+              app.addWorkbook(w.id);
+            } else {
+              app.removeWorkbook(w.id);
+            }
+          }
+          final name = books.first.series.trim();
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(
+              duration: const Duration(seconds: 2),
+              content: Text(add ? '「$name」 ${books.length}회차를 내 교재에 담았어요' : '「$name」을(를) 내 교재에서 뺐어요'),
+            ));
+        },
         onOpen: (w) => WorkbookScreen.open(context, w.id),
         padding: const EdgeInsets.fromLTRB(32, 12, 32, 40),
       ),
@@ -65,6 +82,7 @@ class WorkbookCatalog extends StatefulWidget {
     required this.isSelected,
     required this.onToggle,
     this.onOpen,
+    this.onToggleGroup,
     this.initialCourse,
     this.padding = EdgeInsets.zero,
     this.shrinkWrap = false,
@@ -74,6 +92,9 @@ class WorkbookCatalog extends StatefulWidget {
   final bool Function(String workbookId) isSelected;
   final ValueChanged<Workbook> onToggle;
   final ValueChanged<Workbook>? onOpen;
+
+  /// 시리즈(FLOW TYPE 처럼 회차가 나뉜 교재) 한 권을 담거나 뺄 때. 없으면 회차마다 [onToggle] 을 부른다.
+  final void Function(List<Workbook> books, bool add)? onToggleGroup;
   final String? initialCourse;
   final EdgeInsets padding;
 
@@ -88,6 +109,19 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
   String? _course;
   String? _scope;
   bool _allGrades = false;
+
+  /// 시리즈는 한 권으로 담는다: 다 담겨 있으면 모두 빼고, 아니면 빠진 회차까지 모두 담는다.
+  void _toggleGroup(List<Workbook> books) {
+    final add = !books.every((b) => widget.isSelected(b.id));
+    final cb = widget.onToggleGroup;
+    if (cb != null) {
+      cb(books, add);
+      return;
+    }
+    for (final b in books) {
+      if (widget.isSelected(b.id) != add) widget.onToggle(b);
+    }
+  }
 
   List<Subject> _courses(AppState app) {
     final withBooks = {for (final w in app.bank.workbooks) ...app.bank.coursesOf(w)};
@@ -112,7 +146,8 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
     final shown = [for (final w in books) if (_scope == null || w.scope == _scope) w];
     final stages = <String>{for (final w in shown) w.stage}.toList()
       ..sort((a, b) => kWorkbookStages.indexOf(a).compareTo(kWorkbookStages.indexOf(b)));
-    final mine = books.where((w) => widget.isSelected(w.id)).length;
+    final bookGroups = groupBySeries(books);
+    final mine = bookGroups.where((g) => g.any((w) => widget.isSelected(w.id))).length;
 
     final children = <Widget>[
       // course chips
@@ -150,7 +185,7 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
         const SizedBox(height: 14),
         Row(children: [
           Expanded(
-            child: Text('${course.name} · 문제집 ${books.length}권${mine > 0 ? ' · 내 교재 $mine권' : ''}',
+            child: Text('${course.name} · 문제집 ${bookGroups.length}권${mine > 0 ? ' · 내 교재 $mine권' : ''}',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
           ),
           if (scopes.length > 1)
@@ -181,16 +216,26 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
             final cols = box.maxWidth >= 1100 ? 3 : (box.maxWidth >= 640 ? 2 : 1);
             final w = (box.maxWidth - (cols - 1) * 14) / cols;
             return Wrap(spacing: 14, runSpacing: 14, children: [
-              for (final b in shown.where((x) => x.stage == stage))
+              for (final g in groupBySeries(shown.where((x) => x.stage == stage)))
                 SizedBox(
                   width: w,
-                  child: _BookTile(
-                    book: b,
-                    color: Color(course.color),
-                    selected: widget.isSelected(b.id),
-                    onToggle: () => widget.onToggle(b),
-                    onOpen: widget.onOpen == null ? null : () => widget.onOpen!(b),
-                  ),
+                  child: g.length == 1
+                      ? _BookTile(
+                          book: g.first,
+                          color: Color(course.color),
+                          selected: widget.isSelected(g.first.id),
+                          onToggle: () => widget.onToggle(g.first),
+                          onOpen: widget.onOpen == null ? null : () => widget.onOpen!(g.first),
+                        )
+                      : _SeriesTile(
+                          books: g,
+                          color: Color(course.color),
+                          isSelected: widget.isSelected,
+                          onToggle: () => _toggleGroup(g),
+                          onOpen: widget.onOpen == null
+                              ? null
+                              : () => SeriesScreen.open(context, g.first.series.trim(), onlyMine: false),
+                        ),
                 ),
             ]);
           }),
@@ -337,6 +382,100 @@ class _BookTile extends StatelessWidget {
                     style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
                     icon: const Icon(Icons.add_rounded, size: 18),
                     label: const Text('담기'),
+                  ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// 시리즈 한 권 — "FLOW TYPE · 6회차". 한 번 담으면 회차가 전부 내 교재에 들어가고,
+/// 누르면 회차 목록이 열린다.
+class _SeriesTile extends StatelessWidget {
+  const _SeriesTile({required this.books, required this.color, required this.isSelected, required this.onToggle, this.onOpen});
+  final List<Workbook> books;
+  final Color color;
+  final bool Function(String workbookId) isSelected;
+  final VoidCallback onToggle;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final first = books.first;
+    final series = first.series.trim();
+    final picked = books.where((b) => isSelected(b.id)).length;
+    final all = picked == books.length;
+    var done = 0, total = 0;
+    for (final b in books) {
+      final (d, t) = app.workbookProgress(b);
+      done += d;
+      total += t;
+    }
+    final problems = books.fold<int>(0, (n, b) => n + b.problemIds.length);
+    final meta = [
+      '${books.length}회차',
+      '$problems문항',
+      first.level,
+      if (first.publisher.isNotEmpty) first.publisher,
+    ].join(' · ');
+    return Material(
+      color: picked > 0 ? color.withValues(alpha: 0.06) : AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        key: Key('store-book-series-$series'),
+        borderRadius: BorderRadius.circular(18),
+        onTap: onOpen ?? onToggle,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: picked > 0 ? color : AppColors.line, width: picked > 0 ? 2 : 1),
+          ),
+          child: Row(children: [
+            Container(
+              width: 44,
+              height: 60,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(4), right: Radius.circular(10)),
+              ),
+              alignment: Alignment.center,
+              child: Text(first.stage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.1)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(series,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800, letterSpacing: -0.4, height: 1.25)),
+                const SizedBox(height: 3),
+                Text(meta, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: workbookLevelColor(first.level))),
+                if (done > 0) ...[
+                  const SizedBox(height: 6),
+                  Text('$done/$total 풀었어요', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+                ],
+              ]),
+            ),
+            const SizedBox(width: 8),
+            all
+                ? FilledButton.icon(
+                    key: Key('store-add-series-$series'),
+                    onPressed: onToggle,
+                    style: FilledButton.styleFrom(backgroundColor: color, minimumSize: const Size(0, 44)),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('담김'),
+                  )
+                : OutlinedButton.icon(
+                    key: Key('store-add-series-$series'),
+                    onPressed: onToggle,
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: Text(picked == 0 ? '담기' : '모두 담기'),
                   ),
           ]),
         ),

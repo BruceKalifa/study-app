@@ -8,6 +8,22 @@ import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'solve_screen.dart';
 import 'workbook_screen.dart';
 
+/// 같은 시리즈끼리 묶는다 (시리즈가 없는 문제집은 혼자). 처음 나온 순서를 지킨다.
+/// 교재 고르기·내 교재가 같은 기준으로 "한 권" 을 센다.
+List<List<Workbook>> groupBySeries(Iterable<Workbook> books) {
+  final order = <String>[];
+  final by = <String, List<Workbook>>{};
+  for (final w in books) {
+    final k = w.series.trim().isEmpty ? 'id:${w.id}' : 'series:${w.series.trim()}';
+    if (!by.containsKey(k)) {
+      order.add(k);
+      by[k] = [];
+    }
+    by[k]!.add(w);
+  }
+  return [for (final k in order) by[k]!];
+}
+
 /// 시리즈 안의 회차 고르기 — 내 교재에서 "FLOW TYPE" 을 누르면 1회차·2회차… 가 나온다.
 class SeriesScreen extends StatelessWidget {
   const SeriesScreen({super.key, required this.series, this.onlyMine = true});
