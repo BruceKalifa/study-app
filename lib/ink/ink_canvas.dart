@@ -30,6 +30,7 @@ class InkCanvas extends StatefulWidget {
     this.onTapPage,
     this.minZoom = 0.6,
     this.maxZoom = 4,
+    this.initialZoom = 1,
   });
 
   final InkController controller;
@@ -52,6 +53,10 @@ class InkCanvas extends StatefulWidget {
   final bool Function(Offset pagePos, bool stylus)? onTapPage;
   final double minZoom, maxZoom;
 
+  /// 처음 보이는 배율 (1 = 종이 너비가 화면 너비). 세로 화면에서 문제 단만 화면에 꽉 차게 보여 주고
+  /// 풀이 공간(오른쪽 단)은 옆으로 넘겨서 보게 할 때 1 보다 크게 둔다. 바뀌면 처음 자리(왼쪽 위)로 돌아간다.
+  final double initialZoom;
+
   /// True while the pen is writing (or just lifted): touches elsewhere are probably the palm.
   static bool get penBusy =>
       DateTime.now().millisecondsSinceEpoch - InkCanvasState._lastStylusContact < 450;
@@ -71,7 +76,7 @@ class _Ptr {
 class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixin {
   InkController get c => widget.controller;
 
-  double _zoom = 1;
+  late double _zoom = widget.initialZoom;
   Offset _offset = Offset.zero; // screen px
   Size _viewport = Size.zero;
 
@@ -128,6 +133,10 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
       old.controller.removeListener(_onController);
       widget.controller.addListener(_onController);
     }
+    if (old.initialZoom != widget.initialZoom) {
+      _zoom = widget.initialZoom;
+      _offset = Offset.zero;
+    }
   }
 
   @override
@@ -144,7 +153,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
   // ---------------- public helpers ----------------
   void resetView() {
     setState(() {
-      _zoom = 1;
+      _zoom = widget.initialZoom;
       _offset = Offset.zero;
     });
   }

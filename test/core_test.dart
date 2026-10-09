@@ -303,6 +303,21 @@ void main() {
       expect(ok('x<3', 'x≤3'), isFalse);
     });
 
+    test('고등학교 수학 과목은 고등수학으로 보인다', () {
+      expect(canonicalSubjectName('math', '수학'), '고등수학');
+      expect(canonicalSubjectName('math', '고등수학'), '고등수학');
+      expect(canonicalSubjectName('calc1', '미적분학1'), '미적분학1');
+      final s = Subject.fromJson({
+        'subject': '수학',
+        'subjectId': 'math',
+        'problems': [
+          {'id': 'm1', 'unit': 'u', 'topic': 't', 'type': 'short', 'stem': 's', 'answer': '1', 'solution': ''}
+        ],
+      });
+      expect(s.name, '고등수학');
+      expect(s.problems.single.subjectName, '고등수학');
+    });
+
     test('normalize / parseNumber', () {
       expect(Grader.normalize('   '), isNull);
       expect(Grader.normalize('√3'), 'sqrt(3)');

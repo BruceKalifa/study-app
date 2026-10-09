@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
 import 'common.dart';
@@ -34,6 +35,9 @@ class ExamSheetKeys {
     return null;
   }
 }
+
+/// 출처·교재 머리표(기출문제 · 학교 · 회차 …)는 문제를 올리는 선생님에게만 보인다 — 학생 화면에는 나오지 않는다.
+bool showsOrigin(BuildContext context) => context.getInheritedWidgetOfExactType<AppScope>()?.notifier?.isTeacher ?? false;
 
 /// 배점 like a 모의고사 paper: easy 2점, normal 3점, hard 4점 (교재 문항은 [Problem.points], 0 = 없음).
 int problemPoints(Problem p) => p.points ?? (p.difficulty <= 2 ? 2 : (p.difficulty == 3 ? 3 : 4));
@@ -121,7 +125,7 @@ class ProblemSheet extends StatelessWidget {
     );
   }
 
-  Widget _passageBox(Passage ps) {
+  Widget _passageBox(Passage ps, bool origin) {
     final paras = ps.body.split(RegExp(r'\n\s*\n'));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(passageLabel ?? '다음 글을 읽고 물음에 답하시오.',
@@ -137,7 +141,7 @@ class ProblemSheet extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 12),
               child: MathText('\u3000${para.trim()}', style: const TextStyle(fontSize: 23, height: 1.8)),
             ),
-          if ((ps.source ?? '').isNotEmpty)
+          if (origin && (ps.source ?? '').isNotEmpty)
             Align(
               alignment: Alignment.centerRight,
               child: Text(ps.source!, style: const TextStyle(fontSize: 17, color: AppColors.inkMuted)),
@@ -150,7 +154,8 @@ class ProblemSheet extends StatelessWidget {
   Widget _content(BuildContext context, Problem p, String face, String sans, int? correctChoice, double columnWidth,
       double line, bool sideBySide) {
     final ps = passage;
-    final column = _problemColumn(p, correctChoice, columnWidth);
+    final origin = showsOrigin(context);
+    final column = _problemColumn(p, correctChoice, columnWidth, origin);
     return DefaultTextStyle(
       style: TextStyle(fontFamily: face, fontSize: 25, height: 1.75, color: AppColors.ink),
       child: Padding(
@@ -176,7 +181,7 @@ class ProblemSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 DifficultyDots(p.difficulty, color: color, size: 8),
-                if (p.source != null && p.label == null) ...[
+                if (origin && p.source != null && p.label == null) ...[
                   const SizedBox(width: 12),
                   Flexible(
                     child: Text(p.source!,
@@ -197,12 +202,12 @@ class ProblemSheet extends StatelessWidget {
             const SizedBox(height: 34),
             if (ps != null && sideBySide)
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                SizedBox(width: line * 0.49, child: _passageBox(ps)),
+                SizedBox(width: line * 0.49, child: _passageBox(ps, origin)),
                 SizedBox(width: line * 0.04),
                 column,
               ])
             else ...[
-              if (ps != null) ...[_passageBox(ps), const SizedBox(height: 36)],
+              if (ps != null) ...[_passageBox(ps, origin), const SizedBox(height: 36)],
               column,
             ],
           ],
@@ -211,13 +216,13 @@ class ProblemSheet extends StatelessWidget {
     );
   }
 
-  Widget _problemColumn(Problem p, int? correctChoice, double columnWidth) {
+  Widget _problemColumn(Problem p, int? correctChoice, double columnWidth, bool origin) {
     return SizedBox(
               width: columnWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (p.label != null)
+                  if (origin && p.label != null)
                     Padding(
                       padding: const EdgeInsets.only(left: _indent, bottom: 12),
                       child: TexLabel(p, fontSize: 17),

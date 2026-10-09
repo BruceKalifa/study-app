@@ -556,6 +556,10 @@ class SubjectGroup {
 /// 학년 값 (schema `grades`). 고등 수험생 + 인적성(취준) + 한양대(대학 전공 기초) + 편입 과정. 학생은 여러 개를 함께 고를 수 있다.
 const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
 
+/// 과목 이름 정리: 고등학교 수학 과목(`math`)은 "수학" 이 아니라 "고등수학" 으로 보인다
+/// (편입수학·대학수학·공업수학 등과 헷갈리지 않게). 이미 올라가 있는 교재 파일에도 똑같이 적용된다.
+String canonicalSubjectName(String id, String name) => id == 'math' && name.trim() == '수학' ? '고등수학' : name;
+
 /// A course (과목): 물리학Ⅰ, 수학Ⅰ, 국어(독서)… — one JSON file.
 class Subject {
   final String id;
@@ -642,7 +646,7 @@ class Subject {
 
   factory Subject.fromJson(Map<String, dynamic> j) {
     final id = _str(j['subjectId'], _str(j['id']));
-    final name = _str(j['subject'], _str(j['name'], id));
+    final name = canonicalSubjectName(id, _str(j['subject'], _str(j['name'], id)));
     final raw = j['problems'];
     final problems = <Problem>[];
     final twins = <Problem>[];

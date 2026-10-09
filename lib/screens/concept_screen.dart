@@ -13,6 +13,7 @@ import '../ink/ink_toolbar.dart';
 import '../ink/shape_hint.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
+import '../widgets/problem_card.dart' show showsOrigin;
 import 'solve_screen.dart';
 
 /// 개념 페이지 읽기 — 교재의 개념·실전개념·공식 정리를 종이처럼 펼쳐 놓고 펜으로 필기한다.
@@ -250,7 +251,7 @@ class ConceptSheet extends StatelessWidget {
           Container(height: 3, width: 120, color: color),
           const SizedBox(height: 30),
           MathText(c.body, style: TextStyle(fontSize: 27, height: 1.85, fontFamily: face, color: AppColors.ink)),
-          if ((c.source ?? '').isNotEmpty)
+          if (showsOrigin(context) && (c.source ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(c.source!, style: const TextStyle(fontSize: 20, color: AppColors.inkMuted)),

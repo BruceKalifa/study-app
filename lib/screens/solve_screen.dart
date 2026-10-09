@@ -129,8 +129,19 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
 
   Problem get _p => _problems[_index];
 
-  /// 세로 화면: 태블릿을 채우고도 남을 만큼 긴 종이 (더 쓰면 autoExtend 가 늘린다).
+  /// 세로 화면(지문형): 태블릿을 채우고도 남을 만큼 긴 종이 (더 쓰면 autoExtend 가 늘린다).
   static const double _portraitPageHeight = 2200;
+
+  /// 세로 화면(그 밖의 문항): 가로 화면과 같은 두 단 종이 — 왼쪽이 문제, 오른쪽이 풀이 공간이고 화면에는
+  /// 처음 왼쪽 단만 꽉 차게 보인다. 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다.
+  static const double _portraitSplitPageHeight = 1700;
+
+  /// 세로 화면에서 두 단 종이를 쓰나 (지문형은 지문이 길어 예전처럼 위아래).
+  bool _portraitSplit(BuildContext context) {
+    final size = MediaQuery.maybeOf(context)?.size;
+    if (size == null || size.width > size.height * 1.15) return false;
+    return _app.bank.passageOf(_p) == null;
+  }
 
   /// 지문형 문항은 가로에서도 지문이 길어 종이를 넉넉히 둔다.
   static const double _passagePageHeight = 1200;
@@ -139,7 +150,9 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   /// (오른쪽 단이 풀이 공간. 더 쓰면 autoExtend 가 아래로 늘려 준다.)
   double _pageHeightFor(BuildContext context) {
     final size = MediaQuery.maybeOf(context)?.size;
-    if (size == null || size.width <= size.height * 1.15) return _portraitPageHeight;
+    if (size == null || size.width <= size.height * 1.15) {
+      return _portraitSplit(context) ? _portraitSplitPageHeight : _portraitPageHeight;
+    }
     if (_app.bank.passageOf(_p) != null) return _passagePageHeight;
     return math.max(620.0, kPageWidth * size.height / size.width);
   }
@@ -278,7 +291,11 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
       ink.sink = live;
       live.sendPage(p, pageHeight: ink.pageHeight, strokes: () => ink.strokes);
     }
-    _canvasKey.currentState?.scrollToTop();
+    if (_portraitSplit(context)) {
+      _canvasKey.currentState?.resetView(); // 새 문제는 왼쪽(문제 단)부터
+    } else {
+      _canvasKey.currentState?.scrollToTop();
+    }
     // the answer box position is known after layout: re-read an answer written earlier
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _ink == ink) _scheduleRecognize(force: true);
@@ -615,13 +632,17 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final graded = _exam ? null : _graded[_index];
     final mq = MediaQuery.of(context);
     final landscape = mq.size.width > mq.size.height * 1.15;
+    final split = _portraitSplit(context);
     final answer = _answers[_index];
 
-    // 가로 화면은 시험지처럼 두 단: 왼쪽이 문제, 오른쪽이 풀이 공간
-    final zoom = (950 / mq.size.width).clamp(0.45, 1.0);
-    final columnFraction = landscape ? 0.44 : 1.0;
+    // 가로 화면은 시험지처럼 두 단: 왼쪽이 문제, 오른쪽이 풀이 공간.
+    // 세로 화면도 같은 두 단 종이를 쓰되, 화면 너비의 두 배 종이를 그리고 처음엔 왼쪽 단만 보인다 (오른쪽으로 넘기면 풀이 공간).
+    final zoom = (950 / (split ? 2 * mq.size.width : mq.size.width)).clamp(0.45, 1.0);
+    final twoColumns = landscape || split;
+    final columnFraction = twoColumns ? 0.44 : 1.0;
     // 단 경계선의 페이지 좌표 (ProblemSheet 의 안쪽 여백 64 · 줄 너비 = 1000/zoom − 128 과 맞춘다)
-    final ruleX = landscape ? 64 * zoom + (1000 - 128 * zoom) * columnFraction + 22 : null;
+    final ruleX = twoColumns ? 64 * zoom + (1000 - 128 * zoom) * columnFraction + 22 : null;
+    final initialZoom = split ? (1000 / (ruleX! + 16)).clamp(1.0, 2.6) : 1.0;
 
     final passage = app.bank.passageOf(p);
     String? passageLabel;
@@ -666,6 +687,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                   controller: ink,
                   onTapPage: _onTapPage,
                   underlay: sheet,
+                  initialZoom: initialZoom,
                   columnRuleX: passage == null ? ruleX : null,
                 ),
               ),

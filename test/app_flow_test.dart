@@ -792,7 +792,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('예제'), findsWidgets);
-    expect(find.text('Solvit 예시 문항'), findsWidgets);
+    expect(find.text('Solvit 예시 문항'), findsNothing, reason: '출처는 학생 화면에 나오지 않는다 (선생님만)');
     expect(find.byType(Math), findsWidgets);
     bool hasPoints() => tester
         .widgetList<RichText>(find.byType(RichText))

@@ -5,6 +5,7 @@ import '../app/theme.dart';
 import '../core/problem.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
+import '../widgets/problem_card.dart' show showsOrigin;
 import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'answer_key_screen.dart';
 import 'concept_screen.dart';
@@ -362,7 +363,7 @@ class _Row extends StatelessWidget {
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkSoft)),
           ),
           const SizedBox(width: 12),
-          if (problem.source != null) ...[
+          if (showsOrigin(context) && problem.source != null) ...[
             Pill('기출', color: AppColors.accent, dense: true),
             const SizedBox(width: 8),
           ],
