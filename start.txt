@@ -1,0 +1,7 @@
+Starting: Intent { cmp=com.une.pulinote.study_app/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.une.pulinote.study_app/.MainActivity
+TotalTime: 3972
+WaitTime: 3990
+Complete

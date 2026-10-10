@@ -1,0 +1,6 @@
+++ adb shell pidof com.une.pulinote.study_app
++ echo 'pid: 2646'
+pid: 2646
++ adb shell dumpsys activity activities
++ grep -i -m5 'mResumedActivity\|topResumedActivity'
+    topResumedActivity=ActivityRecord{6a03955 u0 com.une.pulinote.study_app/.MainActivity t8}
