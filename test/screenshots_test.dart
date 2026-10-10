@@ -176,7 +176,13 @@ Future<void> _teacherShots(WidgetTester tester, String server) async {
     final rnd = math.Random(7);
     for (final (i, (name, grade)) in [('오예진', '고3'), ('김선주', '고2'), ('박민수', '고3'), ('이서연', 'N수')].indexed) {
       final (sToken, _) = await AccountApi(server)
-          .signup(role: 'student', loginId: 'st$i$stamp', password: 'stud-pass', name: name, grade: grade);
+          .signup(role: 'student', loginId: 'st$i$stamp', password: 'stud-pass', name: name, grade: grade, studentCode: switch (grade) {
+            '한양대' => 'CI-HYU',
+            'N수' => 'CI-NSU',
+            '취준' => 'CI-JOB',
+            '편입' => 'CI-TRANS',
+            _ => 'CI-HIGH',
+          });
       final api = AccountApi(server, sToken);
       await api.joinTeacher(tMe.inviteCode!);
       final now = DateTime.now().millisecondsSinceEpoch;

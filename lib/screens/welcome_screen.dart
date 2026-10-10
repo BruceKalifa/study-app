@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/app_state.dart';
@@ -25,13 +27,47 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   final _pw2 = TextEditingController();
   final _name = TextEditingController();
   final _code = TextEditingController();
+  final _studentCode = TextEditingController();
+  Timer? _codeTimer;
+
+  /// 추천코드를 확인한 결과 (맞으면 그 부류와 고를 수 있는 학년·과정)
+  SignupCodeInfo? _cohort;
+  String? _codeNote;
 
   @override
   void dispose() {
-    for (final c in [_id, _pw, _pw2, _name, _code]) {
+    _codeTimer?.cancel();
+    for (final c in [_id, _pw, _pw2, _name, _code, _studentCode]) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// 코드를 다 쓰면(쉬었다가) 서버에 물어 맞는 부류를 보여 주고, 학년·과정 칸을 그 부류로 좁힌다.
+  void _onCodeChanged(String v) {
+    _codeTimer?.cancel();
+    if (_cohort != null || _codeNote != null) {
+      setState(() {
+        _cohort = null;
+        _codeNote = null;
+      });
+    }
+    if (v.trim().length < 4) return;
+    _codeTimer = Timer(const Duration(milliseconds: 600), () async {
+      try {
+        final info = await AccountApi(kDefaultServer).checkSignupCode(v);
+        if (!mounted || _studentCode.text != v) return;
+        setState(() {
+          _cohort = info;
+          _codeNote = '${info.label}용 코드예요';
+          _grades.removeWhere((g) => !info.grades.contains(g));
+          if (_grades.isEmpty && info.grades.length == 1) _grades.add(info.grades.first);
+        });
+      } on ApiError catch (e) {
+        if (!mounted || _studentCode.text != v) return;
+        setState(() => _codeNote = e.message);
+      } catch (_) {}
+    });
   }
 
   Future<void> _submit() async {
@@ -48,6 +84,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       err = '승인 코드를 입력하세요';
     } else if (_signup && _role == 'student' && _grades.isEmpty) {
       err = '학년·과정을 하나 이상 골라 주세요';
+    } else if (_signup && _role == 'student' && _studentCode.text.trim().isEmpty) {
+      err = '추천코드를 입력하세요 (선생님께 받은 코드)';
     }
     if (err != null) {
       setState(() => _error = err);
@@ -68,6 +106,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           grade: _role == 'student' ? (_grades.firstOrNull ?? '') : '',
           grades: _role == 'student' ? List<String>.of(_grades) : const <String>[],
           teacherCode: _role == 'teacher' ? _code.text : '',
+          studentCode: _role == 'student' ? _studentCode.text : '',
         );
       } else {
         await app.login(server: server, loginId: _id.text, password: _pw.text);
@@ -259,6 +298,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
         ],
         if (!teacher) ...[
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('auth-student-code'),
+            controller: _studentCode,
+            autocorrect: false,
+            enableSuggestions: false,
+            textCapitalization: TextCapitalization.characters,
+            onChanged: _onCodeChanged,
+            decoration: InputDecoration(
+              labelText: '추천코드',
+              helperText: _codeNote ?? '선생님께 받은 코드를 입력하세요 (코드가 있어야 가입할 수 있어요)',
+              helperStyle: TextStyle(color: _cohort != null ? AppColors.correct : null, fontWeight: FontWeight.w700),
+              prefixIcon: const Icon(Icons.card_giftcard_rounded),
+            ),
+          ),
           const SizedBox(height: 16),
           const Text('학년·과정', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
           const SizedBox(height: 4),
@@ -266,7 +320,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 4, children: [
-            for (final g in kGrades)
+            for (final g in (_cohort?.grades ?? kGrades))
               FilterChip(
                 key: Key('auth-grade-$g'),
                 label: Text(g),

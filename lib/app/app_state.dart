@@ -1157,6 +1157,7 @@ class AppState extends ChangeNotifier {
     String grade = '',
     List<String> grades = const <String>[],
     String teacherCode = '',
+    String studentCode = '',
   }) async {
     final (token, info) = await AccountApi(server).signup(
         role: role,
@@ -1165,7 +1166,8 @@ class AppState extends ChangeNotifier {
         name: name.trim(),
         grade: grade,
         grades: grades,
-        teacherCode: teacherCode);
+        teacherCode: teacherCode,
+        studentCode: studentCode);
     await _signIn(server: server, token: token, info: info, fresh: true, grade: grade, grades: grades);
   }
 

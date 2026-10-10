@@ -1276,7 +1276,7 @@ void main() {
       final st = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false, autoSyncBooks: false);
       await st.init();
       expect(st.needsWelcome, isTrue);
-      await st.signup(server: server, role: 'student', loginId: 's$stamp', password: 'stud-pass', name: '오예진', grade: '고3');
+      await st.signup(server: server, role: 'student', loginId: 's$stamp', password: 'stud-pass', name: '오예진', grade: '고3', studentCode: 'CI-HIGH');
       expect(st.signedIn, isTrue);
       expect(st.isTeacher, isFalse);
       expect(st.needsWelcome, isFalse);

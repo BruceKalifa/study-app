@@ -73,7 +73,7 @@ jobs:
       - name: Start server for app integration tests
         run: |
           cd server
-          TEACHER_SIGNUP_CODE=ci-teacher-code DATA_DIR=$(mktemp -d) CONTENT_DIR=$(mktemp -d) PORT=8099 nohup node server.js > ../ci-out/server.txt 2>&1 &
+          TEACHER_SIGNUP_CODE=ci-teacher-code STUDENT_SIGNUP_CODES=CI-HIGH:high,CI-HYU:hyu,CI-NSU:nsu,CI-JOB:job,CI-TRANS:transfer DATA_DIR=$(mktemp -d) CONTENT_DIR=$(mktemp -d) PORT=8099 nohup node server.js > ../ci-out/server.txt 2>&1 &
           sleep 3; curl -sf http://127.0.0.1:8099/api/community/boards | head -c 200
 
       - name: Unit tests

@@ -7,6 +7,13 @@ import '../app/records.dart';
 import 'content_sync.dart';
 
 /// Error with a message that can be shown as-is (Korean, from the server or the network layer).
+/// 가입 추천코드 확인 결과.
+class SignupCodeInfo {
+  final String label; // 한양대생 · 고등학생 · N수생 …
+  final List<String> grades; // 이 코드로 고를 수 있는 학년·과정
+  const SignupCodeInfo({required this.label, required this.grades});
+}
+
 class ApiError implements Exception {
   final String message;
   final int status;
@@ -478,6 +485,7 @@ class AccountApi {
     String grade = '',
     List<String> grades = const <String>[],
     String teacherCode = '',
+    String studentCode = '',
   }) async {
     final d = await _req('POST', '/api/auth/signup', body: {
       'role': role,
@@ -487,8 +495,15 @@ class AccountApi {
       'grade': grades.isNotEmpty ? grades.first : grade,
       if (grades.isNotEmpty) 'grades': grades,
       if (teacherCode.trim().isNotEmpty) 'teacherCode': teacherCode.trim(),
+      if (studentCode.trim().isNotEmpty) 'studentCode': studentCode.trim(),
     });
     return (_s(d['token']), MeInfo.fromJson(d));
+  }
+
+  /// 추천코드 확인 — 맞으면 그 코드가 받는 부류(예: 한양대생)와 고를 수 있는 학년·과정.
+  Future<SignupCodeInfo> checkSignupCode(String code) async {
+    final d = await _req('POST', '/api/auth/signup-code', body: {'code': code.trim()});
+    return SignupCodeInfo(label: _s(d['label']), grades: [for (final g in (d['grades'] as List? ?? const [])) _s(g)]);
   }
 
   Future<(String, MeInfo)> login(String loginId, String password) async {

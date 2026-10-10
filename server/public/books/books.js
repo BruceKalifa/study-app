@@ -83,8 +83,72 @@ async function start(user) {
   } catch (_) {
     students = [];
   }
-  await load();
+  await Promise.all([load(), loadCodes().catch((e) => note(e.message, false))]);
 }
+
+// ───────────────────────── 가입 추천코드 ─────────────────────────
+
+async function loadCodes() {
+  const out = await api('/api/teacher/signup-codes');
+  const sel = $('codeCohort');
+  if (!sel.options.length) {
+    for (const k of out.cohorts || []) sel.add(new Option(`${k.label} (${(k.grades || []).join('·')})`, k.id));
+  }
+  const list = $('codeList');
+  list.textContent = '';
+  for (const c of out.codes || []) {
+    const row = document.createElement('div');
+    row.className = `code-row${c.active ? '' : ' off'}`;
+    const kind = document.createElement('span');
+    kind.className = 'kind';
+    kind.textContent = c.label;
+    const code = document.createElement('code');
+    code.textContent = c.code;
+    const uses = document.createElement('span');
+    uses.className = 'uses';
+    uses.textContent = `${c.uses}명 가입${c.active ? '' : ' · 꺼짐'}`;
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'ghost';
+    copy.textContent = '복사';
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(c.code); copy.textContent = '복사됨'; } catch (_) { copy.textContent = '길게 눌러 복사'; }
+      setTimeout(() => { copy.textContent = '복사'; }, 1500);
+    });
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'ghost';
+    toggle.textContent = c.active ? '끄기' : '켜기';
+    toggle.addEventListener('click', async () => {
+      try {
+        await api(`/api/teacher/signup-codes/${encodeURIComponent(c.code)}`, { method: 'POST', json: { active: !c.active } });
+        await loadCodes();
+      } catch (e) { note(e.message, false); }
+    });
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'danger ghost';
+    del.textContent = '지우기';
+    del.addEventListener('click', async () => {
+      if (!confirm(`추천코드 ${c.code} 를 지울까요? 이 코드로는 더 이상 가입할 수 없어요. (이미 가입한 학생은 그대로예요)`)) return;
+      try {
+        await api(`/api/teacher/signup-codes/${encodeURIComponent(c.code)}`, { method: 'DELETE' });
+        await loadCodes();
+      } catch (e) { note(e.message, false); }
+    });
+    row.append(kind, code, uses, copy, toggle, del);
+    list.append(row);
+  }
+}
+
+$('codeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await api('/api/teacher/signup-codes', { method: 'POST', json: { cohort: $('codeCohort').value, code: $('codeText').value.trim() } });
+    $('codeText').value = '';
+    await loadCodes();
+  } catch (err) { note(err.message, false); }
+});
 
 // ───────────────────────── 목록 ─────────────────────────
 

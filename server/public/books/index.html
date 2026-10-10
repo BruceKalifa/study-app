@@ -37,6 +37,17 @@
 
   <!-- 교재 창고 -->
   <main class="pane" id="booksPane" hidden>
+    <section class="card codes" id="codes">
+      <h2>학생 가입 추천코드</h2>
+      <p class="muted">학생은 이 코드가 있어야 앱에서 가입할 수 있어요. 코드마다 가입할 수 있는 부류가 정해져 있어요.</p>
+      <div id="codeList" class="code-list"></div>
+      <form id="codeForm" class="code-form">
+        <select id="codeCohort" aria-label="부류"></select>
+        <input id="codeText" placeholder="원하는 코드 (비우면 무작위)" maxlength="24" autocomplete="off" spellcheck="false">
+        <button class="primary" type="submit">코드 만들기</button>
+      </form>
+    </section>
+
     <section class="card drop" id="drop">
       <input type="file" id="file" accept=".pulinote,application/gzip" multiple hidden>
       <div class="drop-art" aria-hidden="true">

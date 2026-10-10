@@ -157,3 +157,16 @@
 - 클라우드 서버 + HTTPS (Render, `render.yaml`).
 - 소셜 로그인(카카오·구글·애플), 비밀번호 찾기(휴대폰·이메일 인증), 선생님 계정 인증.
 - 구독 결제 상태를 계정에 저장 (Play 스토어 출시 때 — 지금은 구독 기능을 뺐다).
+
+## 학생 가입 추천코드
+
+학생은 **추천코드가 있어야** 가입할 수 있다. 코드는 한 부류의 학생만 가입시킨다 — 한양대생(`한양대`), 고등학생(`고1·고2·고3`), N수생(`N수`), 취준생(`취준`), 편입생(`편입`).
+고른 학년·과정이 코드의 부류 밖이면 403. 부류가 하나뿐인 코드(한양대·N수 …)는 학년을 안 써도 자동으로 채운다.
+
+- 처음 켤 때 한양대생·고등학생·N수생 코드를 무작위로 만든다 (`HYU-XXXXXX` · `HIGH-XXXXXX` · `NSU-XXXXXX`, 서버 로그에도 한 번 찍힌다). `DATA_DIR/accounts.json` 에 저장.
+- 고정하고 싶으면 환경변수 `STUDENT_SIGNUP_CODES="HYU-2026:hyu,HIGH-2026:high,NSU-2026:nsu"` (코드:부류, 콤마로 여러 개). 시작할 때 목록에 넣고 켜 둔다.
+- `POST /api/auth/signup` 에 `studentCode` 를 함께 보낸다. 대소문자·공백은 무시. 틀리면 403, 10분에 10번 넘게 틀리면 429.
+- `POST /api/auth/signup-code {code}` — 맞는 코드인지 + 받는 부류 (`{cohort,label,grades}`). 가입 화면이 학년 칸을 좁히는 데 쓴다.
+- 선생님: `GET /api/teacher/signup-codes` (목록·쓴 횟수) · `POST /api/teacher/signup-codes {cohort, code?}` (새 코드) · `POST …/:code {active}` (끄기·켜기) · `DELETE …/:code`. 웹 교재 창고(`/books/`) 맨 위에서 볼 수 있다.
+- 가입한 학생 계정에는 쓴 코드(`signupCode`)와 부류(`cohort`)가 남는다. 코드를 지우거나 꺼도 이미 가입한 학생은 그대로다.
+- 선생님 가입은 예전처럼 `TEACHER_SIGNUP_CODE`.
