@@ -20,6 +20,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwA
 
 /** 테스트 서버의 선생님 가입 승인 코드 */
 const TC = 'test-teacher-code';
+const SCODES = 'T-HIGH:high,T-HYU:hyu,T-NSU:nsu,T-JOB:job'; // 학생 가입 추천코드 (환경변수로 고정)
+const SC = 'T-HIGH';
 let passed = 0;
 let failed = 0;
 function ok(cond, label, extra) {
@@ -85,17 +87,17 @@ function attempt(id, pid, ok, at, extra) {
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pulinote-accounts-test-'));
   const DATA_DIR = path.join(tmp, 'data');
-  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR, ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC };
+  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR, ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC, STUDENT_SIGNUP_CODES: SCODES };
   console.log(`임시 폴더: ${tmp}`);
 
   // ───────── 선생님 가입은 승인된 사람만 ─────────
   section('선생님 가입 승인 코드');
-  const closed = { CONTENT_DIR: path.join(tmp, 'content0'), DATA_DIR: path.join(tmp, 'data0'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: '' };
+  const closed = { CONTENT_DIR: path.join(tmp, 'content0'), DATA_DIR: path.join(tmp, 'data0'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: '', STUDENT_SIGNUP_CODES: SCODES };
   await startServer(closed);
   let q = await post('/api/auth/signup', { role: 'teacher', loginId: 'closed.t', password: 'teach-pass', name: '선생', teacherCode: 'anything' });
   ok(q.status === 403 && isKo(q), '승인 코드를 정해 두지 않으면 선생님 가입은 닫혀 있다', q.json);
-  q = await post('/api/auth/signup', { role: 'student', loginId: 'closed.s', password: 'stud-pass', name: '학생', grade: '고3' });
-  ok(q.status === 200, '그래도 학생 가입은 열려 있다', q.json);
+  q = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'closed.s', password: 'stud-pass', name: '학생', grade: '고3' });
+  ok(q.status === 200, '그래도 학생 가입은 (추천코드가 있으면) 열려 있다', q.json);
   await stopServer();
   await startServer(Object.assign({}, closed, { TEACHER_SIGNUP_CODE: 'secret-code' }));
   q = await post('/api/auth/signup', { role: 'teacher', loginId: 'closed.t', password: 'teach-pass', name: '선생' });
@@ -112,15 +114,15 @@ async function main() {
   section('가입 · 로그인');
   let r = await post('/api/auth/signup', { role: 'admin', loginId: 'abcd', password: '123456', name: '가' });
   ok(r.status === 400 && isKo(r), 'role 이 학생/선생님이 아니면 400');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'ab', password: '123456', name: '가' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'ab', password: '123456', name: '가' });
   ok(r.status === 400 && isKo(r), '아이디 너무 짧으면 400');
-  r = await post('/api/auth/signup', { role: 'student', loginId: '한글아이디', password: '123456', name: '가' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: '한글아이디', password: '123456', name: '가' });
   ok(r.status === 400, '아이디에 한글이면 400');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'yejin01', password: '123', name: '가' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'yejin01', password: '123', name: '가' });
   ok(r.status === 400 && /6자/.test(r.json.error), '비밀번호 6자 미만이면 400');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'yejin01', password: '123456', name: '' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'yejin01', password: '123456', name: '' });
   ok(r.status === 400, '이름 없으면 400');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'yejin01', password: '123456', name: '오예진', grade: '중3' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'yejin01', password: '123456', name: '오예진', grade: '중3' });
   ok(r.status === 400, '고등 외 학년이면 400');
 
   r = await post('/api/auth/signup', { role: 'teacher', loginId: 'Teacher.Une', password: 'phys-pass-1', name: '우네 선생님', teacherCode: TC });
@@ -134,14 +136,14 @@ async function main() {
   const T2 = { token: r.json.token, id: r.json.user.id, code: r.json.inviteCode };
   ok(T2.code !== T.code, '초대 코드는 선생님마다 다르다');
 
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'yejin01', password: 'secret-77', name: '오예진', grade: '고3' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'yejin01', password: 'secret-77', name: '오예진', grade: '고3' });
   ok(r.status === 200 && r.json.user.grade === '고3' && Array.isArray(r.json.teachers) && r.json.teachers.length === 0, '학생 가입', r.json);
   ok(!('inviteCode' in r.json), '학생에게는 초대 코드가 없다');
   ok(typeof r.json.communityKey === 'string' && r.json.communityKey.length >= 16, '본인에게만 커뮤니티 키를 준다');
   const S = { token: r.json.token, id: r.json.user.id, key: r.json.communityKey };
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'YEJIN01', password: 'secret-77', name: '다른 예진' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'YEJIN01', password: 'secret-77', name: '다른 예진', grade: '고3' });
   ok(r.status === 409 && isKo(r), '같은 아이디(대소문자만 다름) 409');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'minsu.k', password: 'minsu-pass', name: '김민수', grade: '고2' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'minsu.k', password: 'minsu-pass', name: '김민수', grade: '고2' });
   const S2 = { token: r.json.token, id: r.json.user.id };
 
   r = await post('/api/auth/login', { loginId: 'yejin01', password: 'wrong-pass' });
@@ -166,13 +168,68 @@ async function main() {
   ok(r.status === 200 && r.json.user.grade === '고2', '학년 바꾸기');
   await post('/api/me', { grade: '고3' }, S.token);
 
+  section('학생 가입 추천코드');
+  r = await post('/api/auth/signup', { role: 'student', loginId: 'nocode.s', password: 'stud-pass', name: '코드없음', grade: '고3' });
+  ok(r.status === 403 && isKo(r), '추천코드가 없으면 학생 가입 불가', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: 'WRONG-CODE', loginId: 'nocode.s', password: 'stud-pass', name: '코드틀림', grade: '고3' });
+  ok(r.status === 403 && isKo(r), '틀린 추천코드는 불가', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: ' t-high ', loginId: 'code.ok', password: 'stud-pass', name: '맞음', grade: '고3' });
+  ok(r.status === 200 && r.json.user.grade === '고3', '맞는 코드 (대소문자·공백 무시)', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: 'T-HIGH', loginId: 'code.wrong.grade', password: 'stud-pass', name: '학년안맞음', grades: ['한양대'] });
+  ok(r.status === 403 && /고등학생/.test(r.json.error || ''), '고등학생 코드로 한양대 학년은 불가', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: 'T-HYU', loginId: 'hyu.only', password: 'stud-pass', name: '한양대', grades: ['한양대'] });
+  ok(r.status === 200 && JSON.stringify(r.json.user.grades) === '["한양대"]', '한양대 코드는 한양대 학생', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: 'T-HYU', loginId: 'hyu.mix', password: 'stud-pass', name: '섞임', grades: ['한양대', 'N수'] });
+  ok(r.status === 403, '한양대 코드에 다른 부류를 섞을 수 없다', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: 'T-NSU', loginId: 'nsu.auto', password: 'stud-pass', name: 'N수' });
+  ok(r.status === 200 && JSON.stringify(r.json.user.grades) === '["N수"]', '부류가 하나뿐이면 학년을 안 써도 자동', r.json);
+  r = await post('/api/auth/signup-code', { code: 't-hyu' });
+  ok(r.status === 200 && r.json.cohort === 'hyu' && r.json.label === '한양대생' && r.json.grades[0] === '한양대', '코드 확인 API', r.json);
+  r = await post('/api/auth/signup-code', { code: 'nope' });
+  ok(r.status === 403, '없는 코드 확인은 403', r.json);
+  for (let i = 0; i < 12; i++) r = await post('/api/auth/signup-code', { code: 'guess' + i });
+  ok(r.status === 429, '틀린 코드를 계속 대입하면 막힌다', r.json);
+  r = await post('/api/auth/signup-code', { code: 'T-HIGH' });
+  ok(r.status === 429, '막힌 동안은 맞는 코드도 잠시 기다려야 한다', r.json);
+  await stopServer();
+  await startServer(env);
+  // 선생님이 코드를 보고 · 만들고 · 끄고 · 지운다
+  r = await post('/api/auth/signup', { role: 'teacher', loginId: 'code.teacher', password: 'teach-pass', name: '코드선생', teacherCode: TC });
+  const CT = r.json.token;
+  r = await get('/api/teacher/signup-codes', CT);
+  ok(r.status === 200 && r.json.codes.some((x) => x.code === 'T-HYU' && x.label === '한양대생' && x.uses >= 0), '선생님은 코드 목록을 본다', r.json);
+  ok(r.json.codes.filter((x) => x.code === 'T-HIGH')[0].uses >= 1, '쓴 횟수가 센다', r.json);
+  r = await post('/api/teacher/signup-codes', { cohort: 'hyu' }, CT);
+  ok(r.status === 200 && /^HYU-[A-Z2-9]{6}$/.test(r.json.code), '새 코드는 무작위로', r.json);
+  const NEWC = r.json.code;
+  r = await post('/api/teacher/signup-codes', { cohort: 'hyu', code: 'hyu-2026' }, CT);
+  ok(r.status === 200 && r.json.code === 'HYU-2026', '원하는 코드로 만들기', r.json);
+  r = await post('/api/teacher/signup-codes', { cohort: 'hyu', code: 'HYU-2026' }, CT);
+  ok(r.status === 409, '같은 코드는 둘 못 만든다', r.json);
+  r = await post('/api/teacher/signup-codes', { cohort: 'abc' }, CT);
+  ok(r.status === 400, '없는 부류는 400', r.json);
+  r = await post('/api/teacher/signup-codes/' + NEWC, { active: false }, CT);
+  ok(r.status === 200 && r.json.active === false, '끄기', r.json);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: NEWC, loginId: 'off.code', password: 'stud-pass', name: '꺼짐', grades: ['한양대'] });
+  ok(r.status === 403, '꺼진 코드로는 가입 불가', r.json);
+  r = await post('/api/teacher/signup-codes/' + NEWC, { active: true }, CT);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: NEWC, loginId: 'on.code', password: 'stud-pass', name: '켜짐', grades: ['한양대'] });
+  ok(r.status === 200, '다시 켜면 가입된다', r.json);
+  r = await del('/api/teacher/signup-codes/HYU-2026', CT);
+  ok(r.status === 200, '지우기', r.json);
+  r = await get('/api/teacher/signup-codes', CT);
+  ok(!r.json.codes.some((x) => x.code === 'HYU-2026'), '지운 코드는 목록에 없다');
+  const sres = await post('/api/auth/signup', { role: 'student', studentCode: 'T-HIGH', loginId: 'who.s', password: 'stud-pass', name: '학생', grade: '고2' });
+  r = await get('/api/teacher/signup-codes', sres.json.token);
+  ok(r.status === 403, '학생은 코드 목록을 못 본다', r.json);
+
   section('학년·과정 복수 선택');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'hyu.multi', password: 'multi-pass', name: '한양대생', grades: ['한양대', 'N수', '편입', 'N수'] });
-  ok(r.status === 200 && r.json.user.grade === '한양대' && JSON.stringify(r.json.user.grades) === '["한양대","N수","편입"]', '여러 개로 가입 (대표 = 첫 번째, 중복 제거)', r.json.user);
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'hyu.multi', password: 'multi-pass', name: '한양대생', grades: ['고1', '고2', '고1'] });
+  ok(r.status === 200 && r.json.user.grade === '고1' && JSON.stringify(r.json.user.grades) === '["고1","고2"]', '여러 개로 가입 (대표 = 첫 번째, 중복 제거)', r.json.user);
   const M = { token: r.json.token };
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'hyu.bad', password: 'multi-pass', name: '잘못', grades: ['한양대', '중3'] });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'hyu.bad', password: 'multi-pass', name: '잘못', grades: ['한양대', '중3'] });
   ok(r.status === 400, '없는 학년이 섞이면 400');
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'old.client', password: 'multi-pass', name: '옛앱', grade: '취준' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: 'T-JOB', loginId: 'old.client', password: 'multi-pass', name: '옛앱', grade: '취준' });
   ok(r.status === 200 && r.json.user.grade === '취준' && JSON.stringify(r.json.user.grades) === '["취준"]', '옛 앱(grade 하나)도 가입된다');
   r = await post('/api/me', { grades: ['편입', '한양대'] }, M.token);
   ok(r.status === 200 && r.json.user.grade === '편입' && r.json.user.grades.length === 2, '정보 수정으로 복수 학년 바꾸기', r.json.user);

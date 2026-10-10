@@ -4,7 +4,8 @@
  *
  *  인증:  Authorization: Bearer <token>   (로그인/가입 응답의 token)
  *
- *    POST   /api/auth/signup         { role: student|teacher, loginId, password, name, grade?, teacherCode? (선생님만) }
+ *    POST   /api/auth/signup         { role: student|teacher, loginId, password, name, grades?, studentCode (학생: 추천코드 필수), teacherCode? (선생님만) }
+ *    POST   /api/auth/signup-code    { code }          추천코드가 맞는지 → { cohort, label, grades } (가입 화면이 학년 칸을 좁히는 데 쓴다)
  *    POST   /api/auth/login          { loginId, password }
  *    POST   /api/auth/logout
  *    GET    /api/me
@@ -22,6 +23,10 @@
  *    GET    /api/teacher/students/:id                  한 학생의 오답 · 과목별 · 최근 풀이 · 내 교재
  *    DELETE /api/teacher/students/:id                  연결 끊기
  *    POST   /api/teacher/invite                        초대 코드 새로 만들기
+ *    GET    /api/teacher/signup-codes                  가입 추천코드 목록 (한양대생 · 고등학생 · N수생 …) + 쓴 횟수
+ *    POST   /api/teacher/signup-codes                  { cohort, code? } 새 추천코드 (code 를 안 주면 무작위)
+ *    POST   /api/teacher/signup-codes/:code            { active } 켜기·끄기
+ *    DELETE /api/teacher/signup-codes/:code            지우기
  *
  * 비밀번호는 scrypt(+salt)로만 저장하고, 토큰은 sha256 해시만 저장한다.
  * 선생님은 자기에게 연결된 학생의 기록만 볼 수 있다.
@@ -44,6 +49,16 @@ const MAX_LEARNER_BYTES = 64 * 1024;
 const SESSION_DAYS = 180;
 const DAY_MS = 86400000;
 const TZ_OFFSET_MS = (Number(process.env.TZ_OFFSET_MIN) || 540) * 60000; // 날짜 계산: 한국 시간
+/** 가입 추천코드가 정하는 대상: 코드 하나는 한 부류의 학생만 가입시킨다 (고른 학년·과정이 그 안에 있어야 한다). */
+const COHORTS = {
+  hyu: { label: '한양대생', prefix: 'HYU', grades: ['한양대'] },
+  high: { label: '고등학생', prefix: 'HIGH', grades: ['고1', '고2', '고3'] },
+  nsu: { label: 'N수생', prefix: 'NSU', grades: ['N수'] },
+  job: { label: '취준생', prefix: 'JOB', grades: ['취준'] },
+  transfer: { label: '편입생', prefix: 'TRANS', grades: ['편입'] },
+};
+const DEFAULT_COHORTS = ['hyu', 'high', 'nsu']; // 처음 켤 때 코드를 만들어 두는 부류
+const CODE_RE = /^[A-Z0-9][A-Z0-9-]{3,23}$/;
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O, 1/I 제외
 const CTRL = /[\u0000-\u001F\u007F\u200B\u2028\u2029]/g; // eslint-disable-line no-control-regex
 
@@ -179,6 +194,42 @@ function createAccountsApi({ dataDir, log, seedFile }) {
   }
   reindex();
 
+  // ── 가입 추천코드 ──
+  // 학생은 추천코드가 있어야 가입한다. 코드는 accounts.json 에 저장하고, 처음 켤 때 한양대생·고등학생·N수생 코드를 무작위로 만들어 둔다.
+  // 고정하고 싶으면 환경변수 STUDENT_SIGNUP_CODES="HYU-2026:hyu,HIGH-2026:high,NSU-2026:nsu" (콤마로 여러 개, 코드:부류).
+  if (!Array.isArray(accounts.data.signupCodes)) accounts.data.signupCodes = [];
+  const codes = () => accounts.data.signupCodes;
+  function normCode(v) { return typeof v === 'string' ? v.trim().toUpperCase().replace(/\s+/g, '') : ''; }
+  function randomSignupCode(cohort) {
+    for (let i = 0; i < 50; i++) {
+      const c = `${COHORTS[cohort].prefix}-${randomCode(6)}`;
+      if (!codes().some((x) => x.code === c)) return c;
+    }
+    throw new HttpError(500, '추천코드를 만들지 못했습니다');
+  }
+  {
+    let changed = false;
+    for (const part of String(process.env.STUDENT_SIGNUP_CODES || '').split(',')) {
+      const [c0, k0] = part.split(':');
+      const code = normCode(c0);
+      const cohort = (k0 || '').trim();
+      if (!code || !COHORTS[cohort] || !CODE_RE.test(code)) continue;
+      const have = codes().find((x) => x.code === code);
+      if (!have) { codes().push({ code, cohort, active: true, uses: 0, createdAt: Date.now(), fixed: true }); changed = true; }
+      else if (have.cohort !== cohort || !have.active) { have.cohort = cohort; have.active = true; changed = true; }
+    }
+    for (const cohort of DEFAULT_COHORTS) {
+      if (codes().some((x) => x.cohort === cohort)) continue;
+      const code = randomSignupCode(cohort);
+      codes().push({ code, cohort, active: true, uses: 0, createdAt: Date.now() });
+      log(`가입 추천코드 만듦: ${COHORTS[cohort].label} ${code}`);
+      changed = true;
+    }
+    if (changed) accounts.save().catch((e) => log(`signup codes: ${e.message}`));
+  }
+  const codeView = (x) => ({ code: x.code, cohort: x.cohort, label: COHORTS[x.cohort].label, grades: COHORTS[x.cohort].grades,
+    active: !!x.active, uses: x.uses || 0, createdAt: x.createdAt });
+
   async function persist(...stores) {
     try {
       await Promise.all((stores.length ? stores : [accounts]).map((x) => x.save()));
@@ -209,6 +260,23 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     if (list.length >= 30) throw new HttpError(429, '가입 요청이 너무 많습니다. 잠시 뒤 다시 시도하세요.');
     list.push(now);
     signups.set(ip, list);
+  }
+
+  const codeFails = new Map(); // ip → [times] (틀린 추천코드 — 대입 공격 방지)
+  function needSignupCode(given, req) {
+    const ip = req.socket.remoteAddress || '';
+    const now = Date.now();
+    const fails = (codeFails.get(ip) || []).filter((t) => now - t < 600000);
+    if (fails.length >= 10) throw new HttpError(429, '추천코드를 여러 번 틀렸어요. 잠시 뒤에 다시 시도하세요.');
+    const code = normCode(given);
+    const row = code ? codes().find((x) => x.code === code) : null;
+    if (!row || !row.active) {
+      fails.push(now);
+      codeFails.set(ip, fails);
+      if (codeFails.size > 5000) for (const [k, v] of codeFails) if (!v.some((t) => now - t < 600000)) codeFails.delete(k);
+      throw new HttpError(403, code ? '추천코드가 맞지 않아요' : '추천코드를 입력하세요');
+    }
+    return row;
   }
 
   // ── 응답 모양 ──
@@ -301,7 +369,17 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     if (!LOGIN_RE.test(loginId)) throw new HttpError(400, '아이디는 영문 소문자·숫자로 시작하는 4~20자(영문·숫자·. _ -)여야 합니다');
     const password = needPassword(b.password);
     const name = needName(b.name);
-    const grades = role === 'student' ? needGrades(b.grades, b.grade) : [];
+    let grades = role === 'student' ? needGrades(b.grades, b.grade) : [];
+    // 학생은 추천코드가 있어야 하고, 고른 학년·과정이 그 코드의 부류 안에 있어야 한다
+    const sc = role === 'student' ? needSignupCode(b.studentCode, req) : null;
+    if (sc) {
+      const allowed = COHORTS[sc.cohort].grades;
+      if (!grades.length && allowed.length === 1) grades = [allowed[0]];
+      if (!grades.length) throw new HttpError(400, '학년을 골라 주세요');
+      if (grades.some((g) => !allowed.includes(g))) {
+        throw new HttpError(403, `이 추천코드는 ${COHORTS[sc.cohort].label}만 쓸 수 있어요 (${allowed.join('·')})`);
+      }
+    }
     const grade = grades[0] || '';
     const school = charLen(lineText(b.school)) <= LIMITS.school ? lineText(b.school) : '';
     checkSignupRate(req.socket.remoteAddress || '');
@@ -318,7 +396,7 @@ function createAccountsApi({ dataDir, log, seedFile }) {
       createdAt: Date.now(),
     };
     if (school) u.school = school;
-    if (role === 'student') { u.grade = grade; u.grades = grades; u.teachers = []; }
+    if (role === 'student') { u.grade = grade; u.grades = grades; u.teachers = []; u.signupCode = sc.code; u.cohort = sc.cohort; sc.uses = (sc.uses || 0) + 1; }
     if (role === 'teacher') u.inviteCode = uniqueInvite();
     if (byLogin.has(loginId)) throw new HttpError(409, '이미 쓰고 있는 아이디입니다'); // scrypt 기다리는 사이 같은 아이디
     users().push(u);
@@ -608,6 +686,55 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     return { inviteCode: u.inviteCode };
   }
 
+  async function checkCode(req) {
+    const b = await readJson(req, 4 * 1024);
+    const row = needSignupCode(b.code, req);
+    const k = COHORTS[row.cohort];
+    return { ok: true, cohort: row.cohort, label: k.label, grades: k.grades };
+  }
+
+  function listCodes(u) {
+    need(u, 'teacher');
+    return { codes: codes().map(codeView), cohorts: Object.entries(COHORTS).map(([id, k]) => ({ id, label: k.label, grades: k.grades })) };
+  }
+
+  async function addCode(req, u) {
+    need(u, 'teacher');
+    const b = await readJson(req, 4 * 1024);
+    const cohort = typeof b.cohort === 'string' ? b.cohort : '';
+    if (!COHORTS[cohort]) throw new HttpError(400, `부류는 ${Object.keys(COHORTS).join(' · ')} 중에서 골라 주세요`);
+    let code = normCode(b.code);
+    if (code) {
+      if (!CODE_RE.test(code)) throw new HttpError(400, '추천코드는 영문 대문자·숫자·- 로 4~24자여야 해요');
+      if (codes().some((x) => x.code === code)) throw new HttpError(409, '이미 있는 추천코드예요');
+    } else code = randomSignupCode(cohort);
+    const row = { code, cohort, active: true, uses: 0, createdAt: Date.now() };
+    codes().push(row);
+    await persist();
+    return codeView(row);
+  }
+
+  async function setCodeActive(req, u, code) {
+    need(u, 'teacher');
+    const b = await readJson(req, 4 * 1024);
+    const row = codes().find((x) => x.code === normCode(decodeURIComponent(code)));
+    if (!row) throw new HttpError(404, '없는 추천코드예요');
+    if (typeof b.active !== 'boolean') throw new HttpError(400, 'active 는 true/false 여야 해요');
+    row.active = b.active;
+    await persist();
+    return codeView(row);
+  }
+
+  async function deleteCode(u, code) {
+    need(u, 'teacher');
+    const key = normCode(decodeURIComponent(code));
+    const i = codes().findIndex((x) => x.code === key);
+    if (i < 0) throw new HttpError(404, '없는 추천코드예요');
+    codes().splice(i, 1);
+    await persist();
+    return { ok: true };
+  }
+
   // ── 라우팅 ──
   async function route(req, res, url) {
     const m = req.method;
@@ -616,6 +743,7 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     const ok = (obj) => sendJson(res, 200, obj);
     if (a === 'auth' && parts.length === 2 && m === 'POST') {
       if (b === 'signup') return ok(await signup(req));
+      if (b === 'signup-code') return ok(await checkCode(req));
       if (b === 'login') return ok(await login(req));
       if (b === 'logout') return ok(await logout(req));
     }
@@ -636,6 +764,10 @@ function createAccountsApi({ dataDir, log, seedFile }) {
       if (b === 'students' && parts.length === 3 && m === 'GET') return ok(teacherStudent(u, c));
       if (b === 'students' && parts.length === 3 && m === 'DELETE') return ok(await removeStudent(u, c));
       if (b === 'invite' && parts.length === 2 && m === 'POST') return ok(await newInvite(u));
+      if (b === 'signup-codes' && parts.length === 2 && m === 'GET') return ok(listCodes(u));
+      if (b === 'signup-codes' && parts.length === 2 && m === 'POST') return ok(await addCode(req, u));
+      if (b === 'signup-codes' && parts.length === 3 && m === 'POST') return ok(await setCodeActive(req, u, c));
+      if (b === 'signup-codes' && parts.length === 3 && m === 'DELETE') return ok(await deleteCode(u, c));
     }
     throw new HttpError(404, '없는 주소이거나 지원하지 않는 방식입니다');
   }

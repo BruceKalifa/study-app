@@ -25,7 +25,6 @@ class InkCanvas extends StatefulWidget {
     this.readOnly = false,
     this.paper,
     this.paperColor,
-    this.columnRuleX,
     this.onStylusDown,
     this.onTapPage,
     this.minZoom = 0.6,
@@ -44,8 +43,6 @@ class InkCanvas extends StatefulWidget {
   final PaperStyle? paper;
   final Color? paperColor;
 
-  /// 시험지 단 경계선 — 페이지 좌표(0~1000)의 x. 문제는 왼쪽, 풀이는 오른쪽.
-  final double? columnRuleX;
   final VoidCallback? onStylusDown;
 
   /// A quick tap (pen or finger) at a page position. Return true to consume it:
@@ -564,7 +561,6 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
                               painter: PaperPainter(
                                 style: paper,
                                 color: widget.paperColor ?? const Color(0xFFFFFDF8),
-                                columnRuleX: widget.columnRuleX,
                               ),
                             ),
                           ),
@@ -594,9 +590,8 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
 }
 
 class PaperPainter extends CustomPainter {
-  PaperPainter({required this.style, required this.color, this.columnRuleX});
+  PaperPainter({required this.style, required this.color});
   final PaperStyle style;
-  final double? columnRuleX;
   final Color color;
 
   @override
@@ -646,37 +641,11 @@ class PaperPainter extends CustomPainter {
         }
         break;
     }
-
-    // 시험지처럼 단을 가르는 세로선 — 왼쪽은 문제, 오른쪽은 풀이 공간
-    final rx = columnRuleX;
-    if (rx != null && rx > 0 && rx < size.width - 60) {
-      canvas.drawLine(
-        Offset(rx, 108),
-        Offset(rx, size.height - 24),
-        Paint()
-          ..color = const Color(0x2E1D2433)
-          ..strokeWidth = 1.2,
-      );
-      final label = TextPainter(
-        text: const TextSpan(
-          text: '풀이',
-          style: TextStyle(
-            fontFamily: 'Pretendard', // 기본 글꼴에는 한글이 없다
-            color: Color(0x5A1D2433),
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 2,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      label.paint(canvas, Offset(rx + 16, 74)); // 머리글 줄에 맞춘다 (위 도구막대에 가리지 않게)
-    }
   }
 
   @override
   bool shouldRepaint(covariant PaperPainter old) =>
-      old.style != style || old.color != color || old.columnRuleX != columnRuleX;
+      old.style != style || old.color != color;
 }
 
 class CommittedInkPainter extends CustomPainter {

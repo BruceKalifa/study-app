@@ -129,9 +129,6 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
 
   Problem get _p => _problems[_index];
 
-  /// 세로 화면(지문형): 태블릿을 채우고도 남을 만큼 긴 종이 (더 쓰면 autoExtend 가 늘린다).
-  static const double _portraitPageHeight = 2200;
-
   /// 세로 화면(그 밖의 문항): 종이를 가로로 길게 — 왼쪽 절반에 문제(예전 그대로의 크기), 오른쪽 절반은 빈 풀이 공간.
   /// 화면에는 처음 문제만 꽉 차게 보이고, 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다. 경계선은 없다.
   static const double _portraitSplitPageHeight = 1700;
@@ -139,8 +136,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   /// 세로 화면에서 두 단 종이를 쓰나 (지문형은 지문이 길어 예전처럼 위아래).
   bool _portraitSplit(BuildContext context) {
     final size = MediaQuery.maybeOf(context)?.size;
-    if (size == null || size.width > size.height * 1.15) return false;
-    return _app.bank.passageOf(_p) == null;
+    return size != null && size.width <= size.height * 1.15;
   }
 
   /// 지문형 문항은 가로에서도 지문이 길어 종이를 넉넉히 둔다.
@@ -151,7 +147,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   double _pageHeightFor(BuildContext context) {
     final size = MediaQuery.maybeOf(context)?.size;
     if (size == null || size.width <= size.height * 1.15) {
-      return _portraitSplit(context) ? _portraitSplitPageHeight : _portraitPageHeight;
+      return _portraitSplitPageHeight;
     }
     if (_app.bank.passageOf(_p) != null) return _passagePageHeight;
     return math.max(620.0, kPageWidth * size.height / size.width);
@@ -661,9 +657,8 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     // 세로 화면은 문제를 예전 그대로(화면 너비) 놓고, 풀이 공간은 그 오른쪽에 가로로 이어 붙인다 —
     // 처음엔 문제만 화면에 꽉 차게 보이고, 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다. 경계선은 없다.
     final zoom = (950 / mq.size.width).clamp(0.45, 1.0);
-    final columnFraction = landscape ? 0.44 : 1.0;
-    // 단 경계선의 페이지 좌표 (ProblemSheet 의 안쪽 여백 64 · 줄 너비 = 1000/zoom − 128 과 맞춘다)
-    final ruleX = landscape ? 64 * zoom + (1000 - 128 * zoom) * columnFraction + 22 : null;
+    // 어느 문제든 같은 꼴: 문제는 왼쪽, 풀이 공간은 그 오른쪽 (선으로 가르지 않는다). 지문형은 지문까지 왼쪽에 넓게.
+    final columnFraction = landscape ? (_app.bank.passageOf(p) != null ? 0.66 : 0.44) : 1.0;
     final pageShare = split ? 0.5 : 1.0;
     final initialZoom = split ? 2.0 : 1.0;
 
@@ -718,7 +713,6 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                     child: SizeChangedLayoutNotifier(child: sheet),
                   ),
                   initialZoom: initialZoom,
-                  columnRuleX: passage == null ? ruleX : null,
                 ),
               ),
             ),

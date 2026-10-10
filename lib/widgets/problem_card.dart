@@ -118,7 +118,9 @@ class ProblemSheet extends StatelessWidget {
     final contentWidth = 1000 / k;
     final line = contentWidth - 128;
     final sideBySide = passage != null && columnFraction < 1;
-    final columnWidth = sideBySide ? line * 0.47 : line * columnFraction.clamp(0.3, 1.0);
+    // 문제 칸(지문형이면 지문+문제)이 차지하는 너비 — 나머지는 풀이 공간
+    final leftLine = line * columnFraction.clamp(0.3, 1.0);
+    final columnWidth = sideBySide ? leftLine * 0.47 : leftLine;
     // laid out wider and scaled down to the page width; [keys.root] stays in page coordinates
     return SizedBox(
       key: keys.root,
@@ -128,7 +130,7 @@ class ProblemSheet extends StatelessWidget {
         alignment: Alignment.topLeft,
         child: SizedBox(
           width: contentWidth,
-          child: _content(context, p, face, sans, correctChoice, columnWidth, line, sideBySide),
+          child: _content(context, p, face, sans, correctChoice, columnWidth, leftLine, sideBySide),
         ),
       ),
     );

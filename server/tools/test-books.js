@@ -18,6 +18,8 @@ const SEED_DIR = path.join(SERVER_DIR, '..', 'assets', 'problems');
 
 /** 테스트 서버의 선생님 가입 승인 코드 */
 const TC = 'test-teacher-code';
+const SCODES = 'T-HIGH:high,T-HYU:hyu,T-NSU:nsu,T-JOB:job'; // 학생 가입 추천코드 (환경변수로 고정)
+const SC = 'T-HIGH';
 let passed = 0;
 let failed = 0;
 function ok(cond, label, extra) {
@@ -105,7 +107,7 @@ const gz = (obj) => zlib.gzipSync(Buffer.from(JSON.stringify(obj), 'utf8'));
 
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pulinote-books-test-'));
-  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR: path.join(tmp, 'data'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC };
+  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR: path.join(tmp, 'data'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC, STUDENT_SIGNUP_CODES: SCODES };
   console.log(`임시 폴더: ${tmp}`);
   await startServer(env);
 
@@ -115,9 +117,9 @@ async function main() {
   const T = { token: r.json.token, id: r.json.user.id, code: r.json.inviteCode };
   r = await post('/api/auth/signup', { role: 'teacher', loginId: 'other.teacher', password: 'teach-pass-2', name: '김선생', teacherCode: TC });
   const T2 = { token: r.json.token, id: r.json.user.id };
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'mine.student', password: 'stu-pass-1', name: '내 학생', grade: '고3' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'mine.student', password: 'stu-pass-1', name: '내 학생', grade: '고3' });
   const S = { token: r.json.token, id: r.json.user.id };
-  r = await post('/api/auth/signup', { role: 'student', loginId: 'far.student', password: 'stu-pass-2', name: '남의 학생', grade: '고2' });
+  r = await post('/api/auth/signup', { role: 'student', studentCode: SC, loginId: 'far.student', password: 'stu-pass-2', name: '남의 학생', grade: '고2' });
   const S2 = { token: r.json.token, id: r.json.user.id };
   r = await post('/api/student/teachers', { code: T.code }, S.token);
   ok(r.status === 200, '학생이 선생님과 연결됨', r.json);
