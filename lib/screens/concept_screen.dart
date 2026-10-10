@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -172,7 +173,16 @@ class _ConceptScreenState extends State<ConceptScreen> {
               : InkCanvas(
                   key: _canvas,
                   controller: ink,
-                  underlay: ConceptSheet(key: _sheetKey, concept: c, color: color, serif: app.settings.examFont),
+                  underlay: NotificationListener<SizeChangedLayoutNotification>(
+                    // 그림이 다 풀려 높이가 정해지면(또는 바뀌면) 종이도 그만큼 늘린다
+                    onNotification: (_) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) => _fitPage());
+                      return false;
+                    },
+                    child: SizeChangedLayoutNotifier(
+                      child: ConceptSheet(key: _sheetKey, concept: c, color: color, serif: app.settings.examFont),
+                    ),
+                  ),
                 ),
         ),
         if (ink != null) ...[
@@ -221,16 +231,76 @@ class _ConceptScreenState extends State<ConceptScreen> {
 }
 
 /// 종이(너비 1000) 위에 놓이는 개념 한 장: 종류 · 제목 · 본문.
-class ConceptSheet extends StatelessWidget {
+/// PDF 쪽 이미지([Concept.images])가 있으면 제목·본문 대신 그 쪽들을 종이 너비에 꼭 맞게 위아래로 펼친다 (PDF 그대로).
+class ConceptSheet extends StatefulWidget {
   const ConceptSheet({super.key, required this.concept, required this.color, this.serif = true});
   final Concept concept;
   final Color color;
   final bool serif;
 
   @override
+  State<ConceptSheet> createState() => _ConceptSheetState();
+}
+
+class _ConceptSheetState extends State<ConceptSheet> {
+  List<Uint8List?> _pages = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _decode();
+  }
+
+  @override
+  void didUpdateWidget(ConceptSheet old) {
+    super.didUpdateWidget(old);
+    if (old.concept.id != widget.concept.id || !identical(old.concept.images, widget.concept.images)) _decode();
+  }
+
+  /// `data:image/…;base64,…` 를 한 번만 풀어 둔다 (그릴 때마다 풀면 느리다).
+  void _decode() {
+    _pages = [
+      for (final u in widget.concept.images)
+        u.startsWith('data:') && u.contains(',')
+            ? () {
+                try {
+                  return base64Decode(u.substring(u.indexOf(',') + 1));
+                } catch (_) {
+                  return null;
+                }
+              }()
+            : null,
+    ];
+  }
+
+  Widget _page(int i) {
+    final bytes = i < _pages.length ? _pages[i] : null;
+    final url = widget.concept.images[i];
+    // 2000px 로 풀어 두 배까지 확대해도 선명하게 (너무 큰 그림이 메모리를 먹지 않게 상한)
+    final image = bytes != null
+        ? Image.memory(bytes, width: 1000, fit: BoxFit.fitWidth, cacheWidth: 2000, filterQuality: FilterQuality.medium, gaplessPlayback: true)
+        : Image.network(url, width: 1000, fit: BoxFit.fitWidth, cacheWidth: 2000, errorBuilder: (_, __, ___) => const SizedBox(height: 200));
+    return image;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final c = concept;
-    final face = serif ? AppTheme.serif : AppTheme.font;
+    final c = widget.concept;
+    final color = widget.color;
+    if (c.images.isNotEmpty) {
+      return SizedBox(
+        width: 1000,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (var i = 0; i < c.images.length; i++) _page(i),
+          if (c.body.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(64, 24, 64, 24),
+              child: MathText(c.body, style: const TextStyle(fontSize: 27, height: 1.85, color: AppColors.ink)),
+            ),
+        ]),
+      );
+    }
+    final face = widget.serif ? AppTheme.serif : AppTheme.font;
     return SizedBox(
       width: 1000,
       child: Padding(

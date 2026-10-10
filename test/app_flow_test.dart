@@ -917,6 +917,21 @@ void main() {
       expect(Subject.fromJson(app.bank.subject('math')!.toJson()).concepts, hasLength(3));
     });
 
+    testWidgets('PDF 쪽 이미지 개념: 그림이 종이 너비로 펼쳐지고 필기 종이도 그만큼 늘어난다', (tester) async {
+      _tabletSize(tester);
+      final app = (await tester.runAsync(_state))!;
+      // 1×1 흰 PNG (실제로는 pdf_book.py 가 만든 WebP)
+      const png =
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      final c = Concept.fromJson({'id': 'pdf-1', 'title': '3쪽', 'body': '', 'images': [png, png]});
+      expect(c.images, hasLength(2));
+      expect(Concept.fromJson(c.toJson()).images, hasLength(2), reason: '저장 → 다시 읽기');
+      await tester.pumpWidget(_app(app, home: ConceptScreen(concepts: [c], index: 0)));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byType(Image), findsNWidgets(2));
+      expect(find.text('3쪽'), findsOneWidget, reason: '앱바 제목은 있고, 본문 제목은 그림으로 대신한다');
+    });
+
     testWidgets('교재 화면: 목차마다 개념 카드, 필터, 개념 읽기(읽음 표시) 와 관련 개념', (tester) async {
       _tabletSize(tester);
       final app = (await tester.runAsync(_state))!;

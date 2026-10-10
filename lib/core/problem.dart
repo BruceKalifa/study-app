@@ -474,6 +474,9 @@ class Concept {
 
   /// 이 개념이 설명하는 문제 유형들. 문제의 유형(`·` 로 나눈 토막)과 같으면 "관련 개념" 으로 이어진다. 비면 [topic] 을 쓴다.
   final List<String> links;
+
+  /// PDF 에서 만든 쪽 이미지 (`data:image/webp;base64,…` 또는 주소). 있으면 본문 대신 이 그림들을 위아래로 펼쳐 PDF 그대로 보여 준다.
+  final List<String> images;
   const Concept({
     required this.id,
     this.title = '',
@@ -484,6 +487,7 @@ class Concept {
     required this.body,
     this.source,
     this.links = const <String>[],
+    this.images = const <String>[],
   });
 
   factory Concept.fromJson(Map<String, dynamic> j) {
@@ -498,6 +502,7 @@ class Concept {
       body: _str(j['body']),
       source: _strOrNull(j['source']),
       links: _strList(j['links']),
+      images: _strList(j['images']),
     );
   }
 
@@ -511,6 +516,7 @@ class Concept {
         'body': body,
         if (source != null) 'source': source,
         if (links.isNotEmpty) 'links': links,
+        if (images.isNotEmpty) 'images': images,
       };
 
   /// 이 개념이 설명하는 문제인가 — 문제 유형을 `·` 로 나눈 토막이 연결 이름과 같으면.
