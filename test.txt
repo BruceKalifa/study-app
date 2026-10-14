@@ -1,0 +1,260 @@
+
+::group::✅ Passing tests
+✅ /home/runner/work/study-app/study-app/test/widget_test.dart: sanity
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 인적성 과정 취준 학생에게만 보인다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 커뮤니티 신분 가입할 때 고른 과정이 글 옆에 보이는 신분이 된다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 학습 목표 과정마다 목표 목록이 다르고, 여러 과정을 고르면 겹치는 것은 한 번만 나온다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 학습 목표 Learner 목표: 복수 선택·저장·옛 값
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 학습 목표 커뮤니티 게시판은 고른 과정에 맞게 나온다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 학습 목표 온보딩을 마치면 D-day 카드에 고른 목표의 시험이 오른다 (날짜는 수능만 미리 채움)
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 한양대 과정 학년·과정은 여러 개를 함께 고를 수 있다 (대표는 첫 번째)
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 한양대 과정 여러 학년·과정을 고르면 겹치는 과목이 모두 보인다
+✅ /home/runner/work/study-app/study-app/test/screenshots_test.dart: screenshots
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 비뚤게 그은 선은 직선이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 거의 수평이면 완전한 수평으로 맞춘다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 동그라미는 원이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 납작한 동그라미는 타원이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 세모는 삼각형이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 네모는 반듯한 직사각형이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 삼각형은 어디서 그리기 시작해도 삼각형이다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 네모는 어디서 그리기 시작해도 사각형이다 (삼각형이 되지 않는다)
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 비슷한 길이의 네모는 정사각형이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 기울어진 네모는 기울어진 채로 반듯한 직사각형이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 평행사변형·사다리꼴은 손으로 그린 꼭짓점을 따라 사각형이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 직각삼각형은 직각으로 맞춘다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 반원은 호가 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 글씨처럼 작거나 복잡한 획은 그대로 둔다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 도형 자동 맞추기 도형 이름
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 식 읽기 사칙연산과 거듭제곱
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 식 읽기 함수와 상수
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 식 읽기 기호도 읽는다 (×, ÷, π, √, 유니코드 빼기)
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 식 읽기 이상한 식은 읽지 않는다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 식 읽기 머리말을 떼어 낸다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 그리기 포물선은 한 획으로 그려진다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 그리기 1/x 는 점근선에서 끊어져 두 획이 된다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 그리기 정의되지 않는 곳은 건너뛴다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 함수 그리기 좌표축과 눈금
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 자리 고르기 한 번 누른 자리를 가운데로 놓는다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 자리 고르기 종이 밖으로 나가지 않게 안으로 밀어 넣는다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 자리 고르기 취소하면 아무 일도 없다
+✅ /home/runner/work/study-app/study-app/test/ink_shapes_test.dart: 자리 고르기 만든 획을 그대로 넣는다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 한양대 과정 회원가입: 학년·과정을 여러 개 고를 수 있고, 하나도 없으면 막는다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 한양대 과정 앱에는 과목 이름만 실려 있고 한양대 학생에게만 보인다
+✅ /home/runner/work/study-app/study-app/test/handwriting_test.dart: 필기 읽기: 정답 모양에 맞게 정답이 어떻게 생겼는지 (값이 아니라 모양만)
+✅ /home/runner/work/study-app/study-app/test/handwriting_test.dart: 필기 읽기: 정답 모양에 맞게 허수단위 i 가 숫자 1 로 바뀌지 않는다
+✅ /home/runner/work/study-app/study-app/test/handwriting_test.dart: 필기 읽기: 정답 모양에 맞게 복소수 후보를 채점기가 읽는다
+✅ /home/runner/work/study-app/study-app/test/handwriting_test.dart: 필기 읽기: 정답 모양에 맞게 숫자 답은 글자로 읽힌 것을 숫자로
+✅ /home/runner/work/study-app/study-app/test/handwriting_test.dart: 필기 읽기: 정답 모양에 맞게 후보 순서: 정답 모양에 맞는 후보가 앞
+✅ /home/runner/work/study-app/study-app/test/handwriting_test.dart: 필기 읽기: 정답 모양에 맞게 글자 답(그 밖)은 건드리지 않는다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 시리즈 교재 교재 고르기: 시리즈는 한 권으로 보이고, 담으면 회차가 전부 담긴다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: problem bank loads every subject (테스트용 문제 은행)
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: Expr vectors
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: Expr numbers and unary
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: Expr errors
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: format fmtNum
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: format roundTo
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: variants deterministic for the same seed
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: variants short answer matches parameters
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: variants choice variant: 5 unique choices, answer index points at choiceExprs[0]
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: variants generateVariants gives distinct problems
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: variants no template throws
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader choice
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader short numeric
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader short non-numeric falls back to string compare
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader 복소수 답
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader ± 와 쉼표로 이은 여러 값
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader 구간·집합 답은 괄호 모양까지 비교한다
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader 고등학교 수학 과목은 고등수학으로 보인다
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: grader normalize / parseNumber
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: model Problem JSON round-trip
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: model Subject.fromJson
+✅ /home/runner/work/study-app/study-app/test/core_test.dart: model ProblemBank byId resolves variants and withExtra
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: every LaTeX snippet in the bank renders with flutter_math
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: home renders and every tab opens
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: solve: write with stylus, answer choice + short, grade, record, results
+handwriting prepare failed: MissingPluginException(No implementation found for method vision#manageInkModels on channel google_mlkit_digital_ink_recognizer)
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'choice-2'>]: [
+  Container-[<'choice-2'>],
+]" derived an Offset (Offset(384.3, 369.5)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderDecoratedBox#634c8 relayoutBoundary=up14
+The hit test result at that offset is: HitTestResult(RenderCustomPaint#13118@Offset(259.7, 249.7), RenderRepaintBoundary#32910@Offset(259.7, 249.7), RenderStack#3012f@Offset(259.7, 249.7), RenderConstrainedBox#dd090@Offset(259.7, 249.7), RenderStack#e6a02@Offset(384.3, 369.5), RenderClipRect#2a413@Offset(384.3, 369.5), RenderPointerListener#91be2@Offset(384.3, 369.5), _RenderLayoutBuilder#2b83b@Offset(384.3, 369.5), RenderRepaintBoundary#c60a2@Offset(384.3, 369.5), RenderStack#32c4d@Offset(384.3, 369.5), RenderFlex#b5980@Offset(384.3, 369.5), RenderStack#7b39e@Offset(384.3, 369.5), RenderCustomMultiChildLayoutBox#61f65@Offset(384.3, 369.5), _RenderInkFeatures#10700@Offset(384.3, 369.5), RenderPhysicalModel#31a66@Offset(384.3, 369.5), RenderRepaintBoundary#d1d89@Offset(384.3, 369.5), RenderIgnorePointer#b92db@Offset(384.3, 369.5), RenderAnimatedOpacity#6799b@Offset(384.3, 369.5), RenderRepaintBoundary#3d04f@Offset(384.3, 369.5), RenderSemanticsAnnotations#76b01@Offset(384.3, 369.5), RenderOffstage#3145e@Offset(384.3, 369.5), RenderSemanticsAnnotations#f5d58@Offset(384.3, 369.5), _RenderTheater#be8bf@Offset(384.3, 369.5), RenderAbsorbPointer#cd998@Offset(384.3, 369.5), RenderPointerListener#638df@Offset(384.3, 369.5), RenderSemanticsAnnotations#42020@Offset(384.3, 369.5), RenderCustomPaint#ed6fb@Offset(384.3, 369.5), RenderSemanticsAnnotations#5864a@Offset(384.3, 369.5), RenderSemanticsAnnotations#7bb60@Offset(384.3, 369.5), RenderSemanticsAnnotations#782ad@Offset(384.3, 369.5), RenderTapRegionSurface#c7936@Offset(384.3, 369.5), RenderSemanticsAnnotations#9882a@Offset(384.3, 369.5), RenderSemanticsAnnotations#90ba7@Offset(384.3, 369.5), HitTestEntry<HitTestTarget>#0a453(_ReusableRenderView#99154), HitTestEntry<HitTestTarget>#5a8b5(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///home/runner/work/study-app/study-app/test/app_flow_test.dart:253:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+
+Warning: A call to tap() with finder "Found 1 widget with text "여기에 답을 쓰세요": [
+  Text("여기에 답을 쓰세요", inherit: true, color: Color(alpha: 1.0000, red: 0.8353, green: 0.8039, blue: 0.7490, colorSpace: ColorSpace.sRGB), family: Pretendard, size: 16.0, weight: 700, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),
+]" derived an Offset (Offset(272.6, 451.2)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderParagraph#8e505 relayoutBoundary=up2
+The hit test result at that offset is: HitTestResult(RenderCustomPaint#13118@Offset(184.2, 304.9), RenderRepaintBoundary#32910@Offset(184.2, 304.9), RenderStack#3012f@Offset(184.2, 304.9), RenderConstrainedBox#dd090@Offset(184.2, 304.9), RenderStack#e6a02@Offset(272.6, 451.2), RenderClipRect#2a413@Offset(272.6, 451.2), RenderPointerListener#91be2@Offset(272.6, 451.2), _RenderLayoutBuilder#2b83b@Offset(272.6, 451.2), RenderRepaintBoundary#c60a2@Offset(272.6, 451.2), RenderStack#32c4d@Offset(272.6, 451.2), RenderFlex#b5980@Offset(272.6, 451.2), RenderStack#7b39e@Offset(272.6, 451.2), RenderCustomMultiChildLayoutBox#61f65@Offset(272.6, 451.2), _RenderInkFeatures#10700@Offset(272.6, 451.2), RenderPhysicalModel#31a66@Offset(272.6, 451.2), RenderRepaintBoundary#d1d89@Offset(272.6, 451.2), RenderIgnorePointer#b92db@Offset(272.6, 451.2), RenderAnimatedOpacity#6799b@Offset(272.6, 451.2), RenderRepaintBoundary#3d04f@Offset(272.6, 451.2), RenderSemanticsAnnotations#76b01@Offset(272.6, 451.2), RenderOffstage#3145e@Offset(272.6, 451.2), RenderSemanticsAnnotations#f5d58@Offset(272.6, 451.2), _RenderTheater#be8bf@Offset(272.6, 451.2), RenderAbsorbPointer#cd998@Offset(272.6, 451.2), RenderPointerListener#638df@Offset(272.6, 451.2), RenderSemanticsAnnotations#42020@Offset(272.6, 451.2), RenderCustomPaint#ed6fb@Offset(272.6, 451.2), RenderSemanticsAnnotations#5864a@Offset(272.6, 451.2), RenderSemanticsAnnotations#7bb60@Offset(272.6, 451.2), RenderSemanticsAnnotations#782ad@Offset(272.6, 451.2), RenderTapRegionSurface#c7936@Offset(272.6, 451.2), RenderSemanticsAnnotations#9882a@Offset(272.6, 451.2), RenderSemanticsAnnotations#90ba7@Offset(272.6, 451.2), HitTestEntry<HitTestTarget>#5b146(_ReusableRenderView#99154), HitTestEntry<HitTestTarget>#62542(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///home/runner/work/study-app/study-app/test/app_flow_test.dart:270:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: variant problems render and grade
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'choice-5'>]: [
+  Container-[<'choice-5'>],
+]" derived an Offset (Offset(384.3, 513.9)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderDecoratedBox#e8679 relayoutBoundary=up14
+The hit test result at that offset is: HitTestResult(RenderCustomPaint#63c9e@Offset(259.7, 347.3), RenderRepaintBoundary#c9d9d@Offset(259.7, 347.3), RenderStack#59054@Offset(259.7, 347.3), RenderConstrainedBox#c0e1c@Offset(259.7, 347.3), RenderStack#7b2b6@Offset(384.3, 513.9), RenderClipRect#32d3e@Offset(384.3, 513.9), RenderPointerListener#ae528@Offset(384.3, 513.9), _RenderLayoutBuilder#64c43@Offset(384.3, 513.9), RenderRepaintBoundary#32493@Offset(384.3, 513.9), RenderStack#f6407@Offset(384.3, 513.9), RenderFlex#a465f@Offset(384.3, 513.9), RenderStack#776b3@Offset(384.3, 513.9), RenderCustomMultiChildLayoutBox#291bf@Offset(384.3, 513.9), _RenderInkFeatures#e3f2f@Offset(384.3, 513.9), RenderPhysicalModel#b8454@Offset(384.3, 513.9), RenderRepaintBoundary#20cf4@Offset(384.3, 513.9), RenderIgnorePointer#f32f9@Offset(384.3, 513.9), RenderAnimatedOpacity#b8f3a@Offset(384.3, 513.9), RenderRepaintBoundary#19b9d@Offset(384.3, 513.9), RenderSemanticsAnnotations#dbf85@Offset(384.3, 513.9), RenderOffstage#13772@Offset(384.3, 513.9), RenderSemanticsAnnotations#983f8@Offset(384.3, 513.9), _RenderTheater#993e7@Offset(384.3, 513.9), RenderAbsorbPointer#79b99@Offset(384.3, 513.9), RenderPointerListener#97880@Offset(384.3, 513.9), RenderSemanticsAnnotations#93567@Offset(384.3, 513.9), RenderCustomPaint#57cb3@Offset(384.3, 513.9), RenderSemanticsAnnotations#7d8c9@Offset(384.3, 513.9), RenderSemanticsAnnotations#fcdf4@Offset(384.3, 513.9), RenderSemanticsAnnotations#0da1b@Offset(384.3, 513.9), RenderTapRegionSurface#31031@Offset(384.3, 513.9), RenderSemanticsAnnotations#02107@Offset(384.3, 513.9), RenderSemanticsAnnotations#f282e@Offset(384.3, 513.9), HitTestEntry<HitTestTarget>#96724(_ReusableRenderView#99154), HitTestEntry<HitTestTarget>#fdd50(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///home/runner/work/study-app/study-app/test/app_flow_test.dart:330:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+handwriting prepare failed: MissingPluginException(No implementation found for method vision#manageInkModels on channel google_mlkit_digital_ink_recognizer)
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: exam mode hides answers and grades everything at the end
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'choice-2'>]: [
+  Container-[<'choice-2'>],
+]" derived an Offset (Offset(384.3, 369.5)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderDecoratedBox#28010 relayoutBoundary=up14
+The hit test result at that offset is: HitTestResult(RenderCustomPaint#4dd5f@Offset(259.7, 249.7), RenderRepaintBoundary#de6bf@Offset(259.7, 249.7), RenderStack#bb020@Offset(259.7, 249.7), RenderConstrainedBox#ea62f@Offset(259.7, 249.7), RenderStack#9be40@Offset(384.3, 369.5), RenderClipRect#d3502@Offset(384.3, 369.5), RenderPointerListener#7093a@Offset(384.3, 369.5), _RenderLayoutBuilder#1684c@Offset(384.3, 369.5), RenderRepaintBoundary#357b1@Offset(384.3, 369.5), RenderStack#21eca@Offset(384.3, 369.5), RenderFlex#6de5a@Offset(384.3, 369.5), RenderStack#f9d21@Offset(384.3, 369.5), RenderCustomMultiChildLayoutBox#5c19a@Offset(384.3, 369.5), _RenderInkFeatures#df3cc@Offset(384.3, 369.5), RenderPhysicalModel#1a7d6@Offset(384.3, 369.5), RenderRepaintBoundary#3d677@Offset(384.3, 369.5), RenderIgnorePointer#e070b@Offset(384.3, 369.5), RenderAnimatedOpacity#5265a@Offset(384.3, 369.5), RenderRepaintBoundary#32cf6@Offset(384.3, 369.5), RenderSemanticsAnnotations#78de3@Offset(384.3, 369.5), RenderOffstage#0afe8@Offset(384.3, 369.5), RenderSemanticsAnnotations#95df8@Offset(384.3, 369.5), _RenderTheater#5fad8@Offset(384.3, 369.5), RenderAbsorbPointer#bc6f0@Offset(384.3, 369.5), RenderPointerListener#2b23b@Offset(384.3, 369.5), RenderSemanticsAnnotations#4f510@Offset(384.3, 369.5), RenderCustomPaint#109d0@Offset(384.3, 369.5), RenderSemanticsAnnotations#a67a6@Offset(384.3, 369.5), RenderSemanticsAnnotations#922b1@Offset(384.3, 369.5), RenderSemanticsAnnotations#1c99d@Offset(384.3, 369.5), RenderTapRegionSurface#4a0f8@Offset(384.3, 369.5), RenderSemanticsAnnotations#da9e3@Offset(384.3, 369.5), RenderSemanticsAnnotations#a0412@Offset(384.3, 369.5), HitTestEntry<HitTestTarget>#db297(_ReusableRenderView#99154), HitTestEntry<HitTestTarget>#93d30(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///home/runner/work/study-app/study-app/test/app_flow_test.dart:362:20)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+handwriting prepare failed: MissingPluginException(No implementation found for method vision#manageInkModels on channel google_mlkit_digital_ink_recognizer)
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'choice-3'>]: [
+  Container-[<'choice-3'>],
+]" derived an Offset (Offset(384.3, 473.1)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderDecoratedBox#e46a1 relayoutBoundary=up14
+The hit test result at that offset is: HitTestResult(RenderCustomPaint#4dd5f@Offset(259.7, 319.7), RenderRepaintBoundary#de6bf@Offset(259.7, 319.7), RenderStack#bb020@Offset(259.7, 319.7), RenderConstrainedBox#ea62f@Offset(259.7, 319.7), RenderStack#9be40@Offset(384.3, 473.1), RenderClipRect#d3502@Offset(384.3, 473.1), RenderPointerListener#7093a@Offset(384.3, 473.1), _RenderLayoutBuilder#1684c@Offset(384.3, 473.1), RenderRepaintBoundary#357b1@Offset(384.3, 473.1), RenderStack#21eca@Offset(384.3, 473.1), RenderFlex#6de5a@Offset(384.3, 473.1), RenderStack#f9d21@Offset(384.3, 473.1), RenderCustomMultiChildLayoutBox#5c19a@Offset(384.3, 473.1), _RenderInkFeatures#df3cc@Offset(384.3, 473.1), RenderPhysicalModel#1a7d6@Offset(384.3, 473.1), RenderRepaintBoundary#3d677@Offset(384.3, 473.1), RenderIgnorePointer#e070b@Offset(384.3, 473.1), RenderAnimatedOpacity#5265a@Offset(384.3, 473.1), RenderRepaintBoundary#32cf6@Offset(384.3, 473.1), RenderSemanticsAnnotations#78de3@Offset(384.3, 473.1), RenderOffstage#0afe8@Offset(384.3, 473.1), RenderSemanticsAnnotations#95df8@Offset(384.3, 473.1), _RenderTheater#5fad8@Offset(384.3, 473.1), RenderAbsorbPointer#bc6f0@Offset(384.3, 473.1), RenderPointerListener#2b23b@Offset(384.3, 473.1), RenderSemanticsAnnotations#4f510@Offset(384.3, 473.1), RenderCustomPaint#109d0@Offset(384.3, 473.1), RenderSemanticsAnnotations#a67a6@Offset(384.3, 473.1), RenderSemanticsAnnotations#922b1@Offset(384.3, 473.1), RenderSemanticsAnnotations#1c99d@Offset(384.3, 473.1), RenderTapRegionSurface#4a0f8@Offset(384.3, 473.1), RenderSemanticsAnnotations#da9e3@Offset(384.3, 473.1), RenderSemanticsAnnotations#a0412@Offset(384.3, 473.1), HitTestEntry<HitTestTarget>#3b21d(_ReusableRenderView#99154), HitTestEntry<HitTestTarget>#cfa8b(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///home/runner/work/study-app/study-app/test/app_flow_test.dart:362:20)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'choice-3'>]: [
+  Container-[<'choice-3'>],
+]" derived an Offset (Offset(567.1, 755.1)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderDecoratedBox#e46a1 relayoutBoundary=up14
+The hit test result at that offset is: HitTestResult(RenderCustomPaint#4dd5f@Offset(383.2, 510.2), RenderRepaintBoundary#de6bf@Offset(383.2, 510.2), RenderStack#bb020@Offset(383.2, 510.2), RenderConstrainedBox#ea62f@Offset(383.2, 510.2), RenderStack#9be40@Offset(567.1, 755.1), RenderClipRect#d3502@Offset(567.1, 755.1), RenderPointerListener#7093a@Offset(567.1, 755.1), _RenderLayoutBuilder#1684c@Offset(567.1, 755.1), RenderRepaintBoundary#357b1@Offset(567.1, 755.1), RenderStack#21eca@Offset(567.1, 755.1), RenderFlex#6de5a@Offset(567.1, 755.1), RenderStack#f9d21@Offset(567.1, 755.1), RenderCustomMultiChildLayoutBox#5c19a@Offset(567.1, 755.1), _RenderInkFeatures#df3cc@Offset(567.1, 755.1), RenderPhysicalModel#1a7d6@Offset(567.1, 755.1), RenderRepaintBoundary#3d677@Offset(567.1, 755.1), RenderIgnorePointer#e070b@Offset(567.1, 755.1), RenderAnimatedOpacity#5265a@Offset(567.1, 755.1), RenderRepaintBoundary#32cf6@Offset(567.1, 755.1), RenderSemanticsAnnotations#78de3@Offset(567.1, 755.1), RenderOffstage#0afe8@Offset(567.1, 755.1), RenderSemanticsAnnotations#95df8@Offset(567.1, 755.1), _RenderTheater#5fad8@Offset(567.1, 755.1), RenderAbsorbPointer#bc6f0@Offset(567.1, 755.1), RenderPointerListener#2b23b@Offset(567.1, 755.1), RenderSemanticsAnnotations#4f510@Offset(567.1, 755.1), RenderCustomPaint#109d0@Offset(567.1, 755.1), RenderSemanticsAnnotations#a67a6@Offset(567.1, 755.1), RenderSemanticsAnnotations#922b1@Offset(567.1, 755.1), RenderSemanticsAnnotations#1c99d@Offset(567.1, 755.1), RenderTapRegionSurface#4a0f8@Offset(567.1, 755.1), RenderSemanticsAnnotations#da9e3@Offset(567.1, 755.1), RenderSemanticsAnnotations#a0412@Offset(567.1, 755.1), HitTestEntry<HitTestTarget>#0c216(_ReusableRenderView#99154), HitTestEntry<HitTestTarget>#86e68(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///home/runner/work/study-app/study-app/test/app_flow_test.dart:362:20)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+::endgroup::
+::group::✅ Passing tests
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: wrong answers schedule spaced review and graduate after 3 correct reviews
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: onboarding: 목표 목록이 고른 과정에 따라 다르고 복수 선택된다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: onboarding: name, grade, goal, then pick books from the catalog → 내 교재 → home
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 내 교재: problems come only from the books on the shelf
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: empty shelf: home sends the student to the catalog; 담기 fills 내 교재
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: welcome: 학생/선생님 → 로그인 form validates; 로그인 없이 쓰기 → onboarding
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: daily set: a wrong answer comes back as its authored twin; twins count for the original
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: endless feed adapts difficulty and does not repeat a family
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 무한 풀기: next keeps drawing new problems
+handwriting prepare failed: MissingPluginException(No implementation found for method vision#manageInkModels on channel google_mlkit_digital_ink_recognizer)
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 지문형 passages and 표 tables render on the exam sheet
+handwriting prepare failed: MissingPluginException(No implementation found for method vision#manageInkModels on channel google_mlkit_digital_ink_recognizer)
+::endgroup::
+::group::✅ Passing tests
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 학습관리: to-do, 순공 timer, 모의고사 성적
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 교재 파일: .pulinote import joins the bank, goes on the shelf, survives restart and can be removed
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: MathText.compact / plain flatten block markup for lists
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: TeX 원문 교재: boxes, display math, figures and the 머리표 render; no 배점
+handwriting prepare failed: MissingPluginException(No implementation found for method vision#manageInkModels on channel google_mlkit_digital_ink_recognizer)
+::endgroup::
+::group::✅ Passing tests
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 문제 보기: 교재별이 기본, 교재 안에서는 단원별
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 교재 목차: 수업문항·숙제문항 DAY 로 묶고, 목차가 없으면 단원으로
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 개념은 유형이 맞는 문제와 이어지고, 목차 칸에 들어간다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 PDF 쪽 이미지 개념: 그림이 종이 너비로 펼쳐지고 필기 종이도 그만큼 늘어난다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 3D 수업 개념: 필기 종이 대신 3D 수업 화면이 열리고, 이동은 위쪽 막대에 있다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 composeLessonHtml: 미리보기용 런타임은 빼고 앱 런타임을 한 번만 끼우며, 바깥 통신을 막는다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 3D 수업만 든 교재(문항 0개)도 가져와지고, 목차에 3D 표시가 나온다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 교재 화면: 목차마다 개념 카드, 필터, 개념 읽기(읽음 표시) 와 관련 개념
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 개념 교재 풀이 시트에 관련 개념이 나오고 누르면 그 개념으로 간다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 내 교재: 시리즈로 묶고 → 회차 고르기 → 교재 목차
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 답안표: 학생이 자기 답을 적고 한 번에 채점한다 (채점된 건 못 고침)
+::endgroup::
+::group::✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 답안표: 선생님이 목차별로 정답을 고치면 교재에 저장된다
+answer push: 요청 실패 (400)
+::endgroup::
+::group::✅ Passing tests
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: TeX 교재에서 쓰는 수식 어휘가 flutter_math 로 그려진다
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: content server: packs are downloaded, cached and reused offline
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 오답노트 shows only courses the student has solved
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: 커뮤니티 without a server explains how to connect
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: names are masked before they leave the tablet
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: community + ranking against the real server
+✅ /home/runner/work/study-app/study-app/test/app_flow_test.dart: accounts: student syncs records, asks the teacher with a picture, teacher answers; new tablet restores
+::endgroup::
+
+🎉 107 tests passed.
