@@ -24,6 +24,7 @@ import 'package:study_app/screens/workbook_screen.dart';
 import 'package:study_app/screens/workbook_store_screen.dart';
 import 'package:study_app/screens/answer_key_screen.dart';
 import 'package:study_app/screens/concept_screen.dart';
+import 'package:study_app/screens/lesson3d_screen.dart';
 import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/widgets/answer_panel.dart';
 import 'package:study_app/widgets/math_text.dart';
@@ -930,6 +931,72 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       expect(find.byType(Image), findsNWidgets(2));
       expect(find.text('3쪽'), findsOneWidget, reason: '앱바 제목은 있고, 본문 제목은 그림으로 대신한다');
+    });
+
+    testWidgets('3D 수업 개념: 필기 종이 대신 3D 수업 화면이 열리고, 이동은 위쪽 막대에 있다', (tester) async {
+      _tabletSize(tester);
+      final app = (await tester.runAsync(_state))!;
+      const html = '<html><head><title>t</title></head><body><script>Solvit3D.lesson({title:"x",steps:[{title:"a"}]})</script></body></html>';
+      final a = Concept.fromJson({'id': '3d-1', 'title': '이중적분', 'body': '', 'lesson3d': html});
+      final b = Concept.fromJson({'id': 'txt-1', 'title': '글 개념', 'body': '본문'});
+      expect(a.lesson3d, html);
+      expect(Concept.fromJson(a.toJson()).lesson3d, html, reason: '저장 → 다시 읽기');
+      expect(b.lesson3d, isEmpty);
+      await tester.pumpWidget(_app(app, home: ConceptScreen(concepts: [a, b], index: 0)));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const Key('lesson3d-view')), findsOneWidget);
+      expect(find.byKey(const Key('lesson-next')), findsOneWidget);
+      expect(app.isConceptRead('3d-1'), isTrue, reason: '열면 읽음');
+      await tester.tap(find.byKey(const Key('lesson-next')));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const Key('lesson3d-view')), findsNothing, reason: '글 개념은 필기 종이');
+    });
+
+    test('composeLessonHtml: 미리보기용 런타임은 빼고 앱 런타임을 한 번만 끼우며, 바깥 통신을 막는다', () {
+      const lesson = '<!doctype html><html><head><title>t</title><script src="solvit3d-runtime.js"></script></head><body><!--SOLVIT3D--><script>Solvit3D.lesson({})</script></body></html>';
+      final out = composeLessonHtml(lesson, 'var RUNTIME=1;/* </script> */');
+      expect(out.contains('src="solvit3d-runtime.js"'), isFalse);
+      expect(out.contains('<!--SOLVIT3D-->'), isFalse);
+      expect('var RUNTIME=1;'.allMatches(out).length, 1);
+      expect(out.contains(r'<\/script>'), isTrue, reason: '런타임 안의 </script 는 이스케이프');
+      expect(out.contains("connect-src 'none'"), isTrue);
+      expect(out.contains("default-src 'none'"), isTrue);
+      expect(out.indexOf('Content-Security-Policy') < out.indexOf('Solvit3D.lesson'), isTrue, reason: 'CSP 가 먼저');
+      // <head> 없는 조각도 감싼다
+      final bare = composeLessonHtml('<div id="a"></div><script>Solvit3D.lesson({})</script>', 'var R=2;');
+      expect(bare.startsWith('<!doctype html>'), isTrue);
+      expect('var R=2;'.allMatches(bare).length, 1);
+    });
+
+    testWidgets('3D 수업만 든 교재(문항 0개)도 가져와지고, 목차에 3D 표시가 나온다', (tester) async {
+      _tabletSize(tester);
+      final app = (await tester.runAsync(_state))!;
+      final j = sampleBookJson();
+      final course = (j['courses'] as List).first as Map<String, dynamic>;
+      course['problems'] = <dynamic>[];
+      course['twins'] = <dynamic>[];
+      course['passages'] = <dynamic>[];
+      course['concepts'] = [
+        {
+          'id': 'sample-type-01-c-3d',
+          'title': '이중적분 3D',
+          'section': '3D 수업',
+          'body': '',
+          'lesson3d': '<script>Solvit3D.lesson({title:"x",steps:[{title:"a"}]})</script>',
+        },
+      ];
+      final wb = (j['workbooks'] as List).first as Map<String, dynamic>;
+      wb['problems'] = <dynamic>[];
+      wb['concepts'] = ['sample-type-01-c-3d'];
+      await tester.runAsync(() => app.importBooks(gzip.encode(utf8.encode(jsonEncode(j)))));
+      await tester.pumpWidget(_app(app, home: const WorkbookScreen(workbookId: 'sample-type-01')));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('concept-sample-type-01-c-3d')), findsOneWidget);
+      expect(find.text('3D'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('concept-sample-type-01-c-3d')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+      expect(find.byKey(const Key('lesson3d-view')), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('교재 화면: 목차마다 개념 카드, 필터, 개념 읽기(읽음 표시) 와 관련 개념', (tester) async {

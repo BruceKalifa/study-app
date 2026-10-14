@@ -407,6 +407,10 @@ class _ConceptRow extends StatelessWidget {
                 maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkMuted)),
             const SizedBox(width: 12),
           ],
+          if (concept.lesson3d.isNotEmpty) ...[
+            Pill('3D', color: AppColors.accent, icon: Icons.view_in_ar_rounded, dense: true),
+            const SizedBox(width: 8),
+          ],
           Pill(concept.kind, color: color, dense: true),
         ]),
       ),

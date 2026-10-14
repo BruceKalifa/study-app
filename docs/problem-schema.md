@@ -131,6 +131,9 @@ TeX 원본이 없는 자료(인적성·NCS, 직접 쓴 교과 문항)는
 `python3 tools/text_book.py check <교재 폴더>` 는 변환하지 않고 빠진 정답·어긋난 선택지만 알려 준다
 (`selftest` 는 지어낸 보기 교재로 변환기를 시험한다 — CI 가 돌린다).
 
+**3D 수업**: `#개념` 머리에 `3D수업: 파일.html` 을 적으면 개념(`Concept.lesson3d`)이 필기 종이 대신 3D 모션그래픽 수업으로 열린다
+(HTML 한 파일, 외부 주소·통신 금지, 400KB 이하). 만드는 법과 도우미 목록은 [lesson3d.md](lesson3d.md), 올리기 전 검사는 `python3 tools/lesson3d_check.py 수업.html`.
+
 앱 설정 → **교재 파일** → 파일 가져오기 (또는 다른 앱에서 "Solvit으로 열기") 로 넣는다.
 교재 내용은 저작물이므로 이 저장소·CI 에는 올리지 않는다 (테스트는 `test/fixtures/sample_book.dart` 의 지어낸 예시만 쓴다).
 

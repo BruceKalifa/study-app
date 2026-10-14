@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수업 제목</title>
+<!-- 내 컴퓨터에서 미리 볼 때만 필요한 줄입니다 (solvit3d-runtime.js 를 이 파일 옆에 두세요). 앱은 자기 런타임으로 바꿔 끼웁니다. -->
+<script src="solvit3d-runtime.js"></script>
+</head>
+<body>
+<script>
+// 좌표: x 오른쪽 · y 안쪽 · z 위.  자세한 사용법은 docs/lesson3d.md
+Solvit3D.lesson({
+  title: '수업 제목',
+  camera: { position: [7, -9, 6], target: [0, 0, 1] },
+
+  // 모든 단계에 남는 물체
+  setup(s) {
+    s.axes({ size: 3 });
+    s.grid({ size: 6 });
+  },
+
+  steps: [
+    {
+      title: '1. 도입',
+      caption: '무엇을 볼지 한두 줄로.\n손가락으로 돌려 보세요.',
+      build(s) {
+        // 예: 곡면 z = 4 − x² − y²
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 40, heightColor: ['#7aa2ff', '#ffb36b'] });
+        s.label('z = 4 − x² − y²', [0, 0, 4.6], { color: '#B42318', size: 0.4 });
+      },
+    },
+    {
+      title: '2. 움직여 보기',
+      caption: '재생을 누르면 점이 곡선을 따라 움직여요.',
+      camera: { position: [6, -7, 5], target: [0, 0, 1] },
+      duration: 6,
+      build(s) {
+        s.v.path = s.curve(t => [2 * Math.cos(t), 2 * Math.sin(t), 4 - 4], { t: [0, 2 * Math.PI], radius: 0.04, color: '#2F9E6E' });
+        s.v.ball = s.point([2, 0, 0], { r: 0.12, color: '#E0703B' });
+      },
+      animate(s, p) {
+        const a = p * 2 * Math.PI;
+        s.v.ball.position.set(2 * Math.cos(a), 2 * Math.sin(a), 0);   // p 만으로 위치가 정해지게
+      },
+    },
+  ],
+});
+</script>
+</body>
+</html>

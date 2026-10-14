@@ -47,6 +47,7 @@ function readBundle(buf) {
   const bookIds = [];
   const titles = [];
   let problems = 0;
+  let concepts = 0;
   for (const b of list) {
     if (!b || typeof b !== 'object' || b.format !== BUNDLE) throw new HttpError(400, 'Solvit 교재 파일이 아닙니다');
     const id = `${b.id ?? ''}`;
@@ -55,11 +56,13 @@ function readBundle(buf) {
     for (const c of b.courses) {
       if (!c || typeof c !== 'object') continue;
       problems += (Array.isArray(c.problems) ? c.problems.length : 0) + (Array.isArray(c.twins) ? c.twins.length : 0);
+      concepts += Array.isArray(c.concepts) ? c.concepts.length : 0;
     }
     bookIds.push(id);
     titles.push(charSlice(lineText(b.title) || id, 80));
   }
-  if (problems === 0) throw new HttpError(400, '문항이 없습니다');
+  // 개념(3D 수업 포함)만 있는 교재도 올릴 수 있다
+  if (problems === 0 && concepts === 0) throw new HttpError(400, '문항이 없습니다');
   const title = titles.length === 1 ? titles[0] : `${titles[0]} 외 ${titles.length - 1}권`;
   return { title, bookIds, titles, problems };
 }

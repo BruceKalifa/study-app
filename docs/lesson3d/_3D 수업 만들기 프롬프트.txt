@@ -1,0 +1,254 @@
+아래 형식으로 "3D 모션그래픽 수업" HTML 파일 하나를 만들어 주세요. 솔빗(Solvit) 태블릿 앱에서 학생에게 개념을 설명할 때 쓸 거예요.
+
+[만들 수업]
+- 과목/단원: (예: 수학 — 이중적분의 기하학적 의미)
+- 대상: (예: 대학 1학년 / 고3)
+- 꼭 보여 주고 싶은 것: (예: 곡면 아래 부피를 기둥으로 쪼개다 극한을 취하는 과정)
+- 단계 수: 5~7단계, 각 단계는 한 가지 생각만
+
+[반드시 지킬 것]
+- 결과는 **HTML 파일 하나** (코드 블록 하나로 전체를 출력). 설명은 코드 밖에 짧게만.
+- 아래 "규칙·도우미 설명서"에 있는 `Solvit3D.lesson({ … })` API 만 사용. three.js 를 직접 불러오거나 CDN/외부 주소/이미지 URL 을 쓰지 마세요 (앱에서 막혀 있어요).
+- 좌표는 z 가 위쪽. 수식은 유니코드 문자(x² ∂f/∂x ∫ ∑ √ π θ ≤ ≥ →)로, 자막은 한국어로 2~3줄 이내.
+- animate 는 진행도 p 만으로 장면이 정해지게 (슬라이더로 앞뒤로 움직여도 맞아야 해요). 단계 간 값 전달은 s.v.
+- 코드 맨 위 <head> 의 `<script src="solvit3d-runtime.js"></script>` 줄은 그대로 두세요.
+- 수학적으로 정확해야 해요. 식·값·그래프가 맞는지 만들기 전에 한 번 확인하고, 자막에 적은 값과 장면이 어긋나지 않게 하세요.
+
+[규칙·도우미 설명서]
+## 수업 파일 규칙
+
+1. **HTML 파일 하나**. 안에 `<script>Solvit3D.lesson({ … })</script>` 가 있어야 해요.
+2. **외부 파일·라이브러리·인터넷 주소 금지** (CDN, 이미지 URL, 웹폰트 …). 앱이 막아 둬서 어차피 안 불러져요.
+   글자는 `s.label('x² + y²', 위치)` 로 3D 안에 쓰거나 자막(`caption`)에 적습니다. 수식은 **유니코드 문자**로 (x² ∂f/∂x ∫ ∑ √ π θ ≤ ≥ → ⃗).
+3. `fetch`, `XMLHttpRequest`, `localStorage`, `window.open`, `<iframe>`, `<link>`, `import` 쓰지 않기.
+4. 크기는 **400KB 이하**. 큰 숫자표를 넣지 말고 수식으로 그리세요.
+5. 개발자 미리보기용으로 `<script src="solvit3d-runtime.js"></script>` 한 줄을 `<head>` 에 둬도 돼요 (앱이 자기 것으로 바꿔 끼워요).
+6. **좌표는 z가 위쪽**(수학 교과서와 같은 오른손 좌표계): x 오른쪽, y 안쪽, z 위.
+
+## 수업 구조
+
+```js
+Solvit3D.lesson({
+  title: '수업 제목',                    // 위쪽에 표시
+  background: '#F7F5EF',                 // (선택) 배경색
+  camera: { position: [7, -9, 6], target: [0, 0, 1] },   // 처음 시점
+
+  setup(s) {                             // (선택) 모든 단계에 남는 물체 (축·격자 …)
+    s.axes({ size: 3 });
+    s.grid({ size: 6 });
+  },
+
+  steps: [                               // 단계들 — 아래 "다음" 버튼/슬라이더로 넘김
+    {
+      title: '1. 단계 제목',
+      caption: '자막 글. 줄바꿈은 \n',    // 화면 아래 카드
+      camera: { position: [...], target: [...] },   // (선택) 이 단계에서 카메라가 부드럽게 이동
+      build(s) { /* 이 단계의 물체를 만든다 */ },
+      animate(s, p, t) { /* (선택) 움직임 — p: 0~1 진행도, t: 초 */ },
+      duration: 6,                       // (선택) animate 길이(초), 기본 5
+      loop: false,                       // (선택) true 면 계속 반복
+      autoplay: true,                    // (선택) false 면 재생을 눌러야 움직임
+      startAt: 0.5,                      // (선택) 처음부터 이 진행도에서 멈춰 시작
+    },
+  ],
+});
+```
+
+- 단계가 바뀔 때마다 앞 단계 물체는 지워지고 `build` 가 다시 불려요. `setup` 물체만 남아요.
+- `build`/`animate` 안에서 `this` 는 그 단계 객체예요. **단계 사이에 값을 넘기려면 `s.v`** (단계마다 새로 비워지는 보관함)를 쓰세요:
+  `build` 에서 `s.v.ball = s.sphere(...)`, `animate` 에서 `s.v.ball.position.set(...)`.
+- `animate` 가 있으면 화면 아래에 재생·일시정지가 생기고, 슬라이더를 끌면 `p` 가 바뀌어 **그 순간의 장면**이 그려져요.
+  그래서 `animate` 는 **p 만으로 장면이 결정되게** 쓰세요 (이전 프레임에 기대지 않기).
+- 자막을 움직임에 맞춰 바꾸고 싶으면 `animate` 안에서 `s.setCaption('제목', '글')`.
+
+## 도우미 (`s.…`)
+
+색은 `'#4f7cff'` 같은 CSS 색 문자열. 좌표는 `[x, y, z]`.
+
+| 호출 | 설명 |
+|---|---|
+| `s.axes({size, names, negative, ticks})` | x·y·z 축 화살표와 눈금 |
+| `s.grid({size, z})` | xy 평면 격자 |
+| `s.point(pos, {r, color, label})` | 점 (라벨 선택) |
+| `s.sphere(pos, r, {color, opacity, wire})` | 구 |
+| `s.box(center, [dx,dy,dz], {color, opacity})` | 직육면체 (기둥·막대) |
+| `s.cylinder(a, b, r, {color, opacity, open})` | a→b 원기둥 |
+| `s.cone(apex, base, r, {color, opacity})` | 원뿔 (꼭짓점, 밑면 중심) |
+| `s.arrow(from, to, {color, width, label})` | 벡터 화살표. 반환값 `.set(from, to)` 로 움직임 |
+| `s.line([p0, p1, …], {color, opacity})` | 꺾은선 |
+| `s.curve(t => [x,y,z], {t:[t0,t1], n, radius, color})` | 매개변수 곡선. `.progress(p)` 처음 p만 그리기, `.at(p)` 점, `.tangentAt(p)` 접선 |
+| `s.surface((x,y) => z, {x:[a,b], y:[c,d], n, color, heightColor:[낮은색,높은색], opacity, wire})` | 곡면 z=f(x,y) |
+| `s.paramSurface((u,v) => [x,y,z], {u:[..], v:[..], n, color, opacity})` | 매개변수 곡면 (구·토러스·회전체) |
+| `s.plane(point, normal, {size, color, opacity})` | 평면 (점과 법선) |
+| `s.vectorField((x,y,z) => [vx,vy,vz], {x,y,z,n,scale,color})` | 벡터장 |
+| `s.label('텍스트', pos, {color, size, bg})` | 항상 화면을 향하는 글자 (여러 줄은 `\n`) |
+| `s.light(pos, intensity)` | 점광원 추가 (기본 조명은 이미 있어요) |
+| `s.camTo({position, target}, 초)` | 카메라를 부드럽게 옮김 |
+| `s.THREE`, `s.scene`, `s.add(obj)` | three.js(r147)를 직접 쓰고 싶을 때 (물체는 `s.add(...)` 로 넣어야 단계가 바뀔 때 지워져요) |
+| `s.lerp`, `s.clamp`, `s.ease(t)`, `s.TAU` | 계산 도우미 |
+
+학생 조작: 한 손가락 드래그 = 회전, 두 손가락 = 확대·이동, 위쪽 "자동회전", "시점 처음으로", 아래쪽 이전·재생·슬라이더·다음.
+
+## 만들 때 요령
+
+- 한 단계에는 **한 가지 생각**만. 보통 4~8단계.
+- 단계 첫 장면은 가만히 보여 주고(`animate` 없음), 설명이 필요한 부분만 `animate` 로 움직이세요.
+- 자막은 짧게(2~3줄). 수식은 유니코드로: `∬ f(x,y) dA = ∫₀¹ ∫₀¹ (x+y) dy dx`.
+- 색: 대상은 파랑 `#4f7cff`, 강조는 주황 `#E0703B`, 영역은 초록 `#2F9E6E`, 경고·정답 표시는 빨강 `#B42318`.
+- 화면 안 큰 물체가 카메라를 가리지 않게 `camera.position` 은 물체에서 6~12 정도 떨어뜨리세요.
+- 오류가 나면 수업 화면 위쪽에 빨간 줄로 메시지가 보여요 (그 단계만 비고 나머지는 계속 돼요).
+
+[완성된 예시 — 이 스타일과 구조를 따라 주세요]
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이중적분과 부피 (샘플)</title>
+<!-- 솔빗 앱이 아래 줄을 자기 런타임으로 바꿔 끼운다. 내 컴퓨터에서 미리 볼 때는 solvit3d-runtime.js 를 이 파일 옆에 둔다. -->
+<script src="solvit3d-runtime.js"></script>
+</head>
+<body>
+<script>
+Solvit3D.lesson({
+  title: '이중적분 = 곡면 아래의 부피',
+  camera: { position: [7.5, -9, 6.5], target: [0, 0, 1.2] },
+
+  // 모든 단계에 남는 물체
+  setup(s) {
+    s.axes({ size: 3.2 });
+    s.grid({ size: 6 });
+  },
+
+  steps: [
+    {
+      title: '1. 곡면 z = 4 − x² − y²',
+      caption: '아래로 볼록한 접시를 뒤집어 놓은 모양이에요.\n손가락으로 돌려 보고, 두 손가락으로 확대·축소해 보세요.',
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 44, heightColor: ['#7aa2ff', '#ffb36b'] });
+        s.label('z = 4 − x² − y²', [0, 0, 4.6], { color: '#B42318', size: 0.4 });
+      },
+    },
+    {
+      title: '2. xy 평면 위의 영역 R',
+      caption: 'x, y 가 −1 ≤ x ≤ 1, −1 ≤ y ≤ 1 인 정사각형 R 위에서만 부피를 구해요.',
+      camera: { position: [4, -8, 9], target: [0, 0, 0.5] },
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 44, opacity: 0.25, wire: false });
+        s.box([0, 0, 0.01], [2, 2, 0.02], { color: '#2F9E6E', opacity: 0.75 });
+        s.label('R', [0, 0, 0.5], { color: '#116a43', size: 0.5 });
+      },
+    },
+    {
+      title: '3. 작은 기둥으로 쪼개기',
+      caption: '영역 R 을 잘게 나누고, 각 칸 위에 높이 f(x, y) 인 기둥을 세워요.\n**재생**을 누르면 칸이 점점 촘촘해져요.',
+      camera: { position: [5.5, -7, 5.5], target: [0, 0, 1.5] },
+      duration: 6,
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-1.4, 1.4], y: [-1.4, 1.4], n: 30, opacity: 0.22, wire: false });
+        s.v.group = s.add(new s.THREE.Group());
+      },
+      animate(s, p) {
+        const T = s.THREE, g = s.v.group;
+        while (g.children.length) { const c = g.children.pop(); c.geometry.dispose(); c.material.dispose(); }
+        const n = Math.max(2, Math.round(2 + p * 10));     // 한 변을 n 칸으로
+        const w = 2 / n;
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+          const x = -1 + (i + 0.5) * w, y = -1 + (j + 0.5) * w, h = 4 - x * x - y * y;
+          const m = new T.Mesh(new T.BoxGeometry(w * 0.94, w * 0.94, h),
+            new T.MeshPhongMaterial({ color: s.color('#4f7cff').lerp(s.color('#ffb36b'), (h - 2) / 2), transparent: true, opacity: 0.9 }));
+          m.position.set(x, y, h / 2); g.add(m);
+        }
+        s.setCaption('3. 작은 기둥으로 쪼개기', '한 변을 ' + n + '칸으로 나눴어요 (기둥 ' + (n * n) + '개).\n칸이 촘촘할수록 기둥들의 부피 합이 곡면 아래 부피에 가까워져요.');
+      },
+    },
+    {
+      title: '4. 극한이 이중적분',
+      caption: '기둥을 무한히 잘게 하면 합이 이중적분이 돼요.\n∬ f(x, y) dA  =  ∫₋₁¹ ∫₋₁¹ (4 − x² − y²) dy dx  =  40/3',
+      camera: { position: [6.5, -8, 5], target: [0, 0, 1.5] },
+      build(s) {
+        const f = (x, y) => 4 - x * x - y * y;
+        s.surface(f, { x: [-1, 1], y: [-1, 1], n: 24, color: '#ffb36b', opacity: 0.95 });
+        [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, y]) => s.line([[x, y, 0], [x, y, f(x, y)]], { color: '#1D2433' }));
+        s.box([0, 0, 0.01], [2, 2, 0.02], { color: '#2F9E6E', opacity: 0.6 });
+        s.label('V = 40/3', [0, 0, 4.4], { color: '#B42318', size: 0.45 });
+      },
+    },
+    {
+      title: '5. 접평면과 기울기 벡터',
+      caption: '점 (1, 1, 2) 에서 곡면에 닿는 접평면과 그 점의 법선 방향이에요.\n재생하면 접점이 곡선을 따라 움직이고 접평면이 따라가요.',
+      camera: { position: [6, -6, 4.5], target: [0, 0, 1.5] },
+      duration: 7, loop: true,
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 40, opacity: 0.6 });
+        s.v.pt = s.point([1, 1, 2], { color: '#B42318', r: 0.11 });
+        s.v.pl = s.plane([1, 1, 2], [2, 2, 1], { size: 2.6, color: '#2F9E6E' });
+        s.v.nv = s.arrow([1, 1, 2], [2, 2, 3], { color: '#B42318', label: 'n' });
+      },
+      animate(s, p) {
+        const a = p * s.TAU, x = 1.2 * Math.cos(a), y = 1.2 * Math.sin(a), z = 4 - x * x - y * y;
+        s.v.pt.position.set(x, y, z);
+        s.v.pl.position.set(x, y, z);
+        const n = s.V(2 * x, 2 * y, 1).normalize();
+        s.v.pl.quaternion.setFromUnitVectors(s.V(0, 0, 1), n);
+        s.v.nv.set([x, y, z], [x + n.x, y + n.y, z + n.z]);
+      },
+    },
+  ],
+});
+</script>
+</body>
+</html>
+
+[빈 양식]
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수업 제목</title>
+<!-- 내 컴퓨터에서 미리 볼 때만 필요한 줄입니다 (solvit3d-runtime.js 를 이 파일 옆에 두세요). 앱은 자기 런타임으로 바꿔 끼웁니다. -->
+<script src="solvit3d-runtime.js"></script>
+</head>
+<body>
+<script>
+// 좌표: x 오른쪽 · y 안쪽 · z 위.  자세한 사용법은 docs/lesson3d.md
+Solvit3D.lesson({
+  title: '수업 제목',
+  camera: { position: [7, -9, 6], target: [0, 0, 1] },
+
+  // 모든 단계에 남는 물체
+  setup(s) {
+    s.axes({ size: 3 });
+    s.grid({ size: 6 });
+  },
+
+  steps: [
+    {
+      title: '1. 도입',
+      caption: '무엇을 볼지 한두 줄로.\n손가락으로 돌려 보세요.',
+      build(s) {
+        // 예: 곡면 z = 4 − x² − y²
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 40, heightColor: ['#7aa2ff', '#ffb36b'] });
+        s.label('z = 4 − x² − y²', [0, 0, 4.6], { color: '#B42318', size: 0.4 });
+      },
+    },
+    {
+      title: '2. 움직여 보기',
+      caption: '재생을 누르면 점이 곡선을 따라 움직여요.',
+      camera: { position: [6, -7, 5], target: [0, 0, 1] },
+      duration: 6,
+      build(s) {
+        s.v.path = s.curve(t => [2 * Math.cos(t), 2 * Math.sin(t), 4 - 4], { t: [0, 2 * Math.PI], radius: 0.04, color: '#2F9E6E' });
+        s.v.ball = s.point([2, 0, 0], { r: 0.12, color: '#E0703B' });
+      },
+      animate(s, p) {
+        const a = p * 2 * Math.PI;
+        s.v.ball.position.set(2 * Math.cos(a), 2 * Math.sin(a), 0);   // p 만으로 위치가 정해지게
+      },
+    },
+  ],
+});
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@ dependencies:
   google_mlkit_digital_ink_recognition: ^0.16.1
   web_socket_channel: ^3.0.3
   flutter_svg: ^2.0.10
+  webview_flutter: ^4.9.0 # 3D 수업(three.js)을 앱 안에서 재생
 
 # patched copy: Korean glyph fallback inside math + spacing kept at line breaks (third_party/flutter_math_fork/README.md)
 dependency_overrides:
@@ -29,6 +30,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/problems/
+    - assets/lesson3d/solvit3d-runtime.js
   fonts:
     - family: Pretendard
       fonts:

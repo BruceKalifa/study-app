@@ -15,6 +15,7 @@ import '../ink/shape_hint.dart';
 import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/problem_card.dart' show showsOrigin;
+import 'lesson3d_screen.dart';
 import 'solve_screen.dart';
 
 /// 개념 페이지 읽기 — 교재의 개념·실전개념·공식 정리를 종이처럼 펼쳐 놓고 펜으로 필기한다.
@@ -146,6 +147,7 @@ class _ConceptScreenState extends State<ConceptScreen> {
     final ink = _ink;
     final read = app.isConceptRead(c.id);
     final ps = _problems();
+    final lesson = c.lesson3d.isNotEmpty;
     return Scaffold(
       backgroundColor: const Color(0xFFE9E6DF),
       appBar: AppBar(
@@ -156,6 +158,27 @@ class _ConceptScreenState extends State<ConceptScreen> {
               child: Text('${_index + 1} / ${widget.concepts.length}',
                   style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
             ),
+          if (lesson) ...[
+            IconButton(
+              key: const Key('lesson-prev'),
+              tooltip: '이전 개념',
+              onPressed: _index > 0 ? () => _open(_index - 1) : null,
+              icon: const Icon(Icons.chevron_left_rounded, size: 28),
+            ),
+            IconButton(
+              key: const Key('lesson-next'),
+              tooltip: '다음 개념',
+              onPressed: _index < widget.concepts.length - 1 ? () => _open(_index + 1) : null,
+              icon: const Icon(Icons.chevron_right_rounded, size: 28),
+            ),
+            if (ps.isNotEmpty)
+              TextButton.icon(
+                key: const Key('concept-solve'),
+                onPressed: () => SolveScreen.open(context, title: c.title.isEmpty ? '개념 문제' : '${c.title} · 문제', problems: ps),
+                icon: Icon(Icons.edit_rounded, color: color),
+                label: Text('문제 풀기 · ${ps.length}', style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+              ),
+          ],
           IconButton(
             key: const Key('concept-read'),
             tooltip: read ? '읽음 표시 빼기' : '읽음으로 표시',
@@ -166,7 +189,10 @@ class _ConceptScreenState extends State<ConceptScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Stack(children: [
+      body: lesson
+          // 3D 수업: 수업 화면이 아래쪽 조작줄까지 직접 그리므로, 이동·문제풀기는 위쪽 막대에 둔다
+          ? Lesson3DView(key: ValueKey('lesson-${c.id}'), html: c.lesson3d)
+          : Stack(children: [
         Positioned.fill(
           child: ink == null
               ? const Center(child: CircularProgressIndicator())

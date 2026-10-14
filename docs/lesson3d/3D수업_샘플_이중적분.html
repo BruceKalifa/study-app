@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이중적분과 부피 (샘플)</title>
+<!-- 솔빗 앱이 아래 줄을 자기 런타임으로 바꿔 끼운다. 내 컴퓨터에서 미리 볼 때는 solvit3d-runtime.js 를 이 파일 옆에 둔다. -->
+<script src="solvit3d-runtime.js"></script>
+</head>
+<body>
+<script>
+Solvit3D.lesson({
+  title: '이중적분 = 곡면 아래의 부피',
+  camera: { position: [7.5, -9, 6.5], target: [0, 0, 1.2] },
+
+  // 모든 단계에 남는 물체
+  setup(s) {
+    s.axes({ size: 3.2 });
+    s.grid({ size: 6 });
+  },
+
+  steps: [
+    {
+      title: '1. 곡면 z = 4 − x² − y²',
+      caption: '아래로 볼록한 접시를 뒤집어 놓은 모양이에요.\n손가락으로 돌려 보고, 두 손가락으로 확대·축소해 보세요.',
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 44, heightColor: ['#7aa2ff', '#ffb36b'] });
+        s.label('z = 4 − x² − y²', [0, 0, 4.6], { color: '#B42318', size: 0.4 });
+      },
+    },
+    {
+      title: '2. xy 평면 위의 영역 R',
+      caption: 'x, y 가 −1 ≤ x ≤ 1, −1 ≤ y ≤ 1 인 정사각형 R 위에서만 부피를 구해요.',
+      camera: { position: [4, -8, 9], target: [0, 0, 0.5] },
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 44, opacity: 0.25, wire: false });
+        s.box([0, 0, 0.01], [2, 2, 0.02], { color: '#2F9E6E', opacity: 0.75 });
+        s.label('R', [0, 0, 0.5], { color: '#116a43', size: 0.5 });
+      },
+    },
+    {
+      title: '3. 작은 기둥으로 쪼개기',
+      caption: '영역 R 을 잘게 나누고, 각 칸 위에 높이 f(x, y) 인 기둥을 세워요.\n**재생**을 누르면 칸이 점점 촘촘해져요.',
+      camera: { position: [5.5, -7, 5.5], target: [0, 0, 1.5] },
+      duration: 6,
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-1.4, 1.4], y: [-1.4, 1.4], n: 30, opacity: 0.22, wire: false });
+        s.v.group = s.add(new s.THREE.Group());
+      },
+      animate(s, p) {
+        const T = s.THREE, g = s.v.group;
+        while (g.children.length) { const c = g.children.pop(); c.geometry.dispose(); c.material.dispose(); }
+        const n = Math.max(2, Math.round(2 + p * 10));     // 한 변을 n 칸으로
+        const w = 2 / n;
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+          const x = -1 + (i + 0.5) * w, y = -1 + (j + 0.5) * w, h = 4 - x * x - y * y;
+          const m = new T.Mesh(new T.BoxGeometry(w * 0.94, w * 0.94, h),
+            new T.MeshPhongMaterial({ color: s.color('#4f7cff').lerp(s.color('#ffb36b'), (h - 2) / 2), transparent: true, opacity: 0.9 }));
+          m.position.set(x, y, h / 2); g.add(m);
+        }
+        s.setCaption('3. 작은 기둥으로 쪼개기', '한 변을 ' + n + '칸으로 나눴어요 (기둥 ' + (n * n) + '개).\n칸이 촘촘할수록 기둥들의 부피 합이 곡면 아래 부피에 가까워져요.');
+      },
+    },
+    {
+      title: '4. 극한이 이중적분',
+      caption: '기둥을 무한히 잘게 하면 합이 이중적분이 돼요.\n∬ f(x, y) dA  =  ∫₋₁¹ ∫₋₁¹ (4 − x² − y²) dy dx  =  40/3',
+      camera: { position: [6.5, -8, 5], target: [0, 0, 1.5] },
+      build(s) {
+        const f = (x, y) => 4 - x * x - y * y;
+        s.surface(f, { x: [-1, 1], y: [-1, 1], n: 24, color: '#ffb36b', opacity: 0.95 });
+        [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, y]) => s.line([[x, y, 0], [x, y, f(x, y)]], { color: '#1D2433' }));
+        s.box([0, 0, 0.01], [2, 2, 0.02], { color: '#2F9E6E', opacity: 0.6 });
+        s.label('V = 40/3', [0, 0, 4.4], { color: '#B42318', size: 0.45 });
+      },
+    },
+    {
+      title: '5. 접평면과 기울기 벡터',
+      caption: '점 (1, 1, 2) 에서 곡면에 닿는 접평면과 그 점의 법선 방향이에요.\n재생하면 접점이 곡선을 따라 움직이고 접평면이 따라가요.',
+      camera: { position: [6, -6, 4.5], target: [0, 0, 1.5] },
+      duration: 7, loop: true,
+      build(s) {
+        s.surface((x, y) => 4 - x * x - y * y, { x: [-2, 2], y: [-2, 2], n: 40, opacity: 0.6 });
+        s.v.pt = s.point([1, 1, 2], { color: '#B42318', r: 0.11 });
+        s.v.pl = s.plane([1, 1, 2], [2, 2, 1], { size: 2.6, color: '#2F9E6E' });
+        s.v.nv = s.arrow([1, 1, 2], [2, 2, 3], { color: '#B42318', label: 'n' });
+      },
+      animate(s, p) {
+        const a = p * s.TAU, x = 1.2 * Math.cos(a), y = 1.2 * Math.sin(a), z = 4 - x * x - y * y;
+        s.v.pt.position.set(x, y, z);
+        s.v.pl.position.set(x, y, z);
+        const n = s.V(2 * x, 2 * y, 1).normalize();
+        s.v.pl.quaternion.setFromUnitVectors(s.V(0, 0, 1), n);
+        s.v.nv.set([x, y, z], [x + n.x, y + n.y, z + n.z]);
+      },
+    },
+  ],
+});
+</script>
+</body>
+</html>

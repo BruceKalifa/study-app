@@ -41,6 +41,7 @@ class BookBundle {
   const BookBundle(this.id, this.title, this.courses, this.workbooks);
 
   int get problemCount => courses.fold(0, (n, c) => n + c.problems.length + c.twins.length);
+  int get conceptCount => courses.fold(0, (n, c) => n + c.concepts.length);
 }
 
 /// `.pulinote` 교재 파일 (gzip JSON `{format:'pulinote-bundle', id, title, courses:[…], workbooks:[…]}`)
@@ -124,7 +125,7 @@ class ContentImport {
   Future<List<BookBundle>> add(List<int> bytes, {String sha = ''}) async {
     final all = decodeAll(bytes);
     final parsed = [for (final j in all) parse(j)];
-    if (parsed.any((b) => b.problemCount == 0)) throw const FormatException('문항이 없어요');
+    if (parsed.any((b) => b.problemCount == 0 && b.conceptCount == 0)) throw const FormatException('문항이 없어요');
     var books = await list();
     for (var k = 0; k < all.length; k++) {
       final bundle = parsed[k];

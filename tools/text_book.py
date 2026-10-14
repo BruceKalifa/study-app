@@ -271,6 +271,56 @@ def item_slug(no, used):
     return base
 
 
+LESSON3D_MAX = 400 * 1024
+LESSON3D_BAD = [
+    (r'<\s*(iframe|object|embed|link|form)\b', '<{0}> 태그는 쓸 수 없어요'),
+    (r'\b(fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b', '{0} (인터넷 통신)은 쓸 수 없어요'),
+    (r'\bimport\s*\(|^\s*import\s+.+\s+from\s', '모듈 불러오기(import)는 쓸 수 없어요'),
+    (r'\b(localStorage|sessionStorage|indexedDB|document\.cookie)\b', '{0} (저장소)는 쓸 수 없어요'),
+    (r'\bwindow\.(open|location)\b|\blocation\.(href|assign|replace)\b', '{0} (주소 이동)은 쓸 수 없어요'),
+]
+
+
+def load_lesson3d(folder, name, problems, where):
+    """`3D수업: 파일.html` → 앱에 넣을 HTML 글. 교재 폴더(또는 그 안의 3D수업 폴더)에서 찾고, 안 맞는 곳은 problems 에 적는다."""
+    name = name.strip().strip('"')
+    path = None
+    for d in (folder, os.path.join(folder, '3D수업'), os.path.join(folder, '3D')):
+        for cand in (name, name + '.html'):
+            q = os.path.join(d, cand)
+            if os.path.isfile(q):
+                path = q
+                break
+        if path:
+            break
+    if not path:
+        problems.append(f'{where}: 3D수업 파일 "{name}" 을 찾지 못했어요 (교재 폴더나 3D수업 폴더에 넣어 주세요)')
+        return ''
+    raw = open(path, 'rb').read()
+    try:
+        html = raw.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        problems.append(f'{where}: "{name}" 은 UTF-8 로 저장해 주세요')
+        return ''
+    # 미리보기용 런타임 불러오기는 앱이 자기 것을 끼우므로 뺀다
+    html = re.sub(r'<script\b[^>]*\bsrc\s*=\s*["\'][^"\']*solvit3d[^"\']*["\'][^>]*>\s*</script>\s*', '', html, flags=re.I)
+    html = html.replace('<!--SOLVIT3D-->', '')
+    if 'Solvit3D.lesson(' not in html:
+        problems.append(f'{where}: "{name}" 에 Solvit3D.lesson( … ) 이 없어요 — 양식 파일을 바탕으로 만들어 주세요')
+    if len(html.encode('utf-8')) > LESSON3D_MAX:
+        problems.append(f'{where}: "{name}" 이 너무 커요 ({len(html.encode("utf-8")) // 1024}KB > {LESSON3D_MAX // 1024}KB) — 그림은 코드로 그리고, 큰 데이터는 줄여 주세요')
+    for u in re.findall(r'https?://[^\s"\'<>)]+', html):
+        if u.startswith(('http://www.w3.org/', 'https://www.w3.org/')):
+            continue
+        problems.append(f'{where}: "{name}" 에 인터넷 주소가 있어요 ({u[:60]}) — 외부 파일·라이브러리는 못 써요')
+        break
+    for pat, msg in LESSON3D_BAD:
+        m = re.search(pat, html, flags=re.M)
+        if m:
+            problems.append(f'{where}: "{name}" — ' + msg.format(m.group(1) if m.groups() else m.group(0)))
+    return html
+
+
 def build(folder, outdir=None):
     meta = read_info(os.path.join(folder, '정보.txt'))
     srcs = sorted(f for f in os.listdir(folder) if f.startswith('문항') and f.endswith('.txt'))
@@ -402,7 +452,8 @@ def build(folder, outdir=None):
         where = f'개념 {b["no"]}'
         head = b['head']
         text = clean(b['body'].get('본문', ''), figs, problems, where)
-        if not text:
+        lesson = load_lesson3d(folder, head['3D수업'], problems, where) if head.get('3D수업') else ''
+        if not text and not lesson:
             problems.append(f'{where}: [본문] 이 비어 있어요')
         kind = head.get('종류', '개념').strip() or '개념'
         if kind not in CONCEPT_KINDS:
@@ -432,6 +483,8 @@ def build(folder, outdir=None):
             c['links'] = links
         if head.get('출처'):
             c['source'] = head['출처']
+        if lesson:
+            c['lesson3d'] = lesson
         course.setdefault('concepts', []).append(c)
         concept_ids.append(c['id'])
 
@@ -457,6 +510,7 @@ def build(folder, outdir=None):
               'courses': list(courses.values()), 'workbooks': [wb]}
     report = {'book': title, 'id': book_id, 'problems': len(all_ids), 'passages': len(pass_json),
               'concepts': len(concept_ids),
+              'lessons3d': sum(1 for c in courses.values() for k in c.get('concepts', []) if k.get('lesson3d')),
               'choice': sum(1 for c in courses.values() for p in c['problems'] if p['type'] == 'choice'),
               'box': sum(1 for c in courses.values() for p in c['problems'] if p.get('boxItems')),
               'figures': len(set(figs.values())), 'issues': problems}
@@ -706,6 +760,34 @@ def selftest():
         # 한글이 떨어져 나가는 번호도 서로 갈린다 ('해양 지각-01' → sea-per-01 은 안 된다)
         sea = [i for i in ps if i.endswith('-01') and 'solid' not in i]
         eq(len(sea), 1, '둘째 문항 id')
+
+    # 3D 수업 개념 (#개념 + 3D수업: 파일.html)
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, '보기 3D 01회차')
+        os.makedirs(os.path.join(folder, '3D수업'))
+        with open(os.path.join(folder, '정보.txt'), 'w', encoding='utf-8') as f:
+            f.write('- 교재명: 보기 3D 01회차\n- 과목: 수학Ⅱ\n- 대상 학년: 고3\n')
+        with open(os.path.join(folder, '3D수업', '이중적분.html'), 'w', encoding='utf-8') as f:
+            f.write('<html><head><script src="solvit3d-runtime.js"></script></head><body><script>Solvit3D.lesson({title:"x",steps:[{title:"a"}]})</script></body></html>')
+        with open(os.path.join(folder, '문항.txt'), 'w', encoding='utf-8') as f:
+            f.write('#개념 L1\n제목: 이중적분\n종류: 개념\n3D수업: 이중적분.html\n\n#문항 1\n형식: 단답형\n정답: 3\n[문제]\n가\n[해설]\n나\n')
+        rep = build(folder, os.path.join(tmp, 'out'))
+        eq(rep['issues'], [], '3D 수업 개념은 본문 없이도 흠 없다')
+        eq(rep['lessons3d'], 1, '3D 수업 수')
+        with gzip.open(rep['file']) as f:
+            b3 = json.loads(f.read().decode('utf-8'))
+        l3 = b3['courses'][0]['concepts'][0]
+        assert 'Solvit3D.lesson(' in l3['lesson3d'], '3D 수업 글이 들어간다'
+        assert 'solvit3d-runtime.js' not in l3['lesson3d'], '미리보기용 런타임 줄은 뺀다'
+        # 흠: 파일 없음 · 인터넷 주소 · 통신
+        with open(os.path.join(folder, '3D수업', '나쁨.html'), 'w', encoding='utf-8') as f:
+            f.write('<script src="https://cdn.example.com/three.js"></script><script>fetch("x");Solvit3D.lesson({})</script>')
+        with open(os.path.join(folder, '문항.txt'), 'a', encoding='utf-8') as f:
+            f.write('\n#개념 L2\n제목: 나쁨\n3D수업: 나쁨.html\n\n#개념 L3\n제목: 없음\n3D수업: 없는파일.html\n')
+        rep = build(folder, None)
+        txt = ' | '.join(rep['issues'])
+        for w in ('인터넷 주소', 'fetch', '없는파일.html'):
+            assert w in txt, f'3D 수업 흠을 못 잡았어요: {w} — {txt}'
 
     # 목록에 없는 과목 (국어·중등 수학 …) → 이름으로 새 과목을 만든다
     with tempfile.TemporaryDirectory() as tmp:

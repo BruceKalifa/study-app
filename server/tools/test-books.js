@@ -134,6 +134,14 @@ async function main() {
   ok(r.status === 400 && isKo(r), '교재 파일이 아니면 400', r.json);
   r = await req('POST', '/api/books', gz({ format: 'pulinote-bundle', id: 'empty', title: '빈 교재', courses: [] }), T.token, true);
   ok(r.status === 400, '문항이 없으면 400', r.json);
+  {
+    // 3D 수업 같은 개념만 있는 교재는 문항이 0개여도 받는다
+    const { readBundle } = require('../books');
+    const info = readBundle(zlib.gzipSync(Buffer.from(JSON.stringify({
+      format: 'pulinote-bundle', id: 'only3d', title: '3D 수업', courses: [{ subject: '수학', problems: [], concepts: [{ id: 'c1', title: 't', lesson3d: '<script></script>' }] }],
+    }))));
+    ok(info.problems === 0 && info.bookIds[0] === 'only3d', '개념만 있는 교재도 올릴 수 있다', info);
+  }
   r = await req('POST', '/api/books', gz(bundle('../etc', '나쁜 id')), T.token, true);
   ok(r.status === 400, '교재 id 가 이상하면 400');
 

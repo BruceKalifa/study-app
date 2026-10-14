@@ -477,6 +477,9 @@ class Concept {
 
   /// PDF 에서 만든 쪽 이미지 (`data:image/webp;base64,…` 또는 주소). 있으면 본문 대신 이 그림들을 위아래로 펼쳐 PDF 그대로 보여 준다.
   final List<String> images;
+
+  /// 3D 모션 그래픽 수업 (docs/lesson3d.md) — `Solvit3D.lesson(…)` 이 든 HTML 한 장. 있으면 앱이 3D 수업으로 연다.
+  final String lesson3d;
   const Concept({
     required this.id,
     this.title = '',
@@ -488,6 +491,7 @@ class Concept {
     this.source,
     this.links = const <String>[],
     this.images = const <String>[],
+    this.lesson3d = '',
   });
 
   factory Concept.fromJson(Map<String, dynamic> j) {
@@ -503,6 +507,7 @@ class Concept {
       source: _strOrNull(j['source']),
       links: _strList(j['links']),
       images: _strList(j['images']),
+      lesson3d: _str(j['lesson3d']),
     );
   }
 
@@ -517,6 +522,7 @@ class Concept {
         if (source != null) 'source': source,
         if (links.isNotEmpty) 'links': links,
         if (images.isNotEmpty) 'images': images,
+        if (lesson3d.isNotEmpty) 'lesson3d': lesson3d,
       };
 
   /// 이 개념이 설명하는 문제인가 — 문제 유형을 `·` 로 나눈 토막이 연결 이름과 같으면.
