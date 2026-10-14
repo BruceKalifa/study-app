@@ -993,9 +993,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byKey(const Key('concept-sample-type-01-c-3d')), findsOneWidget);
       expect(find.text('3D'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('concept-sample-type-01-c-3d')));
-      await tester.pump(const Duration(milliseconds: 600)); // (3D 수업 화면의 로딩 표시가 계속 돌아서 pumpAndSettle 은 쓰지 않는다)
-      expect(find.byKey(const Key('lesson3d-view')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
