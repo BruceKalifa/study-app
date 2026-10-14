@@ -299,6 +299,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final draft = await _app.loadDraft(p.id);
     if (!mounted || _ink != ink) return;
     if (draft != null && ink.isEmpty) ink.load(draft); // never wipe strokes written while loading
+    _draftInk = ink; // 이제부터는 빈 종이도 "정말 비었다" 로 저장해도 된다
     final want = _pageHeightFor(context);
     if (ink.pageHeight < want) ink.pageHeight = want;
     final live = _app.live;
@@ -325,10 +326,14 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     _scheduleRecognize();
   }
 
+  /// 저장된 필기를 다 불러온 종이. 불러오는 중에 문제를 넘기거나 나가면 빈 종이로 덮어써 필기가 지워지던 문제를 막는다.
+  InkController? _draftInk;
+
   void _saveDraftNow() {
     _draftTimer?.cancel();
     final ink = _ink;
     if (ink == null) return;
+    if (ink.isEmpty && _draftInk != ink) return; // 아직 불러오는 중 — 저장된 필기를 지우지 않는다
     if (_graded.containsKey(_index)) return; // attempt already stored its ink
     _app.saveDraft(_problems[_index].id, ink.toDocument());
   }

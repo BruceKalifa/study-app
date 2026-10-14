@@ -42,7 +42,7 @@ class ConceptScreen extends StatefulWidget {
   State<ConceptScreen> createState() => _ConceptScreenState();
 }
 
-class _ConceptScreenState extends State<ConceptScreen> {
+class _ConceptScreenState extends State<ConceptScreen> with WidgetsBindingObserver {
   late AppState _app;
   bool _init = false;
   late int _index = widget.index.clamp(0, widget.concepts.length - 1);
@@ -61,6 +61,7 @@ class _ConceptScreenState extends State<ConceptScreen> {
     if (!_init) {
       _init = true;
       _app = AppScope.read(context);
+      WidgetsBinding.instance.addObserver(this);
       _open(_index);
     }
   }
@@ -123,7 +124,14 @@ class _ConceptScreenState extends State<ConceptScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 다른 앱으로 넘어가거나 꺼지기 전에 필기를 바로 저장
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.inactive) _flush();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _flush();
     final c = _ink;
     if (c != null) {
