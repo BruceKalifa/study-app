@@ -22,6 +22,8 @@ dependencies:
 dependency_overrides:
   flutter_math_fork:
     path: third_party/flutter_math_fork
+  # file_picker 8 는 compileSdk 34 로 만들어졌는데 이 플러그인 최신판은 36 이상을 요구해 빌드가 막힌다 → 34 로도 되는 판으로 고정
+  flutter_plugin_android_lifecycle: 2.0.28
 
 dev_dependencies:
   flutter_test:
