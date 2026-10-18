@@ -65,6 +65,11 @@ COURSES = {
     '확률과 통계': ('math', '고등수학', '#E0703B', 'math'),
     '미적분': ('math', '고등수학', '#E0703B', 'math'),
     '기하': ('math', '고등수학', '#E0703B', 'math'),
+    # 기하의 중단원 이름이 인적성 '공간'(공간지각) 으로 잘못 가지 않게 — 긴 이름이 먼저 맞는다
+    '공간도형': ('math', '고등수학', '#E0703B', 'math'), '공간좌표': ('math', '고등수학', '#E0703B', 'math'),
+    '공간벡터': ('math', '고등수학', '#E0703B', 'math'), '평면벡터': ('math', '고등수학', '#E0703B', 'math'),
+    '이차곡선': ('math', '고등수학', '#E0703B', 'math'), '평면곡선': ('math', '고등수학', '#E0703B', 'math'),
+    '벡터': ('math', '고등수학', '#E0703B', 'math'),
 }
 EMATH1 = ('emath1', '공업수학1', '#6D4AFF', 'univ')
 EMATH2 = ('emath2', '공업수학2', '#5B3FD6', 'univ')
@@ -673,6 +678,10 @@ def selftest():
     def eq(got, want, what):
         if got != want:
             fails.append(f'{what}: {got!r} ≠ {want!r}')
+
+    # 기하 중단원(공간도형·공간좌표)이 인적성 '공간' 으로 가지 않는다
+    eq(course_of('공간도형과 공간좌표')[0], 'math', '기하 중단원 과목')
+    eq(course_of('공간지각')[0], 'apt', '인적성 공간지각 과목')
 
     with tempfile.TemporaryDirectory() as tmp:
         folder = os.path.join(tmp, '보기 교재 01회차')
