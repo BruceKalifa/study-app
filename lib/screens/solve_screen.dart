@@ -133,10 +133,12 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   /// 화면에는 처음 문제만 꽉 차게 보이고, 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다. 경계선은 없다.
   static const double _portraitSplitPageHeight = 1700;
 
-  /// 세로 화면에서 두 단 종이를 쓰나 (지문형은 지문이 길어 예전처럼 위아래).
+  /// 폰 세로 화면(좁은 화면)만 종이를 옆으로 이어 붙여 넘겨 본다.
+  /// 태블릿은 세로로 들어도 가로 화면처럼 한 화면에 왼쪽 문제 · 오른쪽 풀이 공간이 같이 보인다.
+  static const double _phoneWidth = 600;
   bool _portraitSplit(BuildContext context) {
     final size = MediaQuery.maybeOf(context)?.size;
-    return size != null && size.width <= size.height * 1.15;
+    return size != null && size.width <= size.height * 1.15 && size.width < _phoneWidth;
   }
 
   /// 지문형 문항은 가로에서도 지문이 길어 종이를 넉넉히 둔다.
@@ -146,7 +148,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   /// (오른쪽 단이 풀이 공간. 더 쓰면 autoExtend 가 아래로 늘려 준다.)
   double _pageHeightFor(BuildContext context) {
     final size = MediaQuery.maybeOf(context)?.size;
-    if (size == null || size.width <= size.height * 1.15) {
+    if (size == null || _portraitSplit(context)) {
       return _portraitSplitPageHeight;
     }
     if (_app.bank.passageOf(_p) != null) return _passagePageHeight;
@@ -654,7 +656,6 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final color = _colorOf(p);
     final graded = _exam ? null : _graded[_index];
     final mq = MediaQuery.of(context);
-    final landscape = mq.size.width > mq.size.height * 1.15;
     final split = _portraitSplit(context);
     final answer = _answers[_index];
 
@@ -663,7 +664,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     // 처음엔 문제만 화면에 꽉 차게 보이고, 오른쪽으로 넘기면(손가락으로 밀면) 풀이 공간이 나온다. 경계선은 없다.
     final zoom = (950 / mq.size.width).clamp(0.45, 1.0);
     // 어느 문제든 같은 꼴: 문제는 왼쪽, 풀이 공간은 그 오른쪽 (선으로 가르지 않는다). 지문형은 지문까지 왼쪽에 넓게.
-    final columnFraction = landscape ? (_app.bank.passageOf(p) != null ? 0.66 : 0.44) : 1.0;
+    final columnFraction = !split ? (_app.bank.passageOf(p) != null ? 0.66 : 0.44) : 1.0;
     final pageShare = split ? 0.5 : 1.0;
     final initialZoom = split ? 2.0 : 1.0;
 
