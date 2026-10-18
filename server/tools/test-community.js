@@ -108,8 +108,8 @@ async function main() {
   // ───────── 게시판 ─────────
   section('게시판');
   let r = await get('/api/community/boards');
-  ok(r.status === 200 && Array.isArray(r.json.boards) && r.json.boards.length === 22, 'GET /api/community/boards → 22개', r.json);
-  ok(JSON.stringify(r.json.boards.map((b) => b.id).slice(0, 5)) === '["free","qna","proof","info","mind"]' && r.json.boards.every((b) => b.name && b.desc && Array.isArray(b.tracks)), '게시판 id·이름·설명·과정');
+  ok(r.status === 200 && Array.isArray(r.json.boards) && r.json.boards.length === 23, 'GET /api/community/boards → 23개', r.json);
+  ok(JSON.stringify(r.json.boards.map((b) => b.id).slice(0, 5)) === '["free","qna","request","proof","info"]' && r.json.boards.every((b) => b.name && b.desc && Array.isArray(b.tracks)), '게시판 id·이름·설명·과정');
   ok(new Set(r.json.boards.map((b) => b.id)).size === r.json.boards.length, '게시판 id 중복 없음');
   const forTrack = (t) => r.json.boards.filter((b) => !b.tracks.length || b.tracks.includes(t)).map((b) => b.id);
   ok(forTrack('취준').includes('apt') && !forTrack('취준').includes('naesin'), '취준: 인적성·NCS 게시판이 있고 내신은 없다');
@@ -177,7 +177,7 @@ async function main() {
   r = await get('/api/community/posts');
   ok(r.json.posts.every((p) => p.mine === false && p.liked === false), 'me 없으면 mine/liked 모두 false');
   r = await get('/api/community/posts?board=proof');
-  ok(r.json.posts.length === 1 && r.json.posts[0].id === pC1.id, 'board=proof 필터');
+  ok(r.json.posts.filter((p) => !p.notice).length === 1 && r.json.posts.find((p) => !p.notice).id === pC1.id, 'board=proof 필터');
   r = await get('/api/community/posts?board=zzz');
   ok(r.status === 400 && isKo(r), '없는 게시판 목록 → 400');
   r = await get(`/api/community/posts?q=${enc('포물선')}`);
@@ -275,7 +275,7 @@ async function main() {
   r = await get('/api/community/posts');
   ok(!r.json.posts.some((p) => p.id === pC1.id), '3명 신고 → 목록에서 숨김');
   r = await get('/api/community/posts?board=proof');
-  ok(r.json.posts.length === 0, '게시판 목록에서도 숨김');
+  ok(r.json.posts.filter((p) => !p.notice).length === 0, '게시판 목록에서도 숨김');
   r = await get(`/api/community/posts/${pC1.id}`);
   ok(r.status === 404 && /숨겨/.test(r.json.error), '숨긴 글 읽기 → 404 (숨겨진 글)', r.json);
   r = await post(`/api/community/posts/${pC1.id}/like`, { userId: U.g });
@@ -417,6 +417,111 @@ async function main() {
   ok(r.json.me && r.json.me.rank === 55 && !r.json.entries.some((e) => e.me), '50위 밖의 me → rank 55 (entries 엔 없음)', r.json.me);
   const disk = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'ranking.json'), 'utf8'));
   ok(Object.keys(disk.days[D3]).length === 56, '디스크에 55명 + 1 모두 저장 (직렬화된 쓰기)');
+
+  // ───────── 자료요청 · 첨부 · 공지 ─────────
+  section('고정 공지 (게시판마다 이용수칙 · 자료요청 안내)');
+  const X = { w: 'uid-WHISKEY-a1b2c3', x: 'uid-XRAY-d4e5f6', y: 'uid-YANKEE-g7h8i9' };
+  Object.values(X).forEach((v) => usedIds.add(v));
+  r = await get('/api/community/posts?board=math');
+  ok(r.json.posts[0] && r.json.posts[0].notice === true && /이용수칙/.test(r.json.posts[0].title), '수학 게시판 맨 위에 이용수칙 공지');
+  r = await get('/api/community/posts?board=request');
+  const reqNotice = r.json.posts[0];
+  ok(reqNotice && reqNotice.notice === true && /자료요청/.test(reqNotice.title), '자료요청 게시판 맨 위에 안내 공지');
+  r = await get(`/api/community/posts/${enc(reqNotice.id)}`);
+  ok(/학습 교안/.test(r.json.post.body) && /PDF/.test(r.json.post.body) && /이용수칙/.test(r.json.post.body), '자료요청 공지: 학습 교안 PDF 안내 + 이용수칙');
+  const boardsAll = (await get('/api/community/boards')).json.boards;
+  let allHave = true;
+  for (const b of boardsAll) {
+    const l = (await get(`/api/community/posts?board=${enc(b.id)}`)).json.posts;
+    if (!l[0] || !l[0].notice) allHave = false;
+  }
+  ok(allHave, `모든 게시판(${boardsAll.length}개) 맨 위에 공지`);
+  r = await get('/api/community/posts');
+  ok(r.json.posts.every((p) => !p.notice), '전체 목록·검색에는 공지가 섞이지 않음');
+  r = await get('/api/community/posts?board=math&q=이용수칙');
+  ok(r.json.posts.every((p) => !p.notice), '검색 결과에도 공지 없음');
+  r = await post(`/api/community/posts/${enc(reqNotice.id)}/comments`, { userId: X.w, author: '닉', body: '댓글' });
+  ok(r.status === 403 && isKo(r), '공지에 댓글 → 403');
+  r = await post(`/api/community/posts/${enc(reqNotice.id)}/like`, { userId: X.w });
+  ok(r.status === 403, '공지에 응원 → 403');
+  r = await post(`/api/community/posts/${enc(reqNotice.id)}/report`, { userId: X.w, reason: 'x' });
+  ok(r.status === 403, '공지 신고 → 403');
+  r = await del(`/api/community/posts/${enc(reqNotice.id)}?userId=${enc(X.w)}`);
+  ok(r.status === 403, '공지는 학생이 못 지움');
+
+  section('자료요청 글 + PDF 첨부');
+  const pdf = (n) => Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(n, 0x41), Buffer.from('\n%%EOF\n')]);
+  const upload = (id, user, buf, name, headers) => fetch(`${base}/api/community/posts/${enc(id)}/attachments?userId=${enc(user)}&name=${enc(name || '교안.pdf')}`, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/pdf' }, headers || {}), body: buf });
+  r = await post('/api/community/posts', postBody(X.w, { board: 'request', title: '고2 미분 문제 요청', body: '교안 첨부합니다' }));
+  ok(r.status === 200 && r.json.post.board === 'request' && Array.isArray(r.json.post.attachments) && r.json.post.attachments.length === 0, '자료요청 글 작성');
+  const rqA = r.json.post;
+  let u = await upload(rqA.id, X.w, pdf(5000), '미분 교안.pdf');
+  let uj = await u.json();
+  ok(u.status === 200 && uj.attachment && uj.attachment.name === '미분 교안.pdf' && uj.attachment.size > 5000, 'PDF 첨부 성공', uj);
+  const att = uj.attachment;
+  u = await upload(rqA.id, X.x, pdf(100), 'a.pdf');
+  ok(u.status === 403, '글쓴이가 아니면 첨부 불가 → 403');
+  u = await upload(rqA.id, X.w, Buffer.from('hello this is not pdf at all'), 'a.pdf');
+  ok(u.status === 400, 'PDF 가 아닌 파일 → 400');
+  u = await upload(rqA.id, X.w, pdf(100), 'noext');
+  uj = await u.json();
+  ok(u.status === 200 && uj.attachment.name === 'noext.pdf', '이름에 .pdf 가 없으면 붙임');
+  u = await upload(rqA.id, X.w, pdf(100), '../../etc/passwd.pdf');
+  uj = await u.json();
+  ok(u.status === 200 && !/[\\/]/.test(uj.attachment.name), '이름의 경로 문자는 제거');
+  u = await upload(rqA.id, X.w, pdf(100), '4.pdf');
+  ok(u.status === 409, '4번째 첨부 → 409 (최대 3개)');
+  r = await get(`/api/community/posts/${enc(rqA.id)}?me=${enc(X.w)}`);
+  ok(r.json.post.attachments.length === 3 && r.json.post.attachments[0].id === att.id && !('path' in r.json.post.attachments[0]), '글 읽기에 첨부 목록(이름·크기)');
+  r = await get('/api/community/posts?board=request');
+  const inList = r.json.posts.find((p) => p.id === rqA.id);
+  ok(inList && inList.attachments.length === 3, '목록에도 첨부 표시');
+
+  const pOther = (await post('/api/community/posts', postBody(X.x, { board: 'math', title: '일반 글', body: '본문' }))).json.post;
+  u = await upload(pOther.id, X.x, pdf(100), 'a.pdf');
+  ok(u.status === 400, '자료요청이 아닌 게시판에는 첨부 불가 → 400');
+  u = await upload(rqA.id + 'zzz', X.w, pdf(100), 'a.pdf');
+  ok(u.status === 404, '없는 글에 첨부 → 404');
+
+  section('첨부 내려받기 권한 (글쓴이 · 선생님 · 관리자)');
+  const fileUrl = (id, aid) => `${base}/api/community/posts/${enc(id)}/attachments/${enc(aid)}/file`;
+  let d = await fetch(`${fileUrl(rqA.id, att.id)}?userId=${enc(X.w)}`);
+  let buf = Buffer.from(await d.arrayBuffer());
+  ok(d.status === 200 && /application\/pdf/.test(d.headers.get('content-type')) && buf.length === att.size && buf.slice(0, 5).toString() === '%PDF-', '글쓴이는 내려받기 가능');
+  ok(/filename\*=UTF-8''/.test(d.headers.get('content-disposition') || '') && decodeURIComponent((d.headers.get('content-disposition') || '').split("''")[1]) === '미분 교안.pdf', '파일 이름(한글) 그대로');
+  d = await fetch(`${fileUrl(rqA.id, att.id)}?userId=${enc(X.x)}`);
+  ok(d.status === 403, '다른 학생은 못 받음 → 403');
+  d = await fetch(fileUrl(rqA.id, att.id));
+  ok(d.status === 403, '아무 정보 없이 → 403');
+  d = await fetch(fileUrl(rqA.id, att.id), { headers: { 'x-admin-key': KEY } });
+  ok(d.status === 200, '관리 키로 내려받기');
+  d = await fetch(`${base}/api/admin/community/posts/${enc(rqA.id)}/attachments/${enc(att.id)}/file`, { headers: { 'x-admin-key': KEY } });
+  ok(d.status === 200, '관리 주소로 내려받기');
+  d = await fetch(`${base}/api/admin/community/posts/${enc(rqA.id)}/attachments/${enc(att.id)}/file`);
+  ok(d.status === 401 || d.status === 403, '관리 주소는 키 없으면 거절', d.status);
+  d = await fetch(`${fileUrl(rqA.id, 'nope')}?userId=${enc(X.w)}`);
+  ok(d.status === 404, '없는 파일 → 404');
+  r = await get('/api/admin/community/posts?limit=200', admin);
+  const av = r.json.posts.find((p) => p.id === rqA.id);
+  ok(av && av.attachments.length === 3 && av.attachments[0].name === '미분 교안.pdf' && av.attachments[0].createdAt > 0, '관리 목록에 첨부 표시');
+
+  section('첨부 삭제 · 글 삭제 시 파일 정리');
+  const filesDir = path.join(DATA_DIR, 'community-files');
+  ok(fs.readdirSync(filesDir).length === 3, '디스크에 PDF 3개');
+  r = await del(`/api/community/posts/${enc(rqA.id)}/attachments/${enc(att.id)}?userId=${enc(X.x)}`);
+  ok(r.status === 403, '남이 첨부를 지울 수 없음');
+  r = await del(`/api/community/posts/${enc(rqA.id)}/attachments/${enc(att.id)}?userId=${enc(X.w)}`);
+  ok(r.status === 200, '글쓴이는 첨부 삭제');
+  await sleep(100);
+  ok(fs.readdirSync(filesDir).length === 2, '파일도 지워짐');
+  r = await del(`/api/community/posts/${enc(rqA.id)}?userId=${enc(X.w)}`);
+  await sleep(100);
+  ok(r.status === 200 && fs.readdirSync(filesDir).length === 0, '글을 지우면 남은 첨부도 지워짐');
+
+  section('PDF 크기 제한');
+  const rqB = (await post('/api/community/posts', postBody(X.y, { board: 'request', title: '큰 파일', body: '본문' }))).json.post;
+  u = await upload(rqB.id, X.y, pdf(21 * 1024 * 1024), 'big.pdf');
+  ok(u.status === 413, '20MB 초과 → 413', u.status);
 
   // ───────── userId 비노출 ─────────
   section('userId 비노출');

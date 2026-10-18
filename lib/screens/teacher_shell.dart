@@ -10,10 +10,11 @@ import '../widgets/common.dart';
 import '../widgets/math_text.dart';
 import '../widgets/problem_brief.dart';
 import '../widgets/update_dialog.dart' show UpdateTile;
+import 'community_screen.dart' show CommunityScreen;
 import 'library_screen.dart' show CourseBrowser;
 import 'questions_screen.dart';
 
-/// 선생님 화면: 학생 · 질문함 · 문제 보기 · 설정.
+/// 선생님 화면: 학생 · 질문함 · 문제 보기 · 커뮤니티 · 설정.
 class TeacherShell extends StatefulWidget {
   const TeacherShell({super.key});
 
@@ -28,6 +29,7 @@ class _TeacherShellState extends State<TeacherShell> {
     (Icons.groups_outlined, Icons.groups_rounded, '학생'),
     (Icons.forum_outlined, Icons.forum_rounded, '질문함'),
     (Icons.menu_book_outlined, Icons.menu_book_rounded, '문제 보기'),
+    (Icons.diversity_3_outlined, Icons.diversity_3_rounded, '커뮤니티'),
     (Icons.settings_outlined, Icons.settings_rounded, '설정'),
   ];
 
@@ -35,6 +37,7 @@ class _TeacherShellState extends State<TeacherShell> {
         0 => const TeacherStudentsScreen(),
         1 => const QuestionsScreen(),
         2 => const CourseBrowser(),
+        3 => const CommunityScreen(),
         _ => const TeacherSettingsScreen(),
       };
 

@@ -1019,7 +1019,7 @@ class AppState extends ChangeNotifier {
   CommunityApi? get community {
     final a = account;
     if (a != null && a.server.trim().isNotEmpty) {
-      return CommunityApi(a.server, a.communityKey.isNotEmpty ? a.communityKey : profile.id);
+      return CommunityApi(a.server, a.communityKey.isNotEmpty ? a.communityKey : profile.id, a.token);
     }
     return settings.serverUrl.trim().isEmpty ? null : CommunityApi(settings.serverUrl, profile.id);
   }

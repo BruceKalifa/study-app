@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   flutter_math_fork: ^0.7.4
   path_provider: ^2.1.6
+  file_picker: ^8.1.2 # 자료요청 글에 PDF 첨부
+  open_filex: ^4.5.0 # 받은 PDF 를 PDF 앱으로 열기
   google_mlkit_digital_ink_recognition: ^0.16.1
   web_socket_channel: ^3.0.3
   flutter_svg: ^2.0.10

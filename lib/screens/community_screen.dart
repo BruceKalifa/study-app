@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../app/app_state.dart';
 import '../app/theme.dart';
@@ -94,14 +99,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final app = AppScope.of(context);
     final api = app.community;
     return LayoutBuilder(builder: (context, box) {
-      final wide = box.maxWidth >= 1050;
+      final wide = box.maxWidth >= 1050 && !app.isTeacher;
       final feed = _feed(app, api);
       if (!wide) {
         return ListView(padding: const EdgeInsets.fromLTRB(24, 24, 24, 40), children: [
           _header(api),
           const SizedBox(height: 16),
-          if (api != null) const RankingPanel(compact: true),
-          const SizedBox(height: 16),
+          if (api != null && !app.isTeacher) ...[const RankingPanel(compact: true), const SizedBox(height: 16)],
           ...feed,
         ]);
       }
@@ -148,36 +152,34 @@ class _CommunityScreenState extends State<CommunityScreen> {
       ]),
       if (api != null) ...[
         const SizedBox(height: 16),
-        Row(children: [
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: [
+        LayoutBuilder(builder: (context, box) {
+          final narrow = box.maxWidth < 760;
+          final chips = SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              ChoiceChip(
+                label: const Text('전체'),
+                selected: _board == null,
+                onSelected: (_) {
+                  setState(() => _board = null);
+                  _load();
+                },
+              ),
+              for (final b in _boards) ...[
+                const SizedBox(width: 8),
                 ChoiceChip(
-                  label: const Text('전체'),
-                  selected: _board == null,
+                  key: Key('board-${b.id}'),
+                  label: Text(b.name),
+                  selected: _board == b.id,
                   onSelected: (_) {
-                    setState(() => _board = null);
+                    setState(() => _board = b.id);
                     _load();
                   },
                 ),
-                for (final b in _boards) ...[
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    key: Key('board-${b.id}'),
-                    label: Text(b.name),
-                    selected: _board == b.id,
-                    onSelected: (_) {
-                      setState(() => _board = b.id);
-                      _load();
-                    },
-                  ),
-                ],
-              ]),
-            ),
-          ),
-          const SizedBox(width: 12),
-          SegmentedButton<String>(
+              ],
+            ]),
+          );
+          final sort = SegmentedButton<String>(
             showSelectedIcon: false,
             segments: const [
               ButtonSegment(value: 'new', label: Text('최신')),
@@ -188,19 +190,29 @@ class _CommunityScreenState extends State<CommunityScreen> {
               setState(() => _sort = v.first);
               _load();
             },
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 220,
-            child: TextField(
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '검색', isDense: true),
-              onSubmitted: (v) {
-                _q = v.trim();
-                _load();
-              },
-            ),
-          ),
-        ]),
+          );
+          final search = TextField(
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '검색', isDense: true),
+            onSubmitted: (v) {
+              _q = v.trim();
+              _load();
+            },
+          );
+          if (narrow) {
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              chips,
+              const SizedBox(height: 10),
+              Row(children: [sort, const SizedBox(width: 10), Expanded(child: search)]),
+            ]);
+          }
+          return Row(children: [
+            Expanded(child: chips),
+            const SizedBox(width: 12),
+            sort,
+            const SizedBox(width: 12),
+            SizedBox(width: 220, child: search),
+          ]);
+        }),
       ],
     ]);
   }
@@ -270,6 +282,7 @@ class _PostTile extends StatelessWidget {
     final c = boardColor(post.board);
     return Card(
       key: Key('post-${post.id}'),
+      color: post.notice ? AppColors.paperDeep : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
@@ -277,7 +290,14 @@ class _PostTile extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Pill(Board.nameOf(post.board), color: c, dense: true),
+              if (post.notice)
+                const Pill('공지', color: AppColors.accent, icon: Icons.push_pin_rounded, dense: true)
+              else
+                Pill(Board.nameOf(post.board), color: c, dense: true),
+              if (post.attachments.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Pill('PDF ${post.attachments.length}', color: AppColors.inkSoft, icon: Icons.attach_file_rounded, dense: true),
+              ],
               if (post.problemId != null) ...[
                 const SizedBox(width: 6),
                 const Pill('문제 질문', color: AppColors.inkSoft, icon: Icons.link_rounded, dense: true),
@@ -304,9 +324,11 @@ class _PostTile extends StatelessWidget {
                 const Pill('내 글', color: AppColors.blue, dense: true),
               ],
               const Spacer(),
-              _Count(post.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, post.likes,
-                  color: post.liked ? AppColors.wrong : null),
-              _Count(Icons.chat_bubble_outline_rounded, post.commentCount),
+              if (!post.notice) ...[
+                _Count(post.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, post.likes,
+                    color: post.liked ? AppColors.wrong : null),
+                _Count(Icons.chat_bubble_outline_rounded, post.commentCount),
+              ],
               _Count(Icons.visibility_outlined, post.views),
             ]),
           ]),
@@ -441,7 +463,7 @@ class _PostScreenState extends State<PostScreen> {
       appBar: AppBar(
         title: Text(p == null ? '' : Board.nameOf(p.board)),
         actions: [
-          if (p != null)
+          if (p != null && !p.notice)
             PopupMenuButton<String>(
               onSelected: _menu,
               itemBuilder: (_) => [
@@ -465,6 +487,10 @@ class _PostScreenState extends State<PostScreen> {
                           style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
                       const Divider(height: 32),
                       MathText(p.body, style: const TextStyle(fontSize: 17, height: 1.75)),
+                      if (p.attachments.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _AttachmentList(post: p, onChanged: _load),
+                      ],
                       if (p.problemId != null) ...[
                         const SizedBox(height: 18),
                         Builder(builder: (context) {
@@ -480,6 +506,7 @@ class _PostScreenState extends State<PostScreen> {
                           );
                         }),
                       ],
+                      if (!p.notice) ...[
                       const SizedBox(height: 20),
                       Center(
                         child: OutlinedButton.icon(
@@ -494,6 +521,8 @@ class _PostScreenState extends State<PostScreen> {
                           label: Text('응원 ${p.likes}'),
                         ),
                       ),
+                      ],
+                      if (!p.notice) ...[
                       const SizedBox(height: 24),
                       Text('댓글 ${p.comments.length}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 8),
@@ -522,10 +551,12 @@ class _PostScreenState extends State<PostScreen> {
                               ),
                           ]),
                         ),
+                      ],
                     ]),
                   ),
                 ),
               ),
+              if (!p.notice)
               SafeArea(
                 top: false,
                 child: Container(
@@ -555,6 +586,110 @@ class _PostScreenState extends State<PostScreen> {
   }
 }
 
+/// 글에 붙은 PDF. 글쓴이와 선생님만 열 수 있다 (서버도 같은 규칙).
+class _AttachmentList extends StatefulWidget {
+  const _AttachmentList({required this.post, required this.onChanged});
+  final Post post;
+  final Future<void> Function() onChanged;
+
+  @override
+  State<_AttachmentList> createState() => _AttachmentListState();
+}
+
+class _AttachmentListState extends State<_AttachmentList> {
+  String? _busy;
+
+  void _toast(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _open(Attachment a) async {
+    final api = AppScope.read(context).community;
+    if (api == null || _busy != null) return;
+    setState(() => _busy = a.id);
+    try {
+      final bytes = await api.downloadAttachment(widget.post.id, a.id);
+      final dir = await getTemporaryDirectory();
+      final safe = a.name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final f = File('${dir.path}/${a.id}_$safe');
+      await f.writeAsBytes(bytes, flush: true);
+      final r = await OpenFilex.open(f.path, type: 'application/pdf');
+      if (r.type != ResultType.done) _toast('PDF를 열 수 있는 앱이 없어요 (${r.message})');
+    } on CommunityError catch (e) {
+      _toast(e.message);
+    } catch (e) {
+      _toast('파일을 열지 못했어요');
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  Future<void> _remove(Attachment a) async {
+    final api = AppScope.read(context).community;
+    if (api == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('첨부 파일을 지울까요?'),
+        content: Text(a.name),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('지우기')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await api.deleteAttachment(widget.post.id, a.id);
+      await widget.onChanged();
+    } on CommunityError catch (e) {
+      _toast(e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final p = widget.post;
+    final canOpen = p.mine || app.isTeacher;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: AppColors.paperDeep, borderRadius: BorderRadius.circular(16)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.picture_as_pdf_rounded, size: 20, color: AppColors.wrong),
+          const SizedBox(width: 8),
+          const Text('첨부한 학습 교안', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
+          const Spacer(),
+          if (!canOpen)
+            const Text('글쓴이와 선생님만 열 수 있어요', style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
+        ]),
+        const SizedBox(height: 8),
+        for (final a in p.attachments)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(children: [
+              Expanded(
+                child: Text('${a.name}  ·  ${a.sizeLabel}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              if (canOpen)
+                OutlinedButton(
+                  key: Key('attachment-open-${a.id}'),
+                  onPressed: _busy != null ? null : () => _open(a),
+                  child: Text(_busy == a.id ? '여는 중…' : '열기'),
+                ),
+              if (p.mine)
+                IconButton(
+                  tooltip: '첨부 지우기',
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: () => _remove(a),
+                ),
+            ]),
+          ),
+      ]),
+    );
+  }
+}
+
 // ============================================================ write
 class WritePostScreen extends StatefulWidget {
   const WritePostScreen({super.key, this.board = 'free', this.problem});
@@ -574,11 +709,46 @@ class _WritePostScreenState extends State<WritePostScreen> {
   final _body = TextEditingController();
   bool _sending = false;
 
+  /// 자료요청 글에 붙일 PDF (글을 올린 뒤 하나씩 올린다).
+  final List<PlatformFile> _files = [];
+  static const _maxFiles = 3;
+  static const _maxBytes = 20 * 1024 * 1024;
+
   @override
   void dispose() {
     _title.dispose();
     _body.dispose();
     super.dispose();
+  }
+
+  void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _pickFiles() async {
+    try {
+      final r = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf'],
+        allowMultiple: true,
+        withData: true,
+      );
+      if (r == null || !mounted) return;
+      setState(() {
+        for (final f in r.files) {
+          if (_files.length >= _maxFiles) {
+            _snack('PDF는 $_maxFiles개까지 붙일 수 있어요');
+            break;
+          }
+          if (f.size > _maxBytes) {
+            _snack('${f.name} 은(는) 20MB를 넘어서 붙일 수 없어요');
+            continue;
+          }
+          if (f.bytes == null) continue;
+          _files.add(f);
+        }
+      });
+    } catch (_) {
+      _snack('파일을 고르지 못했어요');
+    }
   }
 
   Future<void> _send() async {
@@ -591,7 +761,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
     }
     setState(() => _sending = true);
     try {
-      await api.write(
+      final created = await api.write(
         author: app.communityName,
         grade: app.communityIdentity,
         board: _board,
@@ -599,6 +769,21 @@ class _WritePostScreenState extends State<WritePostScreen> {
         body: _body.text.trim(),
         problemId: widget.problem?.id,
       );
+      var failed = 0;
+      String? why;
+      if (Board.canAttach(_board)) {
+        for (final f in _files) {
+          try {
+            await api.attach(created.id, f.name, f.bytes!);
+          } on CommunityError catch (e) {
+            failed++;
+            why = e.message;
+          }
+        }
+      }
+      if (failed > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('글은 올렸지만 PDF $failed개는 올리지 못했어요 · $why')));
+      }
       if (mounted) Navigator.of(context).pop(true);
     } on CommunityError catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -637,6 +822,17 @@ class _WritePostScreenState extends State<WritePostScreen> {
                   onSelected: (_) => setState(() => _board = b.id),
                 ),
             ]),
+            if (_board == 'request') ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: AppColors.blueSoft, borderRadius: BorderRadius.circular(14)),
+                child: const Text(
+                  '과목·학년·단원, 원하는 유형과 문항 수를 적어 주세요. 관련 학습 교안(학교 프린트·수업 필기)을 PDF로 올려 주시면 그 내용에 맞춰 문제를 새로 만들 수 있어요.',
+                  style: TextStyle(height: 1.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             TextField(
               key: const Key('post-title'),
@@ -668,6 +864,45 @@ class _WritePostScreenState extends State<WritePostScreen> {
                   ),
                 ]),
               ),
+            if (Board.canAttach(_board)) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(border: Border.all(color: AppColors.line), borderRadius: BorderRadius.circular(14)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Icon(Icons.picture_as_pdf_rounded, color: AppColors.wrong),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('학습 교안 PDF 첨부 (선택)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
+                    ),
+                    OutlinedButton.icon(
+                      key: const Key('attach-pick'),
+                      onPressed: _sending || _files.length >= _maxFiles ? null : _pickFiles,
+                      icon: const Icon(Icons.attach_file_rounded, size: 18),
+                      label: const Text('PDF 고르기'),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  const Text('파일당 20MB까지, 최대 3개 · 글쓴이와 선생님만 열어 볼 수 있어요',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
+                  for (var i = 0; i < _files.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text('${_files[i].name}  ·  ${(_files[i].size / 1048576).toStringAsFixed(1)}MB',
+                              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: _sending ? null : () => setState(() => _files.removeAt(i)),
+                        ),
+                      ]),
+                    ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 12),
             Text('${app.communityName}${app.communityIdentity.isEmpty ? '' : ' · ${app.communityIdentity}'}(으)로 올라가요 · 실명·연락처 등 개인정보는 쓰지 마세요',
                 style: const TextStyle(color: AppColors.inkMuted)),

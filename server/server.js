@@ -489,12 +489,12 @@ const ADMIN = loadAdminKey();
 const contentStore = new ContentStore({ dir: CONTENT_DIR, seedDir: SEED_DIR }).init();
 const contentApi = createContentApi({ store: contentStore, adminKey: ADMIN.key });
 // 커뮤니티 게시판 + 공부시간 순위 (docs/community-api.md) — DATA_DIR/community.json, ranking.json
-const communityApi = createCommunityApi({ dataDir: DATA_DIR, checkKey: contentApi.checkKey });
 const rankingApi = createRankingApi({ dataDir: DATA_DIR });
 // 학생·선생님 계정, 풀이 기록, 1:1 질문 (docs/accounts-api.md) — DATA_DIR/accounts.json, study.json, questions.json
 // 처음 켤 때 넣는 계정: server/seed/accounts.json (SEED_ACCOUNTS 로 바꿀 수 있음, 빈 값이면 넣지 않음)
 const SEED_ACCOUNTS = process.env.SEED_ACCOUNTS ?? path.join(__dirname, 'seed', 'accounts.json');
 const accountsApi = createAccountsApi({ dataDir: DATA_DIR, seedFile: SEED_ACCOUNTS || null });
+const communityApi = createCommunityApi({ dataDir: DATA_DIR, checkKey: contentApi.checkKey, accounts: accountsApi });
 const questionsApi = createQuestionsApi({ dataDir: DATA_DIR, accounts: accountsApi });
 const booksApi = createBooksApi({ dataDir: DATA_DIR, accounts: accountsApi });
 

@@ -16,7 +16,7 @@
 ] }
 ```
 
-게시판은 22개다 (공통: 자유·질문·공부인증·고민·멘탈·공부법·꿀팁·스터디 모집 / 고등: 입시정보·내신·수능·모의고사·수학·과학·국어·영어·사회탐구·수시·정시·N수·재수 /
+게시판은 23개다 (공통: 자유·질문·자료요청·공부인증·고민·멘탈·공부법·꿀팁·스터디 모집 / 고등: 입시정보·내신·수능·모의고사·수학·과학·국어·영어·사회탐구·수시·정시·N수·재수 /
 취준: 인적성·NCS·취업정보 / 한양대: 한양대 라운지·공업수학·미분적분학·시험·학점 / 편입: 편입정보·편입수학). `tracks` 는 그 게시판이 맞는 학년·과정이고, 빈 배열이면 모두에게 맞다.
 앱은 가입 때 고른 과정에 맞는 게시판만 칩으로 보여 주고(전체 보기는 모든 글), 서버는 어느 게시판에든 글을 받는다. 위 예시는 일부만 적은 것이다 — 전체 목록은 `server/community.js` 의 `BOARDS`.
 
@@ -59,6 +59,21 @@
 
 ### 신고 `POST /api/community/posts/:id/report` `{ "userId", "reason" }` → `{ "ok": true }`
 같은 사람의 중복 신고는 한 번만 센다. 서로 다른 3명이 신고하면 글이 숨겨진다(`hidden`).
+
+### 고정 공지
+게시판마다 운영 공지가 한 개씩 있다 (`notice: true`, 작성자 `솔빗 운영`). 게시판을 골라 첫 쪽(`before` 없음·검색 아님·`sort=new`)을 볼 때만 목록 맨 위에 붙고,
+전체 목록·검색·인기순에는 섞이지 않는다. 공지에는 댓글·응원·신고·학생 삭제가 모두 403이다.
+`자료요청`은 "관련 학습 교안(PDF)을 올려 주시면 도움이 된다"는 안내, 나머지는 이용수칙이다.
+문구를 바꾸려면 `community.js` 의 `NOTICE_VERSION` 을 올린다(그 버전을 처음 보는 서버에서 다시 올라오고, 같은 버전에서 관리자가 지운 공지는 되살아나지 않는다).
+
+### 첨부 PDF (자료요청 게시판만)
+- 올리기 `POST /api/community/posts/:id/attachments?userId=&name=파일이름.pdf` — 본문은 PDF 원본 바이트(`Content-Type: application/pdf`).
+  글쓴이만, 글 하나에 3개·파일당 20MB까지, 앞 5바이트가 `%PDF-` 여야 한다. → `{ "attachment": { "id", "name", "size" } }`
+  (글을 먼저 만든 뒤 id 로 올린다. 이름의 경로 문자는 `_` 로 바뀌고 `.pdf` 가 없으면 붙는다.)
+- 내려받기 `GET /api/community/posts/:id/attachments/:aid/file` — **글쓴이(`?userId=`) / 선생님 계정(`Authorization: Bearer`) / 관리 키**만. 그 밖에는 403.
+  관리 화면은 `GET /api/admin/community/posts/:id/attachments/:aid/file`.
+- 지우기 `DELETE /api/community/posts/:id/attachments/:aid?userId=` (글쓴이만). 글을 지우면 첨부도 함께 지워진다.
+- 글 응답에는 `attachments: [{ id, name, size }]` 만 나가고(관리 응답은 `createdAt` 포함), 파일은 `DATA_DIR/community-files/<id>.pdf` 에 있다.
 
 ### 관리 (x-admin-key)
 

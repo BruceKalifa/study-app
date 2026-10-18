@@ -1633,7 +1633,7 @@
   // ───────────────────────── 커뮤니티 관리 ─────────────────────────
   // API: docs/community-api.md (관리: /api/admin/community/…). 학생 userId 는 서버가 내보내지 않는다.
   const BOARD_NAMES = {
-    free: '자유', qna: '질문', proof: '공부인증', info: '입시정보', mind: '고민·멘탈', tips: '공부법·꿀팁', study: '스터디 모집',
+    free: '자유', qna: '질문', request: '자료요청', proof: '공부인증', info: '입시정보', mind: '고민·멘탈', tips: '공부법·꿀팁', study: '스터디 모집',
     naesin: '내신', suneung: '수능·모의고사', math: '수학', sci: '과학', lang: '국어·영어', soc: '사회탐구', sisi: '수시·정시',
     nsu: 'N수·재수', apt: '인적성·NCS', job: '취업정보', hyu: '한양대 라운지', univmath: '공업수학·미분적분학', univexam: '시험·학점',
     transfer: '편입정보', trmath: '편입수학',
@@ -1682,7 +1682,11 @@
     const badges = `<span class="badge">${esc(BOARD_NAMES[p.board] || p.board)}</span>`
       + (p.hidden ? '<span class="badge bad">숨김</span>' : '')
       + (p.reportCount ? `<span class="badge warn">신고 ${p.reportCount}</span>` : '')
+      + (p.notice ? '<span class="badge lvl">공지</span>' : '')
       + (p.problemId ? `<span class="badge lvl" title="연결된 문제">${esc(p.problemId)}</span>` : '');
+    const files = (p.attachments || []).length
+      ? `<ul class="cm-files">${p.attachments.map((a) => `<li><span>📎 ${esc(a.name)} · ${a.size >= 1048576 ? (a.size / 1048576).toFixed(1) + 'MB' : Math.ceil(a.size / 1024) + 'KB'}</span>
+          <button class="btn small" data-cm="dl" data-aid="${esc(a.id)}">PDF 받기</button></li>`).join('')}</ul>` : '';
     const reasons = mode === 'report' && p.reports.length
       ? `<ul class="cm-reasons">${p.reports.map((r) => `<li><b>${esc(r.reason)}</b><span>${fmtTime(r.at)}</span></li>`).join('')}</ul>` : '';
     const comments = open
@@ -1696,7 +1700,7 @@
       <div class="cm-meta">${badges}<span class="who">${who}</span></div>
       <h3>${esc(p.title)}</h3>
       <p class="cm-body ${open ? '' : 'clamp'}">${esc(p.body)}</p>
-      ${reasons}${comments}
+      ${files}${reasons}${comments}
       <div class="cm-foot"><span class="cm-stats">좋아요 ${p.likes} · 댓글 ${p.comments.length} · 조회 ${p.views}</span>${actions}</div>
     </article>`;
   }
@@ -1725,6 +1729,21 @@
       if (act === 'toggle') {
         if (cm.open.has(id)) cm.open.delete(id); else cm.open.add(id);
         renderCommunity();
+        return;
+      }
+      if (act === 'dl') {
+        const a = (p.attachments || []).find((x) => x.id === b.dataset.aid);
+        if (!a) return;
+        const res = await api.raw('GET', `/api/admin/community/posts/${encodeURIComponent(id)}/attachments/${encodeURIComponent(a.id)}/file`);
+        if (!res.ok) { let m = '받지 못했습니다'; try { m = (await res.json()).error || m; } catch (_) { /* */ } throw new Error(m); }
+        const url = URL.createObjectURL(await res.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = a.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
         return;
       }
       if (act === 'restore') {

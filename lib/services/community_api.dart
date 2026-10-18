@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'content_sync.dart';
 
@@ -17,13 +18,17 @@ class Board {
 
   /// 이 게시판이 맞는 학년·과정 (비면 모두). server/community.js 의 BOARDS 와 같아야 한다.
   final List<String> tracks;
-  const Board(this.id, this.name, this.desc, [this.tracks = const <String>[]]);
+
+  /// 글에 PDF 를 붙일 수 있는 게시판 (자료요청).
+  final bool attach;
+  const Board(this.id, this.name, this.desc, [this.tracks = const <String>[], this.attach = false]);
 
   static const _high = ['고1', '고2', '고3', 'N수'];
 
   static const defaults = [
     Board('free', '자유', '수험생활 이야기'),
     Board('qna', '질문', '과목·문제 질문'),
+    Board('request', '자료요청', '필요한 문제·교재를 요청해요 (PDF 첨부 가능)', [], true),
     Board('proof', '공부인증', '오늘 공부한 것 인증'),
     Board('info', '입시정보', '입시·모의고사 정보', _high),
     Board('mind', '고민·멘탈', '털어놓고 응원받기'),
@@ -54,6 +59,13 @@ class Board {
       for (final b in defaults)
         if (b.tracks.isEmpty || b.tracks.any(gs.contains)) b,
     ];
+  }
+
+  static bool canAttach(String id) {
+    for (final b in defaults) {
+      if (b.id == id) return b.attach;
+    }
+    return false;
   }
 
   static String nameOf(String id) {
@@ -87,11 +99,27 @@ class Comment {
       );
 }
 
+/// 글에 붙은 PDF (이름·크기만 — 내용은 글쓴이와 선생님이 따로 내려받는다).
+class Attachment {
+  final String id, name;
+  final int size;
+  const Attachment(this.id, this.name, this.size);
+
+  factory Attachment.fromJson(Map<String, dynamic> j) =>
+      Attachment('${j['id']}', '${j['name'] ?? '자료.pdf'}', (j['size'] as num?)?.toInt() ?? 0);
+
+  String get sizeLabel => size >= 1048576 ? '${(size / 1048576).toStringAsFixed(1)}MB' : '${(size / 1024).ceil()}KB';
+}
+
 class Post {
   final String id, board, title, preview, body, author, grade;
   final String? problemId;
   final int createdAt, likes, commentCount, views;
   final bool liked, mine;
+
+  /// 운영 공지 (맨 위에 고정, 댓글·응원 없음).
+  final bool notice;
+  final List<Attachment> attachments;
   final List<Comment> comments;
 
   const Post({
@@ -109,6 +137,8 @@ class Post {
     required this.liked,
     required this.mine,
     this.problemId,
+    this.notice = false,
+    this.attachments = const [],
     this.comments = const [],
   });
 
@@ -130,6 +160,10 @@ class Post {
       liked: j['liked'] == true,
       mine: j['mine'] == true,
       problemId: j['problemId'] as String?,
+      notice: j['notice'] == true,
+      attachments: [
+        for (final a in (j['attachments'] as List? ?? const [])) Attachment.fromJson((a as Map).cast<String, dynamic>())
+      ],
       comments: list,
     );
   }
@@ -171,9 +205,12 @@ String maskName(String name) {
 
 /// Client for docs/community-api.md (same server as the content API).
 class CommunityApi {
-  CommunityApi(this.serverUrl, this.userId);
+  CommunityApi(this.serverUrl, this.userId, [this.token = '']);
   final String serverUrl;
   final String userId;
+
+  /// 로그인 토큰 — 선생님 계정이면 다른 학생이 올린 첨부 PDF 도 열 수 있다.
+  final String token;
 
   String get _base {
     final b = ContentSync.httpBase(serverUrl);
@@ -186,6 +223,7 @@ class CommunityApi {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
     try {
       final req = await client.openUrl(method, uri).timeout(const Duration(seconds: 8));
+      if (token.isNotEmpty) req.headers.set('Authorization', 'Bearer $token');
       if (body != null) {
         req.headers.contentType = ContentType.json;
         req.add(utf8.encode(jsonEncode(body)));
@@ -246,6 +284,72 @@ class CommunityApi {
     });
     return Post.fromJson(((d as Map)['post'] as Map).cast<String, dynamic>());
   }
+
+  /// 자료요청 글에 PDF 붙이기 (글쓴이만). 최대 20MB.
+  Future<Attachment> attach(String postId, String name, List<int> bytes) async {
+    final uri = Uri.parse('$_base/api/community/posts/${Uri.encodeComponent(postId)}/attachments')
+        .replace(queryParameters: {'userId': userId, 'name': name});
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
+    try {
+      final req = await client.postUrl(uri).timeout(const Duration(seconds: 10));
+      req.headers.contentType = ContentType('application', 'pdf');
+      req.contentLength = bytes.length;
+      req.add(bytes);
+      final res = await req.close().timeout(const Duration(minutes: 3));
+      final text = await res.transform(utf8.decoder).join();
+      dynamic data;
+      try {
+        data = text.isEmpty ? null : jsonDecode(text);
+      } catch (_) {}
+      if (res.statusCode >= 400) {
+        throw CommunityError(data is Map && data['error'] != null ? '${data['error']}' : '파일을 올리지 못했어요 (${res.statusCode})');
+      }
+      return Attachment.fromJson(((data as Map)['attachment'] as Map).cast<String, dynamic>());
+    } on SocketException {
+      throw const CommunityError('서버에 연결할 수 없어요 · 주소와 와이파이를 확인하세요');
+    } on TimeoutException {
+      throw const CommunityError('파일을 올리는 데 너무 오래 걸려요');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// 첨부 PDF 내려받기 (글쓴이 또는 선생님 계정).
+  Future<List<int>> downloadAttachment(String postId, String attachmentId) async {
+    final uri = Uri.parse(
+            '$_base/api/community/posts/${Uri.encodeComponent(postId)}/attachments/${Uri.encodeComponent(attachmentId)}/file')
+        .replace(queryParameters: {'userId': userId});
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
+    try {
+      final req = await client.getUrl(uri).timeout(const Duration(seconds: 10));
+      if (token.isNotEmpty) req.headers.set('Authorization', 'Bearer $token');
+      final res = await req.close().timeout(const Duration(minutes: 3));
+      if (res.statusCode >= 400) {
+        final text = await res.transform(utf8.decoder).join();
+        String msg = '파일을 열 수 없어요 (${res.statusCode})';
+        try {
+          final d = jsonDecode(text);
+          if (d is Map && d['error'] != null) msg = '${d['error']}';
+        } catch (_) {}
+        throw CommunityError(msg);
+      }
+      final out = BytesBuilder(copy: false);
+      await for (final c in res) {
+        out.add(c);
+      }
+      return out.takeBytes();
+    } on SocketException {
+      throw const CommunityError('서버에 연결할 수 없어요 · 주소와 와이파이를 확인하세요');
+    } on TimeoutException {
+      throw const CommunityError('파일을 받는 데 너무 오래 걸려요');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<void> deleteAttachment(String postId, String attachmentId) => _req(
+      'DELETE', '/api/community/posts/${Uri.encodeComponent(postId)}/attachments/${Uri.encodeComponent(attachmentId)}',
+      query: {'userId': userId});
 
   Future<void> comment(String postId, {required String author, required String grade, required String body}) =>
       _req('POST', '/api/community/posts/${Uri.encodeComponent(postId)}/comments',

@@ -1517,6 +1517,10 @@ void _univTests() {
       expect(ids(['한양대', 'N수']), containsAll(['univmath', 'nsu', 'sisi']), reason: '복수 과정은 합쳐서');
       expect(ids(const []), hasLength(Board.defaults.length), reason: '과정을 모르면 전부');
       expect(Board.nameOf('trmath'), '편입수학');
+      expect(ids(const ['고2']), contains('request'), reason: '자료요청은 모두에게');
+      expect(ids(const ['취준']), contains('request'));
+      expect(Board.canAttach('request'), isTrue);
+      expect(Board.canAttach('qna'), isFalse);
     });
 
     test('온보딩을 마치면 D-day 카드에 고른 목표의 시험이 오른다 (날짜는 수능만 미리 채움)', () async {
