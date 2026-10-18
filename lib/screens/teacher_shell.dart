@@ -251,30 +251,39 @@ class _TeacherStudentsScreenState extends State<TeacherStudentsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+        padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width < 600 ? 16 : 32, 28, MediaQuery.of(context).size.width < 600 ? 16 : 32, 40),
         children: [
-          Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${app.profile.name} 선생님의 학생',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-                const SizedBox(height: 4),
-                Text(
-                  list == null ? '불러오는 중…' : '학생 ${list.length}명 · 오늘 공부한 학생 $active명 · 오늘 푼 문제 $today개',
-                  style: const TextStyle(fontSize: 15, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
-                ),
-              ]),
-            ),
-            SizedBox(
-              width: 220,
-              child: TextField(
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '학생 이름'),
-                onChanged: (v) => setState(() => _q = v.trim()),
+          LayoutBuilder(builder: (context, hb) {
+            // 폰처럼 좁으면 제목이 한 글자씩 세로로 쪼개지지 않게 검색칸을 제목 아래로 내린다.
+            final narrow = hb.maxWidth < 560;
+            final title = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${app.profile.name} 선생님의 학생',
+                  style: TextStyle(fontSize: narrow ? 24 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+              const SizedBox(height: 4),
+              Text(
+                list == null ? '불러오는 중…' : '학생 ${list.length}명 · 오늘 공부한 학생 $active명 · 오늘 푼 문제 $today개',
+                style: const TextStyle(fontSize: 15, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(key: const Key('t-refresh'), tooltip: '새로고침', onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
-          ]),
+            ]);
+            final search = TextField(
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '학생 이름'),
+              onChanged: (v) => setState(() => _q = v.trim()),
+            );
+            final refresh = IconButton(key: const Key('t-refresh'), tooltip: '새로고침', onPressed: _load, icon: const Icon(Icons.refresh_rounded));
+            if (narrow) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                title,
+                const SizedBox(height: 14),
+                Row(children: [Expanded(child: search), const SizedBox(width: 8), refresh]),
+              ]);
+            }
+            return Row(children: [
+              Expanded(child: title),
+              SizedBox(width: 220, child: search),
+              const SizedBox(width: 8),
+              refresh,
+            ]);
+          }),
           const SizedBox(height: 20),
           _InviteCard(code: _code, onNew: _newCode),
           const SizedBox(height: 22),

@@ -95,22 +95,22 @@ class _CourseBrowserState extends State<CourseBrowser> {
 
     final content = CustomScrollView(slivers: [
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 8),
+        padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width < 600 ? 16 : 32, 28, MediaQuery.of(context).size.width < 600 ? 16 : 32, 8),
         sliver: SliverToBoxAdapter(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                child: Text(sel?.name ?? '문제집',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-              ),
-              SizedBox(
-                width: 300,
-                child: TextField(
-                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '유형·단원·내용 검색'),
-                  onChanged: (v) => setState(() => _query = v.trim()),
-                ),
-              ),
-            ]),
+            LayoutBuilder(builder: (context, hb) {
+              final narrow = hb.maxWidth < 600;
+              final title = Text(sel?.name ?? '문제집',
+                  style: TextStyle(fontSize: narrow ? 24 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2));
+              final search = TextField(
+                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '유형·단원·내용 검색'),
+                onChanged: (v) => setState(() => _query = v.trim()),
+              );
+              if (narrow) {
+                return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [title, const SizedBox(height: 12), search]);
+              }
+              return Row(children: [Expanded(child: title), SizedBox(width: 300, child: search)]);
+            }),
             const SizedBox(height: 16),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -382,10 +382,13 @@ class _BookRow extends StatelessWidget {
               ]),
             ),
             const SizedBox(width: 14),
-            SizedBox(width: 120, child: AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 6)),
-            const SizedBox(width: 10),
+            // 좁은 화면(폰 세로)에서는 진행 막대를 빼서 교재 이름이 보이게 한다.
+            if (MediaQuery.of(context).size.width >= 600) ...[
+              SizedBox(width: 120, child: AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 6)),
+              const SizedBox(width: 10),
+            ],
             SizedBox(
-              width: 72,
+              width: MediaQuery.of(context).size.width >= 600 ? 72 : 52,
               child: Text('$done/$total',
                   textAlign: TextAlign.right,
                   style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
