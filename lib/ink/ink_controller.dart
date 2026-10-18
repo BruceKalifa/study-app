@@ -429,11 +429,15 @@ class InkController extends ChangeNotifier {
     _pendingLive.add(pt);
     if (now - _lastLiveFlush >= 50) _flushLive(now);
     if (_holdAnchor == null || (pos - _holdAnchor!).distance > 4) _armHold(pos);
-    if (autoExtend && pos.dy > pageHeight - 260) {
-      pageHeight += 800;
-      notifyListeners();
-    }
+    if (autoExtend && pos.dy > pageHeight - 260) extendPage();
     activeTick.value++;
+  }
+
+  /// 풀이 공간이 모자랄 때 종이를 아래로 늘린다 (너무 길어지지 않게 상한을 둔다).
+  void extendPage([double by = 800]) {
+    if (pageHeight >= 24000) return;
+    pageHeight += by;
+    notifyListeners();
   }
 
   void _flushLive(int now) {

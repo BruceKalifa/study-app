@@ -719,6 +719,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
                     child: SizeChangedLayoutNotifier(child: sheet),
                   ),
                   initialZoom: initialZoom,
+                  returnButton: true,
                 ),
               ),
             ),

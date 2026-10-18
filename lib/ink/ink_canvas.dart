@@ -30,6 +30,7 @@ class InkCanvas extends StatefulWidget {
     this.minZoom = 0.6,
     this.maxZoom = 4,
     this.initialZoom = 1,
+    this.returnButton = false,
   });
 
   final InkController controller;
@@ -53,6 +54,9 @@ class InkCanvas extends StatefulWidget {
   /// 처음 보이는 배율 (1 = 종이 너비가 화면 너비). 세로 화면에서 문제 단만 화면에 꽉 차게 보여 주고
   /// 풀이 공간(오른쪽 단)은 옆으로 넘겨서 보게 할 때 1 보다 크게 둔다. 바뀌면 처음 자리(왼쪽 위)로 돌아간다.
   final double initialZoom;
+
+  /// 문제에서 한 화면 넘게 내려가면 "문제로" 돌아오는 버튼을 띄운다 (풀이 공간이 아래로 길어졌을 때).
+  final bool returnButton;
 
   /// True while the pen is writing (or just lifted): touches elsewhere are probably the palm.
   static bool get penBusy =>
@@ -172,8 +176,13 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     });
   }
 
-  void _clamp() {
+  /// [grow]: 손가락·휠로 종이 맨 아래를 넘겨 더 내리려 하면 종이를 아래로 늘려 준다 (풀이 공간이 모자랄 때).
+  void _clamp({bool grow = false}) {
     final pageW = kPageWidth * scale;
+    if (grow && c.autoExtend) {
+      final limit = math.min(0.0, _viewport.height - c.pageHeight * scale - 80);
+      if (_offset.dy < limit - 24) c.extendPage();
+    }
     final pageH = c.pageHeight * scale;
     double dx;
     if (pageW <= _viewport.width) {
@@ -389,7 +398,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
       } else {
         _offset = _gestureStartOffset + (focal - _gestureStartFocal);
       }
-      _clamp();
+      _clamp(grow: pts.length < 2);
     });
     _panTrail.add((_now, focal));
     if (_panTrail.length > 6) _panTrail.removeAt(0);
@@ -463,7 +472,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     }
     setState(() {
       _offset += _velocity * dtMs;
-      _clamp();
+      _clamp(grow: true);
     });
   }
 
@@ -479,7 +488,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     if (e is PointerScrollEvent && widget.interactive) {
       setState(() {
         _offset -= e.scrollDelta;
-        _clamp();
+        _clamp(grow: true);
       });
     }
   }
@@ -533,7 +542,8 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
         ..setEntry(1, 1, s)
         ..setEntry(0, 3, _offset.dx)
         ..setEntry(1, 3, _offset.dy);
-      return Listener(
+      final away = widget.returnButton && _offset.dy < -_viewport.height * 0.6;
+      final canvas = Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: _onDown,
         onPointerMove: _onMove,
@@ -585,6 +595,39 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
           ),
         ),
       );
+      if (!widget.returnButton) return canvas;
+      return Stack(children: [
+        Positioned.fill(child: canvas),
+        Positioned(
+          right: 20,
+          bottom: 122,
+          child: IgnorePointer(
+            ignoring: !away,
+            child: AnimatedOpacity(
+              opacity: away ? 1 : 0,
+              duration: const Duration(milliseconds: 180),
+              child: Material(
+                color: const Color(0xFF1E2A4A),
+                elevation: 4,
+                borderRadius: BorderRadius.circular(26),
+                child: InkWell(
+                  key: const Key('return-to-problem'),
+                  borderRadius: BorderRadius.circular(26),
+                  onTap: resetView,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.north_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text('문제로', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]);
     });
   }
 }
