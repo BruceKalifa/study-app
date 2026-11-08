@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   flutter_math_fork: ^0.7.4
   path_provider: ^2.1.6
-  file_picker: ^8.1.2 # 자료요청 글에 PDF 첨부
+  file_selector: ^1.0.3 # 자료요청 글에 PDF 첨부 (공식 패키지 — file_picker 는 compileSdk 가 맞지 않아 빌드가 막혔다)
   open_filex: ^4.5.0 # 받은 PDF 를 PDF 앱으로 열기
   google_mlkit_digital_ink_recognition: ^0.16.1
   web_socket_channel: ^3.0.3
@@ -22,8 +22,6 @@ dependencies:
 dependency_overrides:
   flutter_math_fork:
     path: third_party/flutter_math_fork
-  # file_picker 8 는 compileSdk 34 로 만들어졌는데 이 플러그인 최신판은 36 이상을 요구해 빌드가 막힌다 → 34 로도 되는 판으로 고정
-  flutter_plugin_android_lifecycle: 2.0.28
 
 dev_dependencies:
   flutter_test:

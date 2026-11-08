@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -690,6 +690,12 @@ class _AttachmentListState extends State<_AttachmentList> {
   }
 }
 
+class _PickedPdf {
+  const _PickedPdf(this.name, this.bytes);
+  final String name;
+  final List<int> bytes;
+}
+
 // ============================================================ write
 class WritePostScreen extends StatefulWidget {
   const WritePostScreen({super.key, this.board = 'free', this.problem});
@@ -710,7 +716,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
   bool _sending = false;
 
   /// 자료요청 글에 붙일 PDF (글을 올린 뒤 하나씩 올린다).
-  final List<PlatformFile> _files = [];
+  final List<_PickedPdf> _files = [];
   static const _maxFiles = 3;
   static const _maxBytes = 20 * 1024 * 1024;
 
@@ -725,27 +731,28 @@ class _WritePostScreenState extends State<WritePostScreen> {
 
   Future<void> _pickFiles() async {
     try {
-      final r = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const ['pdf'],
-        allowMultiple: true,
-        withData: true,
-      );
-      if (r == null || !mounted) return;
-      setState(() {
-        for (final f in r.files) {
-          if (_files.length >= _maxFiles) {
-            _snack('PDF는 $_maxFiles개까지 붙일 수 있어요');
-            break;
-          }
-          if (f.size > _maxBytes) {
-            _snack('${f.name} 은(는) 20MB를 넘어서 붙일 수 없어요');
-            continue;
-          }
-          if (f.bytes == null) continue;
-          _files.add(f);
+      const pdf = XTypeGroup(label: 'PDF', extensions: ['pdf'], mimeTypes: ['application/pdf'], uniformTypeIdentifiers: ['com.adobe.pdf']);
+      final picked = await openFiles(acceptedTypeGroups: const [pdf]);
+      if (picked.isEmpty || !mounted) return;
+      final add = <_PickedPdf>[];
+      for (final f in picked) {
+        if (_files.length + add.length >= _maxFiles) {
+          _snack('PDF는 $_maxFiles개까지 붙일 수 있어요');
+          break;
         }
-      });
+        final size = await f.length();
+        if (size > _maxBytes) {
+          _snack('${f.name} 은(는) 20MB를 넘어서 붙일 수 없어요');
+          continue;
+        }
+        final bytes = await f.readAsBytes();
+        if (bytes.length < 5 || String.fromCharCodes(bytes.sublist(0, 5)) != '%PDF-') {
+          _snack('${f.name} 은(는) PDF 파일이 아니에요');
+          continue;
+        }
+        add.add(_PickedPdf(f.name.isEmpty ? '자료.pdf' : f.name, bytes));
+      }
+      if (mounted) setState(() => _files.addAll(add));
     } catch (_) {
       _snack('파일을 고르지 못했어요');
     }
@@ -774,7 +781,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
       if (Board.canAttach(_board)) {
         for (final f in _files) {
           try {
-            await api.attach(created.id, f.name, f.bytes!);
+            await api.attach(created.id, f.name, f.bytes);
           } on CommunityError catch (e) {
             failed++;
             why = e.message;
@@ -891,7 +898,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
                       padding: const EdgeInsets.only(top: 8),
                       child: Row(children: [
                         Expanded(
-                          child: Text('${_files[i].name}  ·  ${(_files[i].size / 1048576).toStringAsFixed(1)}MB',
+                          child: Text('${_files[i].name}  ·  ${(_files[i].bytes.length / 1048576).toStringAsFixed(1)}MB',
                               maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
                         ),
                         IconButton(
