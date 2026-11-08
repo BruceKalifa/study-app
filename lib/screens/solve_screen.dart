@@ -407,14 +407,15 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     final i = b.intersect(box);
     if (i.width <= 0 || i.height <= 0) return false;
     final area = b.width * b.height;
-    return area <= 0 || i.width * i.height >= 0.6 * area;
+    // 칸 밖으로 조금 삐져나간 획(긴 분수 줄, 큰 괄호)도 답으로 읽는다
+    return area <= 0 || i.width * i.height >= 0.4 * area;
   }
 
   List<InkStroke> _answerStrokes() {
     final ink = _ink;
     final r = _sheet.answerRect;
     if (ink == null || r == null) return const [];
-    final box = r.inflate(12);
+    final box = r.inflate(20);
     return [
       for (final s in ink.strokes)
         if (s.tool == InkTool.pen && _inBox(s.bounds, box)) s
@@ -451,7 +452,10 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     await Handwriting.instance.prepare();
     final local = [for (final s in strokes) s.translated(-r.left, -r.top)];
     final cands = await Handwriting.instance.recognize(local,
-        width: r.width, height: r.height, shape: Handwriting.shapeOf(_problems[i].answer));
+        width: r.width,
+        height: r.height,
+        shape: Handwriting.shapeOf(_problems[i].answer),
+        list: Handwriting.isListAnswer(_problems[i].answer));
     if (!mounted) return;
     setState(() {
       _recognizing = false;

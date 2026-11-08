@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' show Rect;
+
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_digital_ink_recognition/google_mlkit_digital_ink_recognition.dart' as mlkit;
 
@@ -52,39 +55,135 @@ class Handwriting {
 
   /// Returns candidate texts, best first. [shape] is what the answer is *expected to look like*
   /// (숫자 / 복소수 / 그 밖) — it only tells how to read look-alike letters, never what the value is.
+  /// [list]: 정답이 쉼표로 이은 여러 값이다 (쉼표를 소수점으로 바꾸지 않는다).
   Future<List<String>> recognize(List<InkStroke> strokes,
-      {double width = 0, double height = 0, AnswerShape shape = AnswerShape.other}) async {
+      {double width = 0, double height = 0, AnswerShape shape = AnswerShape.other, bool list = false}) async {
     final r = _recognizer;
     if (r == null || strokes.isEmpty) return const [];
     try {
-      final ink = mlkit.Ink();
-      final ordered = [...strokes]..sort((a, b) => a.startedAt.compareTo(b.startedAt));
-      for (final s in ordered) {
-        final st = mlkit.Stroke();
-        for (final p in s.points) {
-          st.points.add(mlkit.StrokePoint(x: p.x, y: p.y, t: s.startedAt + p.t));
-        }
-        ink.strokes.add(st);
+      final whole = await _read(r, strokes, width: width, height: height);
+      // 분수를 위아래로 쓴 경우 (분자 / 가로줄 / 분모): 한 줄로 읽으면 "34" 처럼 되므로 따로 읽어 잇는다
+      final f = splitFraction(strokes);
+      if (f != null && shape != AnswerShape.other) {
+        Future<List<String>> part(List<InkStroke> ss) async =>
+            ss.isEmpty ? const [''] : [for (final t in await _read(r, ss)) cleanAnswer(t, shape: shape, keepComma: list)];
+        final combos = combineFraction(
+          await part(f.before),
+          await part(f.numerator),
+          await part(f.denominator),
+          await part(f.after),
+        );
+        return rank([...combos, ...whole], shape: shape, list: list);
       }
-      final ctx = width > 0 && height > 0
-          ? mlkit.DigitalInkRecognitionContext(writingArea: mlkit.WritingArea(width: width, height: height))
-          : null;
-      final cands = await r.recognize(ink, context: ctx);
-      return rank([for (final c in cands) c.text], shape: shape);
+      return rank(whole, shape: shape, list: list);
     } catch (e) {
       debugPrint('recognize failed: $e');
       return const [];
     }
   }
 
+  Future<List<String>> _read(mlkit.DigitalInkRecognizer r, List<InkStroke> strokes,
+      {double width = 0, double height = 0}) async {
+    final ink = mlkit.Ink();
+    final ordered = [...strokes]..sort((a, b) => a.startedAt.compareTo(b.startedAt));
+    for (final s in ordered) {
+      final st = mlkit.Stroke();
+      for (final p in s.points) {
+        st.points.add(mlkit.StrokePoint(x: p.x, y: p.y, t: s.startedAt + p.t));
+      }
+      ink.strokes.add(st);
+    }
+    final ctx = width > 0 && height > 0
+        ? mlkit.DigitalInkRecognitionContext(writingArea: mlkit.WritingArea(width: width, height: height))
+        : null;
+    final cands = await r.recognize(ink, context: ctx);
+    return [for (final c in cands) c.text];
+  }
+
+  /// 획들이 위아래로 쓴 분수인지 본다: 가로줄 하나와 그 위(분자)·아래(분모)에 획이 있으면 나눈다.
+  /// 줄 왼쪽·오른쪽 획(− 부호, π 따위)은 [FractionSplit.before] / [FractionSplit.after].
+  @visibleForTesting
+  static FractionSplit? splitFraction(List<InkStroke> strokes) {
+    if (strokes.length < 3) return null;
+    Rect box(InkStroke s) {
+      var x0 = double.infinity, y0 = double.infinity, x1 = -double.infinity, y1 = -double.infinity;
+      for (final p in s.points) {
+        x0 = math.min(x0, p.x);
+        y0 = math.min(y0, p.y);
+        x1 = math.max(x1, p.x);
+        y1 = math.max(y1, p.y);
+      }
+      return Rect.fromLTRB(x0, y0, x1, y1);
+    }
+
+    final boxes = {for (final s in strokes) s: box(s)};
+    FractionSplit? best;
+    var bestW = 0.0;
+    for (final bar in strokes) {
+      final b = boxes[bar]!;
+      if (b.width < 14 || b.height > math.max(6.0, b.width * 0.22)) continue; // 가로줄
+      final lo = b.left - b.width * 0.15, hi = b.right + b.width * 0.15;
+      final num = <InkStroke>[], den = <InkStroke>[], before = <InkStroke>[], after = <InkStroke>[];
+      for (final s in strokes) {
+        if (identical(s, bar)) continue;
+        final c = boxes[s]!.center;
+        if (c.dx >= lo && c.dx <= hi && c.dy < b.center.dy - 2) {
+          num.add(s);
+        } else if (c.dx >= lo && c.dx <= hi && c.dy > b.center.dy + 2) {
+          den.add(s);
+        } else if (c.dx < lo) {
+          before.add(s);
+        } else if (c.dx > hi) {
+          after.add(s);
+        } else {
+          // 줄과 같은 높이 한가운데 (= 의 다른 줄 같은 것) → 분수가 아님
+          num.clear();
+          break;
+        }
+      }
+      if (num.isEmpty || den.isEmpty) continue;
+      if (b.width > bestW) {
+        bestW = b.width;
+        best = FractionSplit(before, num, den, after);
+      }
+    }
+    return best;
+  }
+
+  /// 앞·분자·분모·뒤 후보 → "앞(분자)/(분모)뒤" 후보들 (좋은 것부터, 각 부분 앞의 몇 개만).
+  @visibleForTesting
+  static List<String> combineFraction(List<String> before, List<String> num, List<String> den, List<String> after) {
+    String wrap(String t) => RegExp(r'^[0-9.√π]+$').hasMatch(t) || RegExp(r'^\(.*\)$').hasMatch(t) ? t : '($t)';
+    final out = <String>[];
+    final seen = <String>{};
+    final pre = before.take(2).toList(), nn = num.take(3).toList(), dd = den.take(3).toList(), post = after.take(2).toList();
+    for (var score = 0; score <= 6; score++) {
+      for (var a = 0; a < pre.length; a++) {
+        for (var i = 0; i < nn.length; i++) {
+          for (var j = 0; j < dd.length; j++) {
+            for (var z = 0; z < post.length; z++) {
+              if (a + i + j + z != score) continue;
+              if (nn[i].isEmpty || dd[j].isEmpty) continue;
+              var p = pre[a];
+              if (RegExp(r'^[-_—–−]+$').hasMatch(p)) p = '-';
+              final t = '$p${wrap(nn[i])}/${wrap(dd[j])}${post[z]}';
+              if (seen.add(t)) out.add(t);
+            }
+          }
+        }
+      }
+    }
+    return out;
+  }
+
   /// Raw recognizer outputs (best first) → cleaned candidates: every output is read in each plausible way
   /// (e.g. "l" as 1 or as i), and the ones that look like the expected kind of answer come first.
   @visibleForTesting
-  static List<String> rank(List<String> raws, {AnswerShape shape = AnswerShape.other, int limit = 6}) {
+  static List<String> rank(List<String> raws, {AnswerShape shape = AnswerShape.other, int limit = 6, bool list = false}) {
     final scored = <(String, int, int)>[];
     final seen = <String>{};
-    for (var k = 0; k < raws.length && k < 10; k++) {
-      for (final t in variants(raws[k], shape: shape)) {
+    for (var k = 0; k < raws.length && k < 16; k++) {
+      for (final t in variants(raws[k], shape: shape, list: list)) {
         if (t.isEmpty || !seen.add(t)) continue;
         var score = k;
         if (!_looksLike(t, shape)) score += 100;
@@ -96,14 +195,17 @@ class Handwriting {
     return [for (final e in scored.take(limit)) e.$1];
   }
 
-  static final RegExp _numericChars = RegExp(r'^[0-9+\-*/^().√π±]+$');
-  static final RegExp _complexChars = RegExp(r'^[0-9+\-*/^().√πi±]+$');
+  static final RegExp _numericChars = RegExp(r'^[0-9+\-*/^().,√π±]+$');
+  static final RegExp _complexChars = RegExp(r'^[0-9+\-*/^().,√πi±]+$');
 
   static bool _looksLike(String t, AnswerShape shape) => switch (shape) {
         AnswerShape.numeric => _numericChars.hasMatch(t),
         AnswerShape.complex => _complexChars.hasMatch(t),
         AnswerShape.other => true,
       };
+
+  /// 정답이 쉼표로 이은 여러 값인지 (예: "1,3", "-2, 5").
+  static bool isListAnswer(String answer) => answer.contains(',');
 
   /// What the *expected answer* looks like — used only to read the handwriting, never to check it.
   static AnswerShape shapeOf(String answer) {
@@ -116,20 +218,26 @@ class Handwriting {
 
   /// The ways one recognizer output can be read, most likely first.
   @visibleForTesting
-  static List<String> variants(String raw, {AnswerShape shape = AnswerShape.other}) {
+  static List<String> variants(String raw, {AnswerShape shape = AnswerShape.other, bool list = false}) {
     if (shape == AnswerShape.complex) {
       // 허수단위: i 로 읽는 쪽과 숫자 1 로 읽는 쪽을 둘 다 낸다 (i 가 있는 쪽이 앞)
-      final asI = cleanAnswer(raw.replaceAll(RegExp(r'[lI|jJıíì!¡]'), 'i'), shape: shape);
-      final asOne = cleanAnswer(raw, shape: shape, keepI: false);
+      final asI = cleanAnswer(raw.replaceAll(RegExp(r'[lI|jJıíì!¡]'), 'i'), shape: shape, keepComma: list);
+      final asOne = cleanAnswer(raw, shape: shape, keepI: false, keepComma: list);
       return asI == asOne ? [asI] : [asI, asOne];
     }
-    return [cleanAnswer(raw, shape: shape)];
+    return [cleanAnswer(raw, shape: shape, keepComma: list)];
   }
 
   /// Map look-alike letters to digits/symbols that make sense in a numeric answer.
   /// A lowercase i is kept ("2+i" is a complex number, not "2+1") unless [keepI] is false.
-  static String cleanAnswer(String raw, {AnswerShape shape = AnswerShape.other, bool keepI = true}) {
+  static String cleanAnswer(String raw,
+      {AnswerShape shape = AnswerShape.other, bool keepI = true, bool keepComma = false}) {
     var s = raw.trim().replaceAll(' ', '');
+    // 숫자 답에서 빠지는 군더더기: 끝의 마침표, "답:" · "=" 로 시작하는 것
+    if (shape != AnswerShape.other) {
+      s = s.replaceFirst(RegExp(r'^(답|ans|Ans|A)?[:=]'), '');
+      s = s.replaceFirst(RegExp(r'[.,]$'), '');
+    }
     const map = {
       'O': '0', 'o': '0', 'D': '0', 'Q': '0',
       'l': '1', 'I': '1', '|': '1', 'L': '1',
@@ -142,7 +250,6 @@ class Handwriting {
       'B': '8',
       'q': '9', 'g': '9',
       '÷': '/', '—': '-', '–': '-', '_': '-', '−': '-', '×': '*', '·': '*',
-      ',': '.',
     };
     // √ and π are not in the en-US model: they come back as V / v / r and TT / n / T
     s = s.replaceAllMapped(RegExp(r'(^|[\d)])[Vv√](?=[\d(])'), (m) => '${m[1]}√');
@@ -165,6 +272,8 @@ class Handwriting {
       }
       s = b.toString();
     }
+    // 쉼표: 여러 값을 묻는 답이면 그대로, 아니면 아래로 찍힌 소수점
+    if (!keepComma) s = s.replaceAll(',', '.');
     return s;
   }
 
@@ -172,4 +281,10 @@ class Handwriting {
     await _recognizer?.close();
     _recognizer = null;
   }
+}
+
+/// 위아래로 쓴 분수를 나눈 획들.
+class FractionSplit {
+  const FractionSplit(this.before, this.numerator, this.denominator, this.after);
+  final List<InkStroke> before, numerator, denominator, after;
 }
