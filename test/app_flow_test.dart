@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:study_app/widgets/track_picker.dart';
 import 'package:study_app/app/app_state.dart';
 import 'package:study_app/app/goals.dart';
 import 'package:study_app/app/learner.dart';
@@ -416,23 +417,27 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('goal-NCS 대비')));
     await tester.tap(find.byKey(const Key('goal-NCS 대비')));
     await tester.pump();
-    // 뒤로 가서 한양대를 더하면 한양대 목표가 과정 이름과 함께 나온다
+    // 뒤로 가서 대학생을 더하면 학교 칸이 나오고, 대학생 목표가 과정 이름과 함께 나온다
     await tester.tap(find.text('이전'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('grade-한양대')));
+    expect(find.byKey(const Key('grade-고3')), findsNothing, reason: '고등 과정은 새로 고를 수 없다');
+    await tester.tap(find.byKey(const Key('grade-대학생')));
     await tester.pump();
+    expect(find.byKey(const Key('grade-school')), findsOneWidget, reason: '대학생이면 학교를 고른다');
     await tester.tap(find.byKey(const Key('onb-next')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('goal-기말고사 대비')), findsOneWidget);
     expect(find.byKey(const Key('goal-인적성 실전 대비')), findsOneWidget, reason: '취준 목표도 그대로');
-    expect(find.text('한양대'), findsWidgets);
+    expect(find.text('대학생'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('onboarding: name, grade, goal, then pick books from the catalog → 내 교재 → home', (tester) async {
     _tabletSize(tester);
+    TrackPicker.showLegacyTracks = true; // 고등 교재로 된 시험 자료
+    addTearDown(() => TrackPicker.showLegacyTracks = false);
     final s = (await tester.runAsync(() => _state(onboard: false)))!;
     await tester.pumpWidget(_app(s));
     await tester.pump(const Duration(milliseconds: 500));
@@ -1590,23 +1595,30 @@ void _univTests() {
       await tester.enterText(find.byKey(const Key('auth-name')), '한양대생');
 
       bool on(String g) => tester.widget<FilterChip>(find.byKey(Key('auth-grade-$g'))).selected;
-      expect([for (final g in kGrades) if (on(g)) g], isEmpty, reason: '처음엔 아무것도 고르지 않는다');
+      const tracks = ['대학생', '취준', '편입'];
+      expect([for (final g in tracks) if (on(g)) g], isEmpty, reason: '처음엔 아무것도 고르지 않는다');
+      expect(find.byKey(const Key('auth-grade-고3')), findsNothing, reason: '고등학생은 새로 가입하지 않는다');
+      expect(find.byKey(const Key('auth-grade-N수')), findsNothing);
 
       await tester.ensureVisible(find.byKey(const Key('auth-submit')));
       await tester.tap(find.byKey(const Key('auth-submit')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.textContaining('하나 이상'), findsOneWidget, reason: '학년·과정이 없으면 가입하지 않는다');
 
-      for (final g in ['한양대', 'N수', '편입']) {
+      for (final g in tracks) {
         await tester.ensureVisible(find.byKey(Key('auth-grade-$g')));
         await tester.tap(find.byKey(Key('auth-grade-$g')));
         await tester.pump();
       }
-      expect([for (final g in kGrades) if (on(g)) g], ['N수', '한양대', '편입'], reason: '세 개 모두 선택');
-      await tester.tap(find.byKey(const Key('auth-grade-N수')));
+      expect([for (final g in tracks) if (on(g)) g], tracks, reason: '세 개 모두 선택');
+      expect(find.byKey(const Key('auth-grade-school')), findsOneWidget, reason: '대학생을 고르면 학교 칸');
+      await tester.tap(find.byKey(const Key('auth-grade-취준')));
       await tester.pump();
-      expect(on('N수'), isFalse, reason: '다시 누르면 해제');
-      expect(on('한양대'), isTrue);
+      expect(on('취준'), isFalse, reason: '다시 누르면 해제');
+      expect(on('대학생'), isTrue);
+      await tester.tap(find.byKey(const Key('auth-grade-대학생')));
+      await tester.pump();
+      expect(find.byKey(const Key('auth-grade-school')), findsNothing, reason: '대학생을 빼면 학교 칸도 사라진다');
       expect(tester.takeException(), isNull);
     });
 
@@ -1624,6 +1636,8 @@ void _univTests() {
       await tester.runAsync(app.init);
       String ids(String grade) => app.coursesForGrade(grade).map((s) => s.id).join(',');
       expect(ids('한양대'), 'emath1,emath2,calc1,calc2');
+      expect(ids('인하대'), 'emath1,emath2,calc1,calc2', reason: '과목은 모든 대학생에게 (학교별로 나누는 건 교재)');
+      expect(ids('대학생'), 'emath1,emath2,calc1,calc2');
       expect(ids('고3'), '');
       expect(ids('취준'), '');
       app.dispose();

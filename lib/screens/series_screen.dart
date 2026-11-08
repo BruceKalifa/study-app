@@ -40,7 +40,7 @@ class SeriesScreen extends StatelessWidget {
     final app = AppScope.of(context);
     final books = [
       for (final w in app.bank.workbooks)
-        if (w.series == series && (!onlyMine || app.hasWorkbook(w.id))) w,
+        if (w.series == series && app.canSeeWorkbook(w) && (!onlyMine || app.hasWorkbook(w.id))) w,
     ];
     final course = books.isEmpty ? null : app.bank.subject(books.first.course);
     final color = Color(course?.color ?? 0xFF5B6475);

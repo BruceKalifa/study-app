@@ -6,6 +6,7 @@ import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
 import '../services/account_api.dart';
+import '../widgets/track_picker.dart';
 
 /// 첫 화면: 학생 / 선생님 → 로그인 · 회원가입 (또는 로그인 없이 쓰기).
 class WelcomeScreen extends StatefulWidget {
@@ -62,6 +63,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           _codeNote = '${info.label}용 코드예요';
           _grades.removeWhere((g) => !info.grades.contains(g));
           if (_grades.isEmpty && info.grades.length == 1) _grades.add(info.grades.first);
+          // 대학생 코드: 학교가 하나뿐이면 (예: 한양대생 코드) 미리 골라 둔다
+          final schools = [for (final g in info.grades) if (kUniversities.contains(g)) g];
+          if (_grades.isEmpty && schools.length == 1 && !info.grades.contains(kUnivGeneric)) _grades.add(schools.first);
         });
       } on ApiError catch (e) {
         if (!mounted || _studentCode.text != v) return;
@@ -316,24 +320,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           const SizedBox(height: 16),
           const Text('학년·과정', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
           const SizedBox(height: 4),
-          const Text('여러 개 골라도 돼요 (예: 한양대 + N수 + 편입)',
+          const Text('여러 개 골라도 돼요. 대학생이면 학교를 골라 주세요',
               style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 4, children: [
-            for (final g in (_cohort?.grades ?? kGrades))
-              FilterChip(
-                key: Key('auth-grade-$g'),
-                label: Text(g),
-                selected: _grades.contains(g),
-                onSelected: (on) => setState(() {
-                  if (on) {
-                    _grades.add(g);
-                  } else {
-                    _grades.remove(g);
-                  }
-                }),
-              ),
-          ]),
+          TrackPicker(
+            grades: _grades,
+            allowed: _cohort?.grades,
+            keyPrefix: 'auth-grade',
+            onChanged: () => setState(() {}),
+          ),
         ],
       ],
       const SizedBox(height: 10),

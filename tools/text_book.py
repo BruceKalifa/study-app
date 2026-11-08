@@ -87,7 +87,17 @@ COURSES.update({
 DEFAULT_COURSE = APT
 
 # 교과군별 기본 대상 학년 (정보.txt 에 '대상 학년' 이 없을 때)
-DEFAULT_GRADES = {'apt': ['취준'], 'univ': ['한양대'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수'],
+# 대학생이 고르는 학교 (lib/core/problem.dart kUniversities · server/http-util.js UNIVERSITIES 와 같아야 한다)
+UNIVERSITIES = (
+    '한양대', '서울대', '연세대', '고려대', '서강대', '성균관대', '중앙대', '경희대', '한국외대', '서울시립대',
+    '건국대', '동국대', '홍익대', '국민대', '숭실대', '세종대', '단국대', '광운대', '명지대', '상명대',
+    '가톨릭대', '이화여대', '숙명여대', '서울과기대', '한국항공대', '인하대', '인천대', '아주대', '가천대', '한국공학대',
+    '한국기술교육대', 'KAIST', 'POSTECH', 'UNIST', 'GIST', 'DGIST', '부산대', '경북대', '전남대', '충남대',
+    '충북대', '전북대', '강원대', '경상국립대', '부경대', '울산대',
+)
+
+# 교과군별 기본 대상 학년 — 대학 과목은 모든 대학생('대학생'), 학교별로 나누려면 정보.txt 에 '학교: 인하대'
+DEFAULT_GRADES = {'apt': ['취준'], 'univ': ['대학생'], 'sci': ['고2', '고3', 'N수'], 'math': ['고1', '고2', '고3', 'N수'],
                   'kor': ['고1', '고2', '고3', 'N수'], 'eng': ['고1', '고2', '고3', 'N수'], 'soc': ['고1', '고2', '고3', 'N수']}
 
 # 목록에 없는 과목 이름(국어·영어·화학·한국사·중등 …)은 이름으로 교과군을 짐작해 새 과목으로 만든다.
@@ -416,7 +426,7 @@ def build(folder, outdir=None):
         course = courses.setdefault(cid, {
             'subject': cname, 'subjectId': cid, 'color': color, 'group': group,
             'level': 'mid' if grades and all(g.startswith('중') for g in grades) else 'high',
-            'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '수능'),
+            'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '대학' if group == 'univ' else '수능'),
             'passages': [], 'problems': []})
         p = {
             'id': f'{book_id}-{item_slug(b["no"], used)}',
@@ -470,7 +480,7 @@ def build(folder, outdir=None):
         course = courses.setdefault(cid, {
             'subject': cname, 'subjectId': cid, 'color': color, 'group': group,
             'level': 'mid' if grades and all(g.startswith('중') for g in grades) else 'high',
-            'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '수능'),
+            'grades': grades, 'track': meta.get('시험', '').strip() or ('공통' if group == 'apt' else '대학' if group == 'univ' else '수능'),
             'passages': [], 'problems': []})
         c = {
             'id': f'{book_id}-c-{item_slug(b["no"], used)}',
@@ -500,6 +510,12 @@ def build(folder, outdir=None):
         main_course['passages'] = pass_json
     stage = meta.get('커리큘럼 단계', '모의고사').strip()
     main = max(courses.values(), key=lambda c: len(c['problems']))['subjectId'] if courses else 'apt'
+    schools = [x.strip() for x in re.split(r'[,，·/]', meta.get('학교', '')) if x.strip()]
+    for x in schools:
+        if x not in UNIVERSITIES:
+            report_school = f'정보.txt 학교 "{x}" 는 학교 목록에 없어요 (예: 한양대, 인하대, KAIST)'
+            problems.append(report_school)
+    schools = [x for x in schools if x in UNIVERSITIES]
     wb = {
         'id': book_id, 'title': title, 'course': main,
         'stage': stage if stage in STAGES else '모의고사',
@@ -511,6 +527,8 @@ def build(folder, outdir=None):
     }
     if concept_ids:
         wb['concepts'] = concept_ids
+    if schools:
+        wb['schools'] = schools
     bundle = {'format': 'pulinote-bundle', 'version': 1, 'id': book_id, 'title': title,
               'courses': list(courses.values()), 'workbooks': [wb]}
     report = {'book': title, 'id': book_id, 'problems': len(all_ids), 'passages': len(pass_json),
@@ -797,6 +815,26 @@ def selftest():
         txt = ' | '.join(rep['issues'])
         for w in ('인터넷 주소', 'fetch', '없는파일.html'):
             assert w in txt, f'3D 수업 흠을 못 잡았어요: {w} — {txt}'
+
+    # 학교별 대학 교재: '학교: 인하대' → 교재의 schools, 과목 대상은 모든 대학생
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, '인하대 공업수학1 중간')
+        os.makedirs(folder)
+        with open(os.path.join(folder, '정보.txt'), 'w', encoding='utf-8') as f:
+            f.write('- 교재명: 인하대 공업수학1 중간\n- 과목: 공업수학1\n- 학교: 인하대\n- 커리큘럼 단계: 기출\n')
+        with open(os.path.join(folder, '문항.txt'), 'w', encoding='utf-8') as f:
+            f.write('#문항 1\n형식: 단답형\n정답: 3\n[문제]\n가\n[해설]\n나\n')
+        rep = build(folder, os.path.join(tmp, 'out'))
+        eq(rep['issues'], [], '학교별 교재 흠 없음')
+        with gzip.open(rep['file']) as f:
+            bu = json.loads(f.read().decode('utf-8'))
+        eq(bu['workbooks'][0].get('schools'), ['인하대'], '교재의 학교')
+        eq(bu['courses'][0]['grades'], ['대학생'], '대학 과목 기본 대상은 모든 대학생')
+        eq(bu['courses'][0]['track'], '대학', '대학 과목의 시험 구분')
+        with open(os.path.join(folder, '정보.txt'), 'a', encoding='utf-8') as f:
+            f.write('- 학교: 없는대학교\n')
+        rep = build(folder, None)
+        assert any('없는대학교' in x for x in rep['issues']), rep['issues']
 
     # 목록에 없는 과목 (국어·중등 수학 …) → 이름으로 새 과목을 만든다
     with tempfile.TemporaryDirectory() as tmp:

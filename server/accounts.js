@@ -37,7 +37,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { JsonStore } = require('./json-store');
-const { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, GRADES } = require('./http-util');
+const { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, GRADES, UNIVERSITIES, UNIV_GENERIC } = require('./http-util');
 
 const ROLES = ['student', 'teacher'];
 const LOGIN_RE = /^[a-z0-9][a-z0-9._-]{3,19}$/;
@@ -50,14 +50,20 @@ const SESSION_DAYS = 180;
 const DAY_MS = 86400000;
 const TZ_OFFSET_MS = (Number(process.env.TZ_OFFSET_MIN) || 540) * 60000; // 날짜 계산: 한국 시간
 /** 가입 추천코드가 정하는 대상: 코드 하나는 한 부류의 학생만 가입시킨다 (고른 학년·과정이 그 안에 있어야 한다). */
+// 지금은 새 가입을 받지 않는 부류 (솔빗은 당분간 대학생·인적성·편입만). 코드는 남아 있지만 가입이 막힌다.
+// 다시 받으려면 환경변수 CLOSED_COHORTS 를 바꾼다 (예: CLOSED_COHORTS=nsu → 고등학생은 다시 받음, 빈 값 → 모두 받음).
+const CLOSED = new Set(String(process.env.CLOSED_COHORTS ?? 'high,nsu').split(',').map((x) => x.trim()).filter(Boolean));
 const COHORTS = {
+  univ: { label: '대학생', prefix: 'UNIV', grades: [...UNIVERSITIES, UNIV_GENERIC] },
   hyu: { label: '한양대생', prefix: 'HYU', grades: ['한양대'] },
-  high: { label: '고등학생', prefix: 'HIGH', grades: ['고1', '고2', '고3'] },
-  nsu: { label: 'N수생', prefix: 'NSU', grades: ['N수'] },
   job: { label: '취준생', prefix: 'JOB', grades: ['취준'] },
   transfer: { label: '편입생', prefix: 'TRANS', grades: ['편입'] },
+  high: { label: '고등학생', prefix: 'HIGH', grades: ['고1', '고2', '고3'] },
+  nsu: { label: 'N수생', prefix: 'NSU', grades: ['N수'] },
 };
-const DEFAULT_COHORTS = ['hyu', 'high', 'nsu']; // 처음 켤 때 코드를 만들어 두는 부류
+for (const [k, v] of Object.entries(COHORTS)) v.closed = CLOSED.has(k);
+const CLOSED_MSG = '지금은 고등학생·N수생 가입을 받지 않아요 (대학생·취준생·편입생만 가입할 수 있어요)';
+const DEFAULT_COHORTS = ['univ', 'hyu', 'job', 'transfer']; // 처음 켤 때(또는 그 부류 코드가 하나도 없을 때) 코드를 만들어 두는 부류
 const CODE_RE = /^[A-Z0-9][A-Z0-9-]{3,23}$/;
 const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O, 1/I 제외
 const CTRL = /[\u0000-\u001F\u007F\u200B\u2028\u2029]/g; // eslint-disable-line no-control-regex
@@ -89,7 +95,7 @@ function needName(v) {
 function needGrade(v) {
   const g = typeof v === 'string' ? v.trim() : '';
   if (g === '') return '';
-  if (!GRADES.includes(g)) throw new HttpError(400, '학년은 고1·고2·고3·N수·취준·한양대·편입 중에서 골라야 합니다');
+  if (!GRADES.includes(g)) throw new HttpError(400, '과정은 대학생(학교)·취준·편입 중에서 골라야 합니다');
   return g;
 }
 /** 학년·과정 여러 개 (복수 선택). 첫 번째가 대표 학년이다. 옛 앱은 `grade` 하나만 보낸다. */
@@ -227,7 +233,7 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     }
     if (changed) accounts.save().catch((e) => log(`signup codes: ${e.message}`));
   }
-  const codeView = (x) => ({ code: x.code, cohort: x.cohort, label: COHORTS[x.cohort].label, grades: COHORTS[x.cohort].grades,
+  const codeView = (x) => ({ code: x.code, cohort: x.cohort, label: COHORTS[x.cohort].label, grades: COHORTS[x.cohort].grades, closed: !!COHORTS[x.cohort].closed,
     active: !!x.active, uses: x.uses || 0, createdAt: x.createdAt });
 
   async function persist(...stores) {
@@ -373,11 +379,12 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     // 학생은 추천코드가 있어야 하고, 고른 학년·과정이 그 코드의 부류 안에 있어야 한다
     const sc = role === 'student' ? needSignupCode(b.studentCode, req) : null;
     if (sc) {
+      if (COHORTS[sc.cohort].closed) throw new HttpError(403, CLOSED_MSG);
       const allowed = COHORTS[sc.cohort].grades;
       if (!grades.length && allowed.length === 1) grades = [allowed[0]];
       if (!grades.length) throw new HttpError(400, '학년을 골라 주세요');
       if (grades.some((g) => !allowed.includes(g))) {
-        throw new HttpError(403, `이 추천코드는 ${COHORTS[sc.cohort].label}만 쓸 수 있어요 (${allowed.join('·')})`);
+        throw new HttpError(403, `이 추천코드는 ${COHORTS[sc.cohort].label}만 쓸 수 있어요${allowed.length <= 4 ? ` (${allowed.join('·')})` : ''}`);
       }
     }
     const grade = grades[0] || '';
@@ -690,19 +697,22 @@ function createAccountsApi({ dataDir, log, seedFile }) {
     const b = await readJson(req, 4 * 1024);
     const row = needSignupCode(b.code, req);
     const k = COHORTS[row.cohort];
+    if (k.closed) throw new HttpError(403, CLOSED_MSG);
     return { ok: true, cohort: row.cohort, label: k.label, grades: k.grades };
   }
 
   function listCodes(u) {
     need(u, 'teacher');
-    return { codes: codes().map(codeView), cohorts: Object.entries(COHORTS).map(([id, k]) => ({ id, label: k.label, grades: k.grades })) };
+    return { codes: codes().map(codeView), cohorts: Object.entries(COHORTS).map(([id, k]) => ({ id, label: k.label, grades: k.grades, closed: !!k.closed })) };
   }
 
   async function addCode(req, u) {
     need(u, 'teacher');
     const b = await readJson(req, 4 * 1024);
     const cohort = typeof b.cohort === 'string' ? b.cohort : '';
-    if (!COHORTS[cohort]) throw new HttpError(400, `부류는 ${Object.keys(COHORTS).join(' · ')} 중에서 골라 주세요`);
+    if (!COHORTS[cohort] || COHORTS[cohort].closed) {
+      throw new HttpError(400, `부류는 ${Object.keys(COHORTS).filter((k) => !COHORTS[k].closed).join(' · ')} 중에서 골라 주세요`);
+    }
     let code = normCode(b.code);
     if (code) {
       if (!CODE_RE.test(code)) throw new HttpError(400, '추천코드는 영문 대문자·숫자·- 로 4~24자여야 해요');

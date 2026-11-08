@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:study_app/widgets/track_picker.dart';
 import 'package:study_app/app/app_state.dart';
 import 'package:study_app/app/records.dart';
 import 'package:study_app/app/storage.dart';
@@ -440,6 +441,8 @@ void main() {
     }
 
     // onboarding (fresh learner)
+    TrackPicker.showLegacyTracks = true; // 고등 교재로 된 시험 자료
+    addTearDown(() => TrackPicker.showLegacyTracks = false);
     final fresh = (await tester.runAsync(() async {
       final bank = await ProblemBank.load(fixtureBundle);
       final f = AppState(storage: MemoryStorage(), baseBank: bank, enableLive: false);

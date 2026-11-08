@@ -80,7 +80,7 @@ function createRankingApi({ dataDir, log }) {
     if (day > addDays(now, 1)) throw new HttpError(400, '미래 날짜는 보고할 수 없습니다');
     if (day < addDays(now, -(KEEP_DAYS - 1))) throw new HttpError(400, `${KEEP_DAYS}일보다 오래된 기록은 받지 않습니다`);
     const grade = typeof b.grade === 'string' ? b.grade.trim() : '';
-    if (grade && !GRADES.includes(grade)) throw new HttpError(400, '학년은 고1·고2·고3·N수 중 하나이거나 비워 두어야 합니다');
+    if (grade && !GRADES.includes(grade)) throw new HttpError(400, '학년·과정 값이 잘못됐습니다 (비워 두어도 됩니다)');
     let studyMs = Number(b.studyMs);
     if (!Number.isFinite(studyMs)) studyMs = 0;
     studyMs = Math.round(Math.min(MAX_STUDY_MS, Math.max(0, studyMs)));
@@ -103,7 +103,7 @@ function createRankingApi({ dataDir, log }) {
     const day = (sp.get('day') || '').trim() || today();
     if (!parseDay(day)) throw new HttpError(400, '날짜(day)는 YYYY-MM-DD 형식이어야 합니다');
     const grade = (sp.get('grade') || '').trim();
-    if (grade && !GRADES.includes(grade)) throw new HttpError(400, '학년은 고1·고2·고3·N수 중 하나여야 합니다');
+    if (grade && !GRADES.includes(grade)) throw new HttpError(400, '학년·과정 값이 잘못됐습니다');
     const me = (sp.get('me') || '').trim();
 
     const span = period === 'week' ? 7 : 1;

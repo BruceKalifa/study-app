@@ -212,7 +212,7 @@ class _CourseBrowserState extends State<CourseBrowser> {
     bool inSubject(Workbook w) => _subject == null || app.bank.coursesOf(w).contains(_subject);
     final books = [
       for (final w in app.bank.workbooks)
-        if (inSubject(w) && app.bank.problemsOf(w).any((p) => _match(app, p))) w,
+        if (inSubject(w) && app.canSeeWorkbook(w) && app.bank.problemsOf(w).any((p) => _match(app, p))) w,
     ];
     final mine = [for (final w in books) if (app.hasWorkbook(w.id)) w];
     final rest = [for (final w in books) if (!app.hasWorkbook(w.id)) w];

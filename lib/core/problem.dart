@@ -565,8 +565,42 @@ class SubjectGroup {
   }
 }
 
-/// 학년 값 (schema `grades`). 고등 수험생 + 인적성(취준) + 한양대(대학 전공 기초) + 편입 과정. 학생은 여러 개를 함께 고를 수 있다.
-const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
+/// 대학생이 고르는 학교. 학교 이름이 곧 학년 값이다 (예: '인하대'). 목록에 없는 학교는 [kUnivGeneric] ('대학생').
+/// server/http-util.js · server/public/admin/schema.js · tools/text_book.py 의 UNIVERSITIES 와 같아야 한다.
+const List<String> kUniversities = [
+  '한양대', '서울대', '연세대', '고려대', '서강대', '성균관대', '중앙대', '경희대', '한국외대', '서울시립대',
+  '건국대', '동국대', '홍익대', '국민대', '숭실대', '세종대', '단국대', '광운대', '명지대', '상명대',
+  '가톨릭대', '이화여대', '숙명여대', '서울과기대', '한국항공대', '인하대', '인천대', '아주대', '가천대', '한국공학대',
+  '한국기술교육대', 'KAIST', 'POSTECH', 'UNIST', 'GIST', 'DGIST', '부산대', '경북대', '전남대', '충남대',
+  '충북대', '전북대', '강원대', '경상국립대', '부경대', '울산대',
+];
+
+/// 모든 대학생에게 보이는 교재·과목의 대상 값, 또 목록에 없는 학교 학생의 학년 값.
+const String kUnivGeneric = '대학생';
+
+bool isUniversity(String g) => g == kUnivGeneric || kUniversities.contains(g);
+
+/// 학년 값 (schema `grades`). 고등·N수는 예전 가입자용(새 가입은 받지 않는다) · 인적성(취준) · 대학(학교별) · 편입.
+const List<String> kGrades = ['고1', '고2', '고3', 'N수', '취준', kUnivGeneric, ...kUniversities, '편입'];
+
+/// 새로 가입할 때 고르는 과정. '대학생' 을 고르면 학교를 고른다.
+const List<String> kSignupTracks = [kUnivGeneric, '취준', '편입'];
+
+/// 비교용으로 넓힌 학년 값: 학교를 고른 학생은 '대학생' (모든 대학 공통) 교재도 본다.
+Set<String> expandGrades(Iterable<String> grades) {
+  final out = <String>{...grades};
+  if (out.any(isUniversity)) out.add(kUnivGeneric);
+  return out;
+}
+
+/// 과목 대상과 학생 학년이 겹치는지. 과목 쪽 학교 값도 '대학생' 으로 넓혀서 본다
+/// (예전에 '한양대' 로만 올린 공업수학·미분적분학 과목도 모든 대학생에게 보인다 — 학교별로 나누는 것은 교재의 `schools`).
+bool gradesOverlap(Iterable<String> courseGrades, Iterable<String> learnerGrades) {
+  final c = courseGrades.toList();
+  if (c.isEmpty) return true;
+  final l = expandGrades(learnerGrades);
+  return expandGrades(c).any(l.contains);
+}
 
 /// 과목 이름 정리: 고등학교 수학 과목(`math`)은 "수학" 이 아니라 "고등수학" 으로 보인다
 /// (편입수학·대학수학·공업수학 등과 헷갈리지 않게). 이미 올라가 있는 교재 파일에도 똑같이 적용된다.
@@ -759,6 +793,9 @@ class Workbook {
   /// 만든 곳 (예: LAST30 ITEM LAB).
   final String publisher;
 
+  /// 이 교재를 볼 학교 (예: ['인하대']). 비면 모든 학생에게 보인다.
+  final List<String> schools;
+
   const Workbook({
     required this.id,
     required this.title,
@@ -771,6 +808,7 @@ class Workbook {
     this.stage = '개념',
     this.scope = '',
     this.publisher = '',
+    this.schools = const <String>[],
   });
 
   int get stageIndex {
@@ -793,8 +831,24 @@ class Workbook {
       stage: kWorkbookStages.contains(stage) ? stage : _stageFromLevel(level),
       scope: _str(j['scope']),
       publisher: _str(j['publisher']),
+      schools: _strList(j['schools']),
     );
   }
+
+  Workbook withSchools(List<String> s) => Workbook(
+        id: id,
+        title: title,
+        course: course,
+        level: level,
+        desc: desc,
+        problemIds: problemIds,
+        conceptIds: conceptIds,
+        series: series,
+        stage: stage,
+        scope: scope,
+        publisher: publisher,
+        schools: s,
+      );
 
   static List<Workbook> listFromJson(Object? decoded) {
     final m = _map(decoded);

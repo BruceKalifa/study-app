@@ -90,9 +90,21 @@ function firstGrapheme(s) {
   return Array.from(s)[0] || '';
 }
 
-const GRADES = ['고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
+/** 대학생이 고르는 학교 — 학교 이름이 곧 학년 값. lib/core/problem.dart 의 kUniversities 와 같아야 한다. */
+const UNIVERSITIES = [
+  '한양대', '서울대', '연세대', '고려대', '서강대', '성균관대', '중앙대', '경희대', '한국외대', '서울시립대',
+  '건국대', '동국대', '홍익대', '국민대', '숭실대', '세종대', '단국대', '광운대', '명지대', '상명대',
+  '가톨릭대', '이화여대', '숙명여대', '서울과기대', '한국항공대', '인하대', '인천대', '아주대', '가천대', '한국공학대',
+  '한국기술교육대', 'KAIST', 'POSTECH', 'UNIST', 'GIST', 'DGIST', '부산대', '경북대', '전남대', '충남대',
+  '충북대', '전북대', '강원대', '경상국립대', '부경대', '울산대',
+];
+/** 모든 대학 공통 (목록에 없는 학교 학생의 학년 값이기도 하다) */
+const UNIV_GENERIC = '대학생';
 
-/** 커뮤니티 글·댓글 옆에 보이는 신분 (가입할 때 고른 과정에서 만든다): 고2, N수생, 한양대생 … 여러 개면 " · " 로 잇는다. */
-const IDENTITIES = ['고1', '고2', '고3', 'N수생', '취준생', '한양대생', '편입생', '선생님'];
+/** 고등·N수는 예전 가입자용 (새 가입은 받지 않는다) */
+const GRADES = ['고1', '고2', '고3', 'N수', '취준', UNIV_GENERIC, ...UNIVERSITIES, '편입'];
 
-module.exports = { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, firstGrapheme, GRADES, IDENTITIES };
+/** 커뮤니티 글·댓글 옆에 보이는 신분 (가입할 때 고른 과정에서 만든다): 고2, N수생, 인하대생 … 여러 개면 " · " 로 잇는다. */
+const IDENTITIES = ['고1', '고2', '고3', 'N수생', '취준생', UNIV_GENERIC, ...UNIVERSITIES.map((u) => `${u}생`), '편입생', '선생님'];
+
+module.exports = { CORS, HttpError, sendJson, sendError, readJson, pathParts, charLen, charSlice, firstGrapheme, GRADES, IDENTITIES, UNIVERSITIES, UNIV_GENERIC };

@@ -102,7 +102,14 @@ class ContentImport {
       for (final c in (j['courses'] as List? ?? const []))
         if (c is Map) Subject.fromJson(c.map((k, v) => MapEntry('$k', v))),
     ];
-    final wbs = Workbook.listFromJson(j['workbooks'] ?? const []);
+    // 학교를 따로 적지 않은 옛 교재: 과목 대상이 특정 학교('한양대')였으면 그 학교 교재로 본다 (예전처럼 한양대생에게만).
+    final schoolsOf = <String, List<String>>{
+      for (final c in courses) c.id: [for (final g in c.grades) if (kUniversities.contains(g)) g],
+    };
+    final wbs = [
+      for (final w in Workbook.listFromJson(j['workbooks'] ?? const []))
+        if (w.schools.isEmpty && (schoolsOf[w.course]?.isNotEmpty ?? false)) w.withSchools(schoolsOf[w.course]!) else w,
+    ];
     return BookBundle('${j['id']}', '${j['title'] ?? j['id']}', courses, wbs);
   }
 

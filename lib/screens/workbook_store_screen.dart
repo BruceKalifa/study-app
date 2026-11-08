@@ -124,10 +124,13 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
   }
 
   List<Subject> _courses(AppState app) {
-    final withBooks = {for (final w in app.bank.workbooks) ...app.bank.coursesOf(w)};
+    final withBooks = {
+      for (final w in app.bank.workbooks)
+        if (app.canSeeWorkbook(w)) ...app.bank.coursesOf(w)
+    };
     return [
       for (final s in app.bank.subjects)
-        if (withBooks.contains(s.id) && (_allGrades || s.grades.isEmpty || s.grades.any(widget.grades.contains))) s
+        if (withBooks.contains(s.id) && (_allGrades || gradesOverlap(s.grades, widget.grades))) s
     ];
   }
 
@@ -255,7 +258,7 @@ class _WorkbookCatalogState extends State<WorkbookCatalog> {
   static String _stageHint(String stage) => switch (stage) {
         '개념' => '교과 개념을 문제로 익혀요',
         '유형' => '자주 나오는 유형을 정리해요',
-        '기출' => '수능·평가원·교육청 기출',
+        '기출' => '학교 시험·기출 문제',
         'N제' => '실전 감각을 기르는 새 문항',
         '모의고사' => '시간을 재고 한 회씩',
         _ => '',

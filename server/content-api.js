@@ -50,7 +50,7 @@ const PROBLEM_ORDER = ['id', 'unit', 'topic', 'difficulty', 'type', 'passageId',
   'answer', 'answerUnit', 'tolerance', 'solution', 'hint', 'tags', 'template'];
 const COURSE_ORDER = ['subject', 'subjectId', 'color', 'group', 'level', 'grades', 'track', 'units', 'passages', 'problems'];
 const PASSAGE_ORDER = ['id', 'title', 'source', 'body'];
-const WB_ORDER = ['id', 'title', 'course', 'stage', 'scope', 'level', 'publisher', 'series', 'desc', 'problems'];
+const WB_ORDER = ['id', 'title', 'course', 'stage', 'scope', 'level', 'publisher', 'series', 'schools', 'desc', 'problems'];
 
 function ordered(obj, order) {
   const out = {};
@@ -122,6 +122,7 @@ function normalizeWorkbook(raw) {
   w.desc = emptyToUndef(w.desc);
   for (const k of ['stage', 'scope', 'publisher', 'series']) w[k] = emptyToUndef(trimStr(w[k]));
   if (Array.isArray(w.problems)) w.problems = w.problems.map(trimStr);
+  if (Array.isArray(w.schools)) { w.schools = w.schools.map(trimStr).filter(Boolean); if (!w.schools.length) delete w.schools; }
   return ordered(w, WB_ORDER);
 }
 

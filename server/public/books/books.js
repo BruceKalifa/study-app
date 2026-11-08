@@ -92,13 +92,17 @@ async function loadCodes() {
   const out = await api('/api/teacher/signup-codes');
   const sel = $('codeCohort');
   if (!sel.options.length) {
-    for (const k of out.cohorts || []) sel.add(new Option(`${k.label} (${(k.grades || []).join('·')})`, k.id));
+    for (const k of out.cohorts || []) {
+      if (k.closed) continue; // 지금은 가입을 받지 않는 부류 (고등학생·N수생)
+      const gs = k.grades || [];
+      sel.add(new Option(gs.length > 4 ? `${k.label} (학교를 골라 가입)` : `${k.label} (${gs.join('·')})`, k.id));
+    }
   }
   const list = $('codeList');
   list.textContent = '';
   for (const c of out.codes || []) {
     const row = document.createElement('div');
-    row.className = `code-row${c.active ? '' : ' off'}`;
+    row.className = `code-row${c.active && !c.closed ? '' : ' off'}`;
     const kind = document.createElement('span');
     kind.className = 'kind';
     kind.textContent = c.label;
@@ -106,7 +110,7 @@ async function loadCodes() {
     code.textContent = c.code;
     const uses = document.createElement('span');
     uses.className = 'uses';
-    uses.textContent = `${c.uses}명 가입${c.active ? '' : ' · 꺼짐'}`;
+    uses.textContent = `${c.uses}명 가입${c.closed ? ' · 가입 중지' : c.active ? '' : ' · 꺼짐'}`;
     const copy = document.createElement('button');
     copy.type = 'button';
     copy.className = 'ghost';

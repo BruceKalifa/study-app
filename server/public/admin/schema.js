@@ -16,7 +16,16 @@
   const GROUPS = { kor: '국어', math: '수학', eng: '영어', soc: '사회', sci: '과학', apt: '인적성', univ: '대학' };
   const GROUP_ORDER = ['kor', 'math', 'eng', 'soc', 'sci', 'apt', 'univ'];
   const LEVELS = { mid: '중등', high: '고등', univ: '대학' };
-  const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '취준', '한양대', '편입'];
+  // 과목의 대상 학년 (체크 칸). 대학 과목은 '대학생' — 학교별 교재는 문제집의 '학교'(schools)로 나눈다.
+  const GRADES = ['중1', '중2', '중3', '고1', '고2', '고3', 'N수', '취준', '대학생', '편입'];
+  // 학교 — lib/core/problem.dart kUniversities · server/http-util.js UNIVERSITIES 와 같아야 한다
+  const UNIVERSITIES = [
+    '한양대', '서울대', '연세대', '고려대', '서강대', '성균관대', '중앙대', '경희대', '한국외대', '서울시립대',
+    '건국대', '동국대', '홍익대', '국민대', '숭실대', '세종대', '단국대', '광운대', '명지대', '상명대',
+    '가톨릭대', '이화여대', '숙명여대', '서울과기대', '한국항공대', '인하대', '인천대', '아주대', '가천대', '한국공학대',
+    '한국기술교육대', 'KAIST', 'POSTECH', 'UNIST', 'GIST', 'DGIST', '부산대', '경북대', '전남대', '충남대',
+    '충북대', '전북대', '강원대', '경상국립대', '부경대', '울산대',
+  ];
   const TRACKS = ['수능', '내신', '공통', '대학'];
   const WB_LEVELS = ['기본', '실전', '심화', '모의고사'];
   const WB_STAGES = ['개념', '유형', '기출', 'N제', '모의고사'];
@@ -687,7 +696,7 @@
     if (!Object.prototype.hasOwnProperty.call(GROUPS, c.group)) rep.err(where, 'group', '교과군(국어·수학·영어·사회·과학)을 고르세요');
     if (!Object.prototype.hasOwnProperty.call(LEVELS, c.level)) rep.err(where, 'level', '학교급(중등·고등)을 고르세요');
     if (!Array.isArray(c.grades) || !c.grades.length) rep.err(where, 'grades', '대상 학년을 하나 이상 고르세요');
-    else if (!c.grades.every((g) => GRADES.includes(g))) rep.err(where, 'grades', `대상 학년은 ${GRADES.join(' ')} 중에서 고르세요`);
+    else if (!c.grades.every((g) => GRADES.includes(g) || UNIVERSITIES.includes(g))) rep.err(where, 'grades', `대상 학년은 ${GRADES.join(' ')} 중에서 고르세요`);
     else if (new Set(c.grades).size !== c.grades.length) rep.err(where, 'grades', '같은 학년이 두 번 있습니다');
     else if (c.level === 'mid' && c.grades.some((g) => !g.startsWith('중'))) rep.warn(where, 'grades', '중등 과목인데 고등 학년이 들어 있습니다');
     else if (c.level === 'high' && c.grades.some((g) => g.startsWith('중'))) rep.warn(where, 'grades', '고등 과목인데 중학교 학년이 들어 있습니다');
@@ -772,6 +781,13 @@
       if (wb.desc != null && !isStr(wb.desc)) rep.err(where, 'desc', '설명은 글자여야 합니다');
       if (wb.stage != null && wb.stage !== '' && !WB_STAGES.includes(wb.stage)) rep.err(where, 'stage', `단계는 ${WB_STAGES.join('·')} 중 하나여야 합니다`);
       for (const k of ['scope', 'publisher', 'series']) if (wb[k] != null && !isStr(wb[k])) rep.err(where, k, '글자여야 합니다');
+      if (wb.schools != null) {
+        if (!Array.isArray(wb.schools)) rep.err(where, 'schools', '학교는 목록이어야 합니다');
+        else {
+          const bad = wb.schools.filter((x) => !UNIVERSITIES.includes(x));
+          if (bad.length) rep.err(where, 'schools', `학교 목록에 없어요: ${bad.join(', ')} (예: 한양대, 인하대, KAIST)`);
+        }
+      }
       if (!Array.isArray(wb.problems)) { rep.err(where, 'problems', '문항 목록(problems)이 필요합니다'); return; }
       if (!wb.problems.length) rep.err(where, 'problems', '문항을 하나 이상 넣으세요');
       const inWb = new Set();
@@ -803,7 +819,7 @@
   }
 
   return {
-    GROUPS, GROUP_ORDER, LEVELS, GRADES, TRACKS, WB_LEVELS, WB_STAGES, RESERVED_COURSE_IDS, COURSE_ID_RE, ITEM_ID_RE,
+    GROUPS, GROUP_ORDER, LEVELS, GRADES, UNIVERSITIES, TRACKS, WB_LEVELS, WB_STAGES, RESERVED_COURSE_IDS, COURSE_ID_RE, ITEM_ID_RE,
     splitMath, countDollars, parseBlocks, inlineTokens, parseEmphasis, plain, tableCells,
     ExprError, parseExpr, evaluate, exprNames, fmtNum, roundTo, paramChoices, renderPlaceholders, makeVariant, seededRandom,
     Report, checkText, validateProblem, validatePassage, validateCourseMeta, validateCourse, validateWorkbooks,

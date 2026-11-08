@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data' show BytesBuilder;
 
+import '../core/problem.dart' show expandGrades;
 import 'content_sync.dart';
 
 /// Error with a message that can be shown to the student as-is.
@@ -45,15 +46,15 @@ class Board {
     Board('apt', '인적성·NCS', '인적성·NCS 후기와 유형 공유', ['취준']),
     Board('job', '취업정보', '채용 일정·자소서·면접 정보', ['취준']),
     Board('hyu', '한양대 라운지', '학교 생활·수강·시험 이야기', ['한양대']),
-    Board('univmath', '공업수학·미분적분학', '공업수학1·2, 미분적분학1·2 질문', ['한양대']),
-    Board('univexam', '시험·학점', '중간·기말 대비와 학점 관리', ['한양대']),
+    Board('univmath', '공업수학·미분적분학', '공업수학1·2, 미분적분학1·2 질문', ['대학생']),
+    Board('univexam', '시험·학점', '중간·기말 대비와 학점 관리', ['대학생']),
     Board('transfer', '편입정보', '대학별 일정·기출·합격 후기', ['편입']),
     Board('trmath', '편입수학', '편입수학 개념과 기출 질문', ['편입']),
   ];
 
   /// 고른 학년·과정에 맞는 게시판 (공통 게시판 + 과정별). 과정을 모르면 전부.
   static List<Board> forGrades(Iterable<String> grades) {
-    final gs = grades.toSet();
+    final gs = expandGrades(grades);
     if (gs.isEmpty) return defaults;
     return [
       for (final b in defaults)

@@ -4,6 +4,7 @@ import '../app/app_state.dart';
 import '../app/goals.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
+import '../widgets/track_picker.dart';
 import 'workbook_store_screen.dart' show WorkbookCatalog;
 
 /// First run (and "학습 설정 바꾸기"): 이름·학년 → 목표 → 문제집 고르기(내 교재).
@@ -203,21 +204,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const _Label('학년·과정'),
           const Padding(
             padding: EdgeInsets.only(bottom: 10),
-            child: Text('여러 개 골라도 돼요 (예: 한양대 + N수 + 편입)',
+            child: Text('여러 개 골라도 돼요. 대학생이면 학교를 골라 주세요',
                 style: TextStyle(fontSize: 13.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
           ),
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            for (final g in kGrades)
-              _BigChoice(
-                key: Key('grade-$g'),
-                label: g,
-                selected: _grades.contains(g),
-                onTap: () => setState(() {
-                  if (!_grades.remove(g)) _grades.add(g);
-                }),
-                width: 120,
-              ),
-          ]),
+          TrackPicker(grades: _grades, big: true, onChanged: () => setState(() {})),
         ]);
       case 1:
         final sections = goalSections(_grades);
@@ -268,37 +258,6 @@ class _Label extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 10),
         child: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
       );
-}
-
-class _BigChoice extends StatelessWidget {
-  const _BigChoice({super.key, required this.label, required this.selected, required this.onTap, this.width = 120});
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.ink : AppColors.surface,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          width: width,
-          height: 64,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: selected ? AppColors.ink : AppColors.line),
-          ),
-          child: Text(label,
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: selected ? Colors.white : AppColors.ink)),
-        ),
-      ),
-    );
-  }
 }
 
 class _GoalCard extends StatelessWidget {

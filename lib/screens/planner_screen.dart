@@ -124,10 +124,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
         builder: (ctx, set) => AlertDialog(
           title: const Text('목표 시험'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: name, decoration: const InputDecoration(labelText: '시험 이름 (예: 수능, 2학기 중간고사)')),
+            TextField(controller: name, decoration: const InputDecoration(labelText: '시험 이름 (예: 중간고사, 2학기 중간고사)')),
             const SizedBox(height: 14),
             Wrap(spacing: 8, children: [
-              for (final n in ['수능', '6월 모의평가', '9월 모의평가', '중간고사', '기말고사', '인적성', 'NCS', '편입시험'])
+              for (final n in ['중간고사', '기말고사', '인적성', 'NCS', '편입시험', '퀴즈'])
                 ActionChip(label: Text(n), onPressed: () => set(() => name.text = n)),
             ]),
             const SizedBox(height: 14),

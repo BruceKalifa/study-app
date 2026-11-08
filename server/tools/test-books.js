@@ -107,7 +107,7 @@ const gz = (obj) => zlib.gzipSync(Buffer.from(JSON.stringify(obj), 'utf8'));
 
 async function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pulinote-books-test-'));
-  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR: path.join(tmp, 'data'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC, STUDENT_SIGNUP_CODES: SCODES };
+  const env = { CONTENT_DIR: path.join(tmp, 'content'), DATA_DIR: path.join(tmp, 'data'), ADMIN_KEY: 'k-1234', SEED_DIR, TEACHER_SIGNUP_CODE: TC, STUDENT_SIGNUP_CODES: SCODES, CLOSED_COHORTS: '' };
   console.log(`임시 폴더: ${tmp}`);
   await startServer(env);
 

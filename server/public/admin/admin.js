@@ -279,7 +279,9 @@
     f.track.value = c.track || '';
     f.color.value = (c.color || '#2F6BFF').toUpperCase();
     f.colorPick.value = /^#[0-9a-fA-F]{6}$/.test(c.color || '') ? c.color : '#2F6BFF';
-    $('#gradeChecks').innerHTML = S.GRADES.map((g) => `<label><input type="checkbox" value="${g}" ${(c.grades || []).includes(g) ? 'checked' : ''}>${g}</label>`).join('');
+    // 예전 값('한양대' 처럼 학교로 정한 과목)도 체크된 채로 보인다
+    const gradeOpts = S.GRADES.concat((c.grades || []).filter((g) => !S.GRADES.includes(g)));
+    $('#gradeChecks').innerHTML = gradeOpts.map((g) => `<label><input type="checkbox" value="${esc(g)}" ${(c.grades || []).includes(g) ? 'checked' : ''}>${esc(g)}</label>`).join('');
     $('#courseIssues').innerHTML = '';
     $('#courseDelete').hidden = isNew;
     $('#unitFromProblems').hidden = isNew;
@@ -1331,6 +1333,7 @@
         ${fieldHtml('publisher', '만든 곳 <em>선택</em>', `<input data-wf="publisher" value="${esc(w.publisher || '')}" placeholder="예: LAST30 ITEM LAB">`)}
       </div>
       ${fieldHtml('desc', '설명 <em>한 줄</em>', `<input data-wf="desc" value="${esc(w.desc || '')}" placeholder="예: 교과 개념을 유형별로 한 바퀴">`)}
+      ${fieldHtml('schools', '학교 <em>선택 · 비우면 모든 학생</em>', `<input data-wfs="schools" list="univList" value="${esc((w.schools || []).join(', '))}" placeholder="예: 인하대 (여러 학교는 쉼표로)"><datalist id="univList">${S.UNIVERSITIES.map((u) => `<option value="${esc(u)}">`).join('')}</datalist>`)}
       <div class="sec">문항 순서 (${(w.problems || []).length}) <span class="fld-help" style="font-weight:500;letter-spacing:0">끌어서 순서 바꾸기</span></div>
       <div class="fld" data-fld="problems" style="margin:0">
       <div class="wb-problems" id="wbProblems">${(w.problems || []).map((pid, i) => {
@@ -1386,6 +1389,13 @@
       renderWbIssues();
       renderList();
       renderPreviewSoon();
+    }
+    if (t.dataset.wfs) {
+      const list = t.value.split(/[,，·/]/).map((x) => x.trim()).filter(Boolean);
+      if (list.length) w.schools = list; else delete w.schools;
+      wbDirty();
+      renderWbIssues();
+      return;
     }
     if (t.dataset.wbadd) {
       if (t.dataset.wbadd === 'unit') st.wbAddUnit = t.value; else st.wbAddQ = t.value;

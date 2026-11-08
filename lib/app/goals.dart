@@ -3,6 +3,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../core/problem.dart' show isUniversity, kUnivGeneric;
+
 class GoalOption {
   const GoalOption(this.label, this.icon, this.desc, {this.exam = '', this.suneung = false});
 
@@ -63,7 +65,7 @@ const Map<String, List<GoalOption>> goalsByGrade = {
     GoalOption('영역별 약점 보완', Icons.build_circle_rounded, '언어·수리·추리·자료해석 중 약한 영역을 집중해서 풀어요'),
     GoalOption('시간 단축 연습', Icons.timer_rounded, '문항당 풀이 시간을 줄여 시험 시간 안에 끝내요'),
   ],
-  '한양대': [
+  '대학생': [
     GoalOption('중간고사 대비', Icons.edit_calendar_rounded, '중간고사 범위를 단원별로 정리하고 기출 유형을 풀어요', exam: '중간고사'),
     GoalOption('기말고사 대비', Icons.edit_calendar_rounded, '기말고사 파이널 자료로 시험 직전까지 정리해요', exam: '기말고사'),
     GoalOption('전공 기초 다지기', Icons.functions_rounded, '공업수학·미분적분학 기본 개념과 계산력을 쌓아요'),
@@ -77,13 +79,17 @@ const Map<String, List<GoalOption>> goalsByGrade = {
   ],
 };
 
+/// 과정 하나의 목표 (학교는 모두 '대학생' 목표).
+List<GoalOption> goalsFor(String grade) =>
+    goalsByGrade[grade] ?? (isUniversity(grade) ? goalsByGrade[kUnivGeneric]! : const <GoalOption>[]);
+
 /// 고른 과정들에 보여 줄 목표 묶음: (과정 이름, 그 과정의 목표들). 다른 과정에서 이미 나온 목표는 한 번만 보인다.
 List<(String, List<GoalOption>)> goalSections(List<String> grades) {
   final seen = <String>{};
   final out = <(String, List<GoalOption>)>[];
   for (final g in grades) {
     final fresh = [
-      for (final o in goalsByGrade[g] ?? const <GoalOption>[])
+      for (final o in goalsFor(g))
         if (seen.add(o.label)) o,
     ];
     if (fresh.isNotEmpty) out.add((g, fresh));
@@ -124,12 +130,13 @@ String identityOf(String grade) {
       return 'N수생';
     case '취준':
       return '취준생';
-    case '한양대':
-      return '한양대생';
+    case '대학생':
+      return '대학생';
     case '편입':
       return '편입생';
     default:
-      return grade;
+      // 학교: '인하대' → '인하대생'
+      return isUniversity(grade) ? '$grade생' : grade;
   }
 }
 

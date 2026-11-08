@@ -4,9 +4,7 @@
   "color": "#5B3FD6",
   "group": "univ",
   "level": "univ",
-  "grades": [
-    "한양대"
-  ],
+  "grades": ["대학생"],
   "track": "대학",
   "problems": []
 }

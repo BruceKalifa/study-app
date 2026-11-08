@@ -710,8 +710,12 @@ class AppState extends ChangeNotifier {
   /// 여러 학년·과정을 함께 고른 경우: 하나라도 겹치는 과목이 보인다.
   List<Subject> coursesForGrades(List<String> grades) => [
         for (final s in bank.subjects)
-          if (s.id != ProblemBank.customSubjectId && (s.grades.isEmpty || s.grades.any(grades.contains))) s
+          if (s.id != ProblemBank.customSubjectId && gradesOverlap(s.grades, grades)) s
       ];
+
+  /// 학교별 교재: 학교가 정해진 교재는 그 학교 학생에게만 (선생님·이미 담은 교재는 늘 보인다).
+  bool canSeeWorkbook(Workbook w) =>
+      isTeacher || w.schools.isEmpty || learner.workbooks.contains(w.id) || w.schools.any(learner.grades.contains);
 
   /// 내 교재: the workbooks the student put on the shelf (in the order they were added).
   /// Problems come only from these books (plus 오답 변형 of problems the student got wrong).
@@ -770,7 +774,7 @@ class AppState extends ChangeNotifier {
 
   /// Books in the catalog for a course (a series counts for every course it covers).
   List<Workbook> workbooksForCourse(String courseId) =>
-      bank.workbooks.where((w) => bank.coursesOf(w).contains(courseId)).toList();
+      bank.workbooks.where((w) => bank.coursesOf(w).contains(courseId) && canSeeWorkbook(w)).toList();
 
   /// (solved, total) for a workbook.
   (int, int) workbookProgress(Workbook w) {
