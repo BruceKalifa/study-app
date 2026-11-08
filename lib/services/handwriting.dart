@@ -123,28 +123,28 @@ class Handwriting {
       final b = boxes[bar]!;
       if (b.width < 14 || b.height > math.max(6.0, b.width * 0.22)) continue; // 가로줄
       final lo = b.left - b.width * 0.15, hi = b.right + b.width * 0.15;
-      final num = <InkStroke>[], den = <InkStroke>[], before = <InkStroke>[], after = <InkStroke>[];
+      final top = <InkStroke>[], bottom = <InkStroke>[], before = <InkStroke>[], after = <InkStroke>[];
       for (final s in strokes) {
         if (identical(s, bar)) continue;
         final c = boxes[s]!.center;
         if (c.dx >= lo && c.dx <= hi && c.dy < b.center.dy - 2) {
-          num.add(s);
+          top.add(s);
         } else if (c.dx >= lo && c.dx <= hi && c.dy > b.center.dy + 2) {
-          den.add(s);
+          bottom.add(s);
         } else if (c.dx < lo) {
           before.add(s);
         } else if (c.dx > hi) {
           after.add(s);
         } else {
           // 줄과 같은 높이 한가운데 (= 의 다른 줄 같은 것) → 분수가 아님
-          num.clear();
+          top.clear();
           break;
         }
       }
-      if (num.isEmpty || den.isEmpty) continue;
+      if (top.isEmpty || bottom.isEmpty) continue;
       if (b.width > bestW) {
         bestW = b.width;
-        best = FractionSplit(before, num, den, after);
+        best = FractionSplit(before, top, bottom, after);
       }
     }
     return best;
