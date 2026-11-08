@@ -113,7 +113,12 @@ async function main() {
   ok(new Set(r.json.boards.map((b) => b.id)).size === r.json.boards.length, '게시판 id 중복 없음');
   const forTrack = (t) => r.json.boards.filter((b) => !b.tracks.length || b.tracks.includes(t)).map((b) => b.id);
   ok(forTrack('취준').includes('apt') && !forTrack('취준').includes('naesin'), '취준: 인적성·NCS 게시판이 있고 내신은 없다');
-  ok(forTrack('한양대').includes('univmath') && forTrack('편입').includes('trmath') && !forTrack('고1').includes('sisi'), '과정별 게시판');
+  ok(forTrack('대학생').includes('univmath') && forTrack('한양대').includes('hyu') && !forTrack('인하대').includes('hyu') && forTrack('편입').includes('trmath') && !forTrack('고1').includes('sisi'), '과정별 게시판 (공업수학은 모든 대학생, 한양대 라운지는 한양대생)');
+  r = await post('/api/community/posts', { userId: 'uid-identity-inha', author: '닉', grade: '인하대생', board: 'univmath', title: '신분', body: '인하대생 신분' });
+  ok(r.status === 200 && r.json.post.grade === '인하대생', '학교 신분(인하대생)으로 글쓰기', r.json);
+  usedIds.add('uid-identity-inha');
+  if (r.json.post) await del(`/api/community/posts/${encodeURIComponent(r.json.post.id)}?userId=uid-identity-inha`);
+  r = await get('/api/community/boards');
   ok(r.headers.get('access-control-allow-origin') === '*', 'CORS 헤더 *');
   r = await req('OPTIONS', '/api/community/posts');
   ok(r.status === 204 && /DELETE/.test(r.headers.get('access-control-allow-methods') || ''), 'OPTIONS 사전 요청 204');
