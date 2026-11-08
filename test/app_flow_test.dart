@@ -1487,13 +1487,14 @@ void _univTests() {
       expect(goalLabels(['취준']), ['인적성 실전 대비', 'NCS 대비', '영역별 약점 보완', '시간 단축 연습']);
       expect(goalLabels(['한양대']), contains('기말고사 대비'));
       expect(goalLabels(['한양대']), isNot(contains('수능')));
+      expect(goalLabels(['인하대']), goalLabels(['대학생']), reason: '학교마다 같은 대학생 목표');
       expect(goalLabels(['고3']).first, '수능');
       final both = goalLabels(['고3', 'N수']);
       expect(both.where((g) => g == '수능'), hasLength(1));
       expect(both.where((g) => g == '정시 준비'), hasLength(1));
       expect([for (final s in goalSections(['한양대', '편입'])) s.$1], ['한양대', '편입']);
       for (final g in kGrades) {
-        expect(goalsByGrade[g], isNotEmpty, reason: '$g 목표 목록');
+        expect(goalsFor(g), isNotEmpty, reason: '$g 목표 목록');
       }
     });
 
