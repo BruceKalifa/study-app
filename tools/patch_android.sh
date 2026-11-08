@@ -134,6 +134,31 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         ContextCompat.registerReceiver(this, installReceiver, IntentFilter(installAction), ContextCompat.RECEIVER_NOT_EXPORTED)
         takeViewIntent(intent)
+        preferHighRefreshRate()
+    }
+
+    // 필기감: 화면이 지원하는 가장 높은 주사율(갤럭시 탭 120Hz)로 — 그대로 두면 60Hz 로 묶이는 기기가 있다.
+    private fun preferHighRefreshRate() {
+        try {
+            @Suppress("DEPRECATION")
+            val d = windowManager.defaultDisplay ?: return
+            val cur = d.mode
+            val best = d.supportedModes
+                .filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
+                .maxByOrNull { it.refreshRate } ?: return
+            if (best.refreshRate > cur.refreshRate + 1f || window.attributes.preferredDisplayModeId != best.modeId) {
+                val lp = window.attributes
+                lp.preferredDisplayModeId = best.modeId
+                window.attributes = lp
+            }
+        } catch (e: Exception) {
+            // 주사율을 못 바꾸는 기기는 그대로
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) preferHighRefreshRate()
     }
 
     override fun onDestroy() {
@@ -298,6 +323,41 @@ class MainActivity : FlutterActivity() {
             val tool = ev.getToolType(ev.actionIndex)
             if (tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER) {
                 window.decorView.requestUnbufferedDispatch(ev)
+            }
+        }
+        // 펜 움직임 사이사이 점: 안드로이드는 한 이벤트에 여러 샘플(history)을 묶어 보내는데 Flutter 는
+        // 마지막 점만 읽는다. 빠르게 쓰면 곡선이 각지고 끊겨 보이므로, 묶인 샘플을 하나씩 따로 보낸다.
+        if (action == MotionEvent.ACTION_MOVE && ev.historySize > 0) {
+            var pen = false
+            for (i in 0 until ev.pointerCount) {
+                val t = ev.getToolType(i)
+                if (t == MotionEvent.TOOL_TYPE_STYLUS || t == MotionEvent.TOOL_TYPE_ERASER) pen = true
+            }
+            if (pen) {
+                val n = ev.pointerCount
+                val props = Array(n) { MotionEvent.PointerProperties() }
+                for (i in 0 until n) ev.getPointerProperties(i, props[i])
+                var bsh = ev.buttonState
+                if ((bsh and MotionEvent.BUTTON_SECONDARY) != 0) bsh = bsh or MotionEvent.BUTTON_STYLUS_PRIMARY
+                for (h in 0 until ev.historySize) {
+                    val coords = Array(n) { MotionEvent.PointerCoords() }
+                    for (i in 0 until n) ev.getHistoricalPointerCoords(i, h, coords[i])
+                    val past = MotionEvent.obtain(
+                        ev.downTime, ev.getHistoricalEventTime(h), MotionEvent.ACTION_MOVE, n, props, coords, ev.metaState,
+                        bsh, ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags, ev.source, ev.flags
+                    )
+                    super.dispatchTouchEvent(past)
+                    past.recycle()
+                }
+                val coords = Array(n) { MotionEvent.PointerCoords() }
+                for (i in 0 until n) ev.getPointerCoords(i, coords[i])
+                val now = MotionEvent.obtain(
+                    ev.downTime, ev.eventTime, MotionEvent.ACTION_MOVE, n, props, coords, ev.metaState,
+                    bsh, ev.xPrecision, ev.yPrecision, ev.deviceId, ev.edgeFlags, ev.source, ev.flags
+                )
+                val handled = super.dispatchTouchEvent(now)
+                now.recycle()
+                return handled
             }
         }
         // Some firmware reports the S Pen side button as BUTTON_SECONDARY; Flutter only maps

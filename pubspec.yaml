@@ -27,6 +27,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: any
+  fake_async: any # 필기 테스트 (멈춤·예측 타이머)
 
 flutter:
   uses-material-design: true

@@ -203,6 +203,12 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
       e.kind == PointerDeviceKind.invertedStylus ||
       (_isStylus(e.kind) && (e.buttons & (kPrimaryStylusButton | kSecondaryStylusButton)) != 0);
 
+  /// 펜 이벤트가 실제로 생긴 시각 (프레임에 몰려 들어와도 간격이 맞다).
+  int? _ms(PointerEvent e) {
+    final v = e.timeStamp.inMicroseconds ~/ 1000;
+    return v > 0 ? v : null; // 시각이 없는 이벤트(테스트 등)는 벽시계로
+  }
+
   double _pressure(PointerEvent e) {
     if (!_isStylus(e.kind)) return 0.55;
     final lo = e.pressureMin, hi = e.pressureMax;
@@ -331,7 +337,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
     _drawDownAt = _now;
     _drawTravel = 0;
     _drawIsEraser = _wantsEraser(e);
-    c.pointerDown(toPage(e.localPosition), _pressure(e), forceEraser: _drawIsEraser);
+    c.pointerDown(toPage(e.localPosition), _pressure(e), forceEraser: _drawIsEraser, timeMs: _ms(e));
   }
 
   void _beginGesture() {
@@ -375,7 +381,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
         _drawIsEraser = wantEraser;
         c.switchGestureTool(pos, _pressure(e), eraser: wantEraser);
       } else {
-        c.pointerMove(pos, _pressure(e));
+        c.pointerMove(pos, _pressure(e), timeMs: _ms(e));
       }
       return;
     }
@@ -727,7 +733,7 @@ class ActiveInkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final a = c.active;
-    if (a != null) StrokeRenderer.paint(canvas, a, live: true);
+    if (a != null) StrokeRenderer.paint(canvas, a, live: true, predicted: c.predicted);
 
     // selection (moving copy + bounds)
     if (c.selection.isNotEmpty) {

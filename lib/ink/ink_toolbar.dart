@@ -124,7 +124,7 @@ class InkToolbar extends StatelessWidget {
                       s.holdToStraighten = !s.holdToStraighten;
                       onSettingsChanged();
                     },
-                    child: const Text('멈추면 직선으로'),
+                    child: const Text('멈추면 도형으로'),
                   ),
                   CheckedPopupMenuItem<VoidCallback>(
                     checked: s.shapeSnap,
@@ -132,7 +132,7 @@ class InkToolbar extends StatelessWidget {
                       s.shapeSnap = !s.shapeSnap;
                       onSettingsChanged();
                     },
-                    child: const Text('도형 자동 맞추기'),
+                    child: const Text('원·삼각형·사각형도 맞추기'),
                   ),
                   CheckedPopupMenuItem<VoidCallback>(
                     checked: s.pressure,

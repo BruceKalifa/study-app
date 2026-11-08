@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'ink_model.dart';
 import 'shape_snap.dart';
+import 'stroke_renderer.dart';
 
 /// Receives ink changes for live sharing (implemented by LiveSync).
 abstract class InkSyncSink {
@@ -163,10 +164,21 @@ class InkController extends ChangeNotifier {
   Offset? eraserCursor;
   double get eraserRadius => settings.eraserSize / 2;
 
-  // straighten
+  // straighten / 멈추면 도형으로
   Timer? _holdTimer;
   bool _straightened = false;
   Offset? _holdAnchor;
+
+  /// 펜을 멈춰서 맞춘 도형 (직선이 아니면 펜을 더 움직여도 그대로 둔다).
+  ShapeKind? _heldShape;
+  List<InkPoint>? _heldOriginal;
+
+  // 펜 이벤트 시각 (ms) — 획 안의 시간과 끝 예측에 쓴다
+  int? _evStart;
+
+  /// 펜 끝이 곧 갈 자리 (그리는 중인 획 끝에 짧게 이어 그려 지연을 숨긴다). 펜이 멈추면 사라진다.
+  Offset? predicted;
+  Timer? _predictTimer;
 
   // eraser gesture bookkeeping
   bool _eraseSnapshotTaken = false;
@@ -257,7 +269,7 @@ class InkController extends ChangeNotifier {
   // =====================================================================
 
   /// Starts a gesture. [forceEraser] = S Pen side button / eraser tip.
-  void pointerDown(Offset pos, double pressure, {bool forceEraser = false}) {
+  void pointerDown(Offset pos, double pressure, {bool forceEraser = false, int? timeMs}) {
     _cancelHold();
     final t = forceEraser ? InkTool.eraser : _tool;
 
@@ -279,7 +291,7 @@ class InkController extends ChangeNotifier {
     switch (t) {
       case InkTool.pen:
       case InkTool.highlighter:
-        _beginStroke(pos, pressure, t);
+        _beginStroke(pos, pressure, t, timeMs);
         break;
       case InkTool.eraser:
         _eraseSnapshotTaken = false;
@@ -295,7 +307,7 @@ class InkController extends ChangeNotifier {
     }
   }
 
-  void pointerMove(Offset pos, double pressure) {
+  void pointerMove(Offset pos, double pressure, {int? timeMs}) {
     final g = _gestureTool;
     if (g == null) return;
     if (_draggingSelection) {
@@ -306,7 +318,7 @@ class InkController extends ChangeNotifier {
     switch (g) {
       case InkTool.pen:
       case InkTool.highlighter:
-        _extendStroke(pos, pressure);
+        _extendStroke(pos, pressure, timeMs);
         break;
       case InkTool.eraser:
         final last = _lastErasePos ?? pos;
@@ -332,6 +344,7 @@ class InkController extends ChangeNotifier {
 
   void pointerUp() {
     _cancelHold();
+    _clearPrediction();
     final g = _gestureTool;
     _gestureTool = null;
     if (_draggingSelection) {
@@ -359,6 +372,9 @@ class InkController extends ChangeNotifier {
 
   void pointerCancel() {
     _cancelHold();
+    _clearPrediction();
+    _heldShape = null;
+    _heldOriginal = null;
     if (active != null) {
       sink?.erase([active!.id]);
       active = null;
@@ -384,9 +400,13 @@ class InkController extends ChangeNotifier {
   }
 
   // ---------------- strokes ----------------
-  void _beginStroke(Offset pos, double pressure, InkTool t) {
+  void _beginStroke(Offset pos, double pressure, InkTool t, int? timeMs) {
     _strokeStart = DateTime.now().millisecondsSinceEpoch;
+    _evStart = timeMs;
     _straightened = false;
+    _heldShape = null;
+    _heldOriginal = null;
+    predicted = null;
     final s = InkStroke(
       id: newInkId(),
       tool: t,
@@ -405,10 +425,11 @@ class InkController extends ChangeNotifier {
 
   double _p(double pressure) => settings.pressure ? pressure.clamp(0.0, 1.0) : 0.55;
 
-  void _extendStroke(Offset pos, double pressure) {
+  void _extendStroke(Offset pos, double pressure, int? timeMs) {
     final s = active;
     if (s == null) return;
     final now = DateTime.now().millisecondsSinceEpoch;
+    if (_heldShape != null) return; // 원·삼각형·사각형으로 맞춘 뒤에는 그대로
     if (_straightened) {
       // keep it a straight line; move the end point
       final first = s.points.first;
@@ -423,14 +444,59 @@ class InkController extends ChangeNotifier {
     }
     final last = s.points.last;
     if ((Offset(last.x, last.y) - pos).distance < 0.35) return;
-    final pt = InkPoint(pos.dx, pos.dy, _p(pressure), now - _strokeStart);
+    final ev = _evStart;
+    final t = timeMs != null && ev != null ? math.max(last.t, timeMs - ev) : now - _strokeStart;
+    final pt = InkPoint(pos.dx, pos.dy, _p(pressure), t);
     s.points.add(pt);
+    if (s.tool == InkTool.pen) _predict(s);
     s.invalidate();
     _pendingLive.add(pt);
     if (now - _lastLiveFlush >= 50) _flushLive(now);
     if (_holdAnchor == null || (pos - _holdAnchor!).distance > 4) _armHold(pos);
     if (autoExtend && pos.dy > pageHeight - 260) extendPage();
     activeTick.value++;
+  }
+
+  // ---------------- 끝 예측 (지연 숨기기) ----------------
+  static const _predictAheadMs = 18.0; // 화면에 나오기까지 걸리는 시간만큼 앞을 그린다
+  static const _predictMax = 16.0; // 페이지 단위 — 이보다 멀리 내다보지 않는다
+
+  void _predict(InkStroke s) {
+    final pts = s.points;
+    final last = pts.last;
+    // 최근 ~30ms 의 속도
+    var i = pts.length - 2;
+    while (i > 0 && last.t - pts[i].t < 30) {
+      i--;
+    }
+    final ref = pts[math.max(0, i)];
+    final dt = (last.t - ref.t).toDouble();
+    if (dt <= 0 || dt > 80) {
+      predicted = null;
+    } else {
+      final v = (last.offset - ref.offset) / dt; // 단위/ms
+      var d = v * _predictAheadMs;
+      if (d.distance < 0.6) {
+        predicted = null;
+      } else {
+        if (d.distance > _predictMax) d = d / d.distance * _predictMax;
+        predicted = last.offset + d;
+      }
+    }
+    // 펜이 멈추면 (새 점이 안 오면) 예측한 꼬리를 지운다
+    _predictTimer?.cancel();
+    if (predicted != null) {
+      _predictTimer = Timer(const Duration(milliseconds: 34), () {
+        predicted = null;
+        activeTick.value++;
+      });
+    }
+  }
+
+  void _clearPrediction() {
+    _predictTimer?.cancel();
+    _predictTimer = null;
+    predicted = null;
   }
 
   /// 풀이 공간이 모자랄 때 종이를 아래로 늘린다 (너무 길어지지 않게 상한을 둔다).
@@ -455,21 +521,17 @@ class InkController extends ChangeNotifier {
     active = null;
     s.invalidate();
     _snapshot();
-    var changed = _straightened;
-    // 도형 맞추기 — 원·삼각형·사각형처럼 그리면 반듯하게 (글씨 크기는 건드리지 않는다)
-    if (settings.shapeSnap && !_straightened && (s.tool == InkTool.pen || s.tool == InkTool.highlighter)) {
-      final snapped = snapShape(s.points);
-      if (snapped != null) {
-        _snappedOriginal = List<InkPoint>.of(s.points);
-        _snappedStrokeId = s.id;
-        s.points
-          ..clear()
-          ..addAll(snapped.points);
-        s.invalidate();
-        changed = true;
-        lastSnap.value = snapped.kind;
-      }
+    final changed = _straightened;
+    // 도형은 손을 뗄 때 저절로 바꾸지 않는다 (삼성 노트·굿노트처럼 펜을 멈췄을 때만 — _straighten).
+    // 글씨(0, 1, ㅁ …)가 도형으로 바뀌지 않게.
+    final held = _heldShape;
+    if (held != null && _heldOriginal != null) {
+      _snappedOriginal = _heldOriginal;
+      _snappedStrokeId = s.id;
+      lastSnap.value = held;
     }
+    _heldShape = null;
+    _heldOriginal = null;
     _strokes = [..._strokes, s];
     if (changed) {
       sink?.erase([s.id]);
@@ -581,6 +643,24 @@ class InkController extends ChangeNotifier {
   void _straighten() {
     final s = active;
     if (s == null || s.points.length < 4 || _straightened) return;
+    _clearPrediction();
+    // 원·삼각형·사각형 (글씨보다 큰 것만) — 펜을 멈춘 채로 있으면 그 자리에서 맞춘다
+    if (settings.shapeSnap) {
+      final snapped = snapShape(s.points, minSize: 60);
+      if (snapped != null && snapped.kind != ShapeKind.line) {
+        _heldOriginal = List<InkPoint>.of(s.points);
+        _heldShape = snapped.kind;
+        s.points
+          ..clear()
+          ..addAll(snapped.points);
+        s.invalidate();
+        StrokeRenderer.resetLive(s);
+        _straightened = true;
+        _pendingLive.clear();
+        activeTick.value++;
+        return;
+      }
+    }
     final first = s.points.first, last = s.points.last;
     final chord = (last.offset - first.offset).distance;
     if (chord < 40) return;
@@ -804,6 +884,7 @@ class InkController extends ChangeNotifier {
   @override
   void dispose() {
     _holdTimer?.cancel();
+    _predictTimer?.cancel();
     committed.dispose();
     activeTick.dispose();
     lastSnap.dispose();
