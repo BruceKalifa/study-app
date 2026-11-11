@@ -45,92 +45,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 60),
       children: [
-        const Text('설정', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-        const SizedBox(height: 20),
+        const Text('설정', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -1.0)),
+        const SizedBox(height: 22),
 
         // ---------------- account
         const AccountCard(),
-        const SizedBox(height: 8),
-        const Card(child: Padding(padding: EdgeInsets.symmetric(horizontal: 18, vertical: 4), child: UpdateTile())),
-        const SizedBox(height: 8),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        const Card(child: Padding(padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4), child: UpdateTile())),
+        const SizedBox(height: 28),
 
         // ---------------- profiles (로그인 없이 쓸 때만)
         if (!app.signedIn)
-        _Section(title: '학생 프로필', subtitle: '한 태블릿을 여러 학생이 쓰면 프로필을 나눠 기록을 따로 관리해요', children: [
-          Wrap(spacing: 12, runSpacing: 12, children: [
-            for (final p in app.profiles)
-              InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () => app.switchProfile(p.id),
-                onLongPress: app.profiles.length > 1 && p.id != app.profile.id ? () => _confirmDelete(app, p.id, p.name) : null,
-                child: Container(
-                  width: 130,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: p.id == app.profile.id ? Color(p.color).withValues(alpha: 0.10) : AppColors.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                        color: p.id == app.profile.id ? Color(p.color) : AppColors.line, width: p.id == app.profile.id ? 2 : 1),
-                  ),
-                  child: Column(children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Color(p.color),
-                      child: Text(p.name.isEmpty ? '?' : String.fromCharCode(p.name.runes.first),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
+          _Section(title: '학생 프로필', subtitle: '한 태블릿을 여러 학생이 쓰면 프로필을 나눠 기록을 따로 관리해요', children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Wrap(spacing: 12, runSpacing: 12, children: [
+                  for (final p in app.profiles)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => app.switchProfile(p.id),
+                      onLongPress:
+                          app.profiles.length > 1 && p.id != app.profile.id ? () => _confirmDelete(app, p.id, p.name) : null,
+                      child: Container(
+                        width: 124,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: p.id == app.profile.id ? AppColors.highlightSoft : AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: p.id == app.profile.id ? AppColors.ink : AppColors.line,
+                              width: p.id == app.profile.id ? 1.6 : 1),
+                        ),
+                        child: Column(children: [
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: Color(p.color),
+                            child: Text(p.name.isEmpty ? '?' : String.fromCharCode(p.name.runes.first),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(p.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          if (p.id == app.profile.id)
+                            const Text('사용 중',
+                                style: TextStyle(fontSize: 12, color: AppColors.inkSoft, fontWeight: FontWeight.w700)),
+                        ]),
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(p.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
-                    if (p.id == app.profile.id)
-                      const Text('사용 중', style: TextStyle(fontSize: 12, color: AppColors.inkMuted)),
-                  ]),
-                ),
-              ),
-            InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () => _prompt('새 학생 이름', '', (v) => app.addProfile(v)),
-              child: Container(
-                width: 130,
-                height: 112,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.lineStrong),
-                ),
-                child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.person_add_alt_1_rounded, color: AppColors.inkSoft),
-                  SizedBox(height: 6),
-                  Text('학생 추가', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _prompt('새 학생 이름', '', (v) => app.addProfile(v)),
+                    child: Container(
+                      width: 124,
+                      height: 108,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.lineStrong),
+                      ),
+                      child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.person_add_alt_1_rounded, color: AppColors.inkSoft),
+                        SizedBox(height: 6),
+                        Text('학생 추가', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+                      ]),
+                    ),
+                  ),
                 ]),
-              ),
+                const SizedBox(height: 6),
+                Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 12, children: [
+                  TextButton.icon(
+                    onPressed: () => _prompt('이름 바꾸기', app.profile.name, app.renameProfile),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: Text('"${app.profile.name}" 이름 바꾸기'),
+                  ),
+                  const Text('다른 프로필을 길게 누르면 삭제할 수 있어요',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+                ]),
+              ]),
             ),
           ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            TextButton.icon(
-              onPressed: () => _prompt('이름 바꾸기', app.profile.name, app.renameProfile),
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: Text('"${app.profile.name}" 이름 바꾸기'),
-            ),
-            const Spacer(),
-            const Text('다른 프로필을 길게 누르면 삭제할 수 있어요', style: TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
-          ]),
-        ]),
 
         // ---------------- study
-        _Section(title: '학교 · 목표 · 내 교재', subtitle: '오늘의 세트는 내 교재의 문제로 만들어져요', children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.school_outlined),
-            title: Text('${app.learner.gradeLabel} · ${app.learner.goal} 목표',
-                style: const TextStyle(fontWeight: FontWeight.w800)),
-            subtitle: Text(app.myWorkbooks.isEmpty
+        _Section(title: '학교와 목표', subtitle: '오늘의 세트는 내 교재의 문제로 만들어져요', children: [
+          _Row(
+            title: '${app.learner.gradeLabel} · ${app.learner.goal} 목표',
+            sub: app.myWorkbooks.isEmpty
                 ? '내 교재가 비어 있어요'
-                : '내 교재 ${app.myWorkbooks.length}권 · ${app.myWorkbooks.map((w) => w.title).join(', ')}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-            trailing: FilledButton.tonal(
+                : '내 교재 ${app.myWorkbooks.length}권: ${app.myWorkbooks.map((w) => w.title).join(', ')}',
+            trailing: OutlinedButton(
               key: const Key('edit-learner'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
               onPressed: () => Navigator.of(context)
                   .push(MaterialPageRoute<void>(builder: (_) => const OnboardingScreen(editing: true))),
               child: const Text('바꾸기'),
@@ -138,73 +141,87 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ]),
         _Section(
-          title: '커뮤니티 · 공부시간 순위',
+          title: '커뮤니티와 공부시간 순위',
           subtitle: '글과 댓글에는 닉네임이, 순위에는 이름 첫 글자만(예: 오XX) 보여요',
           children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  key: const Key('nickname'),
-                  controller: _nick,
-                  maxLength: 20,
-                  decoration: InputDecoration(
-                    labelText: '커뮤니티 닉네임',
-                    hintText: '비워 두면 ${app.communityName}',
-                    prefixIcon: const Icon(Icons.badge_outlined),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('nickname'),
+                    controller: _nick,
+                    maxLength: 20,
+                    decoration: InputDecoration(
+                      labelText: '커뮤니티 닉네임',
+                      hintText: '비워 두면 ${app.communityName}',
+                      prefixIcon: const Icon(Icons.badge_outlined),
+                    ),
+                    onSubmitted: (v) => app.updateLearner((l) => l.nickname = v.trim()),
                   ),
-                  onSubmitted: (v) => app.updateLearner((l) => l.nickname = v.trim()),
                 ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.tonal(
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  app.updateLearner((l) => l.nickname = _nick.text.trim());
-                },
-                child: const Text('저장'),
-              ),
-            ]),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      FocusScope.of(context).unfocus();
+                      app.updateLearner((l) => l.nickname = _nick.text.trim());
+                    },
+                    child: const Text('저장'),
+                  ),
+                ),
+              ]),
+            ),
             _switch('공부시간 순위에 참여', '켜면 오늘 공부시간이 가린 이름으로 순위에 올라가요', app.learner.rankingOptIn,
                 (v) => app.updateLearner((l) => l.rankingOptIn = v)),
           ],
         ),
         _Section(title: '학습', children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('하루 목표', style: TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Slider(
-              value: s.dailyGoal.toDouble().clamp(5.0, 40.0),
-              min: 5,
-              max: 40,
-              divisions: 7,
-              label: '${s.dailyGoal}문제',
-              onChanged: (v) => app.updateSettings((x) => x.dailyGoal = v.round()),
-            ),
-            trailing: Text('${s.dailyGoal}문제', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          _Row(
+            title: '하루 목표',
+            sub: '오늘의 세트와 홈 진도에 쓰여요',
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              SizedBox(
+                width: 240,
+                child: Slider(
+                  value: s.dailyGoal.toDouble().clamp(5.0, 40.0),
+                  min: 5,
+                  max: 40,
+                  divisions: 7,
+                  label: '${s.dailyGoal}문제',
+                  onChanged: (v) => app.updateSettings((x) => x.dailyGoal = v.round()),
+                ),
+              ),
+              SizedBox(
+                width: 64,
+                child: Text('${s.dailyGoal}문제',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, fontFeatures: AppColors.tabular)),
+              ),
+            ]),
           ),
           _switch('풀이 시간 표시', '문제마다 타이머를 보여줘요', s.showTimer, (v) => app.updateSettings((x) => x.showTimer = v)),
-          _switch('손글씨로 답 쓰기', '단답형은 문제 아래 답칸에 쓰면 자동 인식해요 (끄면 답칸을 눌러 키패드로)', s.handwritingAnswer,
+          _switch('손글씨로 답 쓰기', '단답형은 문제 아래 답칸에 쓰면 자동 인식해요. 끄면 답칸을 눌러 키패드로 입력해요', s.handwritingAnswer,
               (v) => app.updateSettings((x) => x.handwritingAnswer = v)),
           _switch('정답이면 자동으로 다음 문제', null, s.autoAdvance, (v) => app.updateSettings((x) => x.autoAdvance = v)),
-          _switch('전체화면으로 풀기', '문제와 필기 공간만 남겨요 (풀이 화면에서 바로 켜고 끌 수 있어요)', s.fullscreenSolve,
+          _switch('전체화면으로 풀기', '문제와 필기 공간만 남겨요. 풀이 화면에서도 바로 켜고 끌 수 있어요', s.fullscreenSolve,
               (v) => app.updateSettings((x) => x.fullscreenSolve = v)),
           _switch('시험지 글꼴 (명조)', '문제를 시험지처럼 명조체로 보여줘요', s.examFont,
               (v) => app.updateSettings((x) => x.examFont = v)),
           if (app.isTeacher)
-            _switch('출처·머리표 보기 (선생님)', '문항 옆의 출처·변형(원: …)·기출 표시를 앱에서도 봐요 (학생에게는 항상 안 보여요)', s.showOrigin,
+            _switch('출처·머리표 보기 (선생님)', '문항 옆의 출처·변형(원: …)·기출 표시를 앱에서도 봐요. 학생에게는 항상 안 보여요', s.showOrigin,
                 (v) => app.updateSettings((x) => x.showOrigin = v)),
           ValueListenableBuilder<HandwritingStatus>(
             valueListenable: Handwriting.instance.status,
-            builder: (context, st, _) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.text_fields_rounded),
-              title: const Text('필기 인식 모델', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(switch (st) {
+            builder: (context, st, _) => _Row(
+              title: '필기 인식 모델',
+              sub: switch (st) {
                 HandwritingStatus.ready => '준비됨 · 기기 안에서 인식해요 (인터넷 불필요)',
                 HandwritingStatus.downloading => '내려받는 중… (약 20MB, 처음 한 번)',
                 HandwritingStatus.unavailable => '사용할 수 없음 · 인터넷 연결 후 다시 시도하세요',
                 HandwritingStatus.unknown => '확인 전',
-              }),
+              },
               trailing: st == HandwritingStatus.ready
                   ? const Icon(Icons.check_circle_rounded, color: AppColors.correct)
                   : TextButton(onPressed: Handwriting.instance.prepare, child: const Text('준비하기')),
@@ -217,17 +234,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _switch('손가락으로 쓰기', '끄면 손가락은 화면 이동·확대만 해요 (손바닥 인식 방지)', ink.fingerDraws,
               (v) => app.updateInk((x) => x.fingerDraws = v)),
           _switch('필압 사용', '누르는 힘에 따라 굵기가 달라져요', ink.pressure, (v) => app.updateInk((x) => x.pressure = v)),
-          _switch('멈추면 도형으로', '선·원·삼각형·사각형을 그린 뒤 펜을 떼지 않고 잠시 멈추면 반듯하게 바꿔줘요 (그냥 떼면 손글씨 그대로)',
+          _switch('멈추면 도형으로', '선·원·삼각형·사각형을 그린 뒤 펜을 떼지 않고 잠시 멈추면 반듯하게 바꿔줘요. 그냥 떼면 손글씨 그대로예요',
               ink.holdToStraighten, (v) => app.updateInk((x) => x.holdToStraighten = v)),
           _switch('원·삼각형·사각형도 맞추기', '끄면 멈췄을 때 직선만 맞춰요', ink.shapeSnap,
               (v) => app.updateInk((x) => x.shapeSnap = v)),
           _switch('두 손가락 탭으로 실행 취소', '세 손가락 탭은 다시 실행', ink.twoFingerUndo,
               (v) => app.updateInk((x) => x.twoFingerUndo = v)),
-          const SizedBox(height: 8),
-          Row(children: [
-            const Text('기본 종이', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(width: 16),
-            SegmentedButton<PaperStyle>(
+          _Row(
+            title: '기본 종이',
+            trailing: SegmentedButton<PaperStyle>(
               segments: const [
                 ButtonSegment(value: PaperStyle.blank, label: Text('무지')),
                 ButtonSegment(value: PaperStyle.lines, label: Text('줄')),
@@ -237,12 +252,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               selected: {ink.paper},
               onSelectionChanged: (v) => app.updateInk((x) => x.paper = v.first),
             ),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            const Text('지우개', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(width: 16),
-            SegmentedButton<EraserMode>(
+          ),
+          _Row(
+            title: '지우개',
+            trailing: SegmentedButton<EraserMode>(
               segments: const [
                 ButtonSegment(value: EraserMode.stroke, label: Text('획 단위')),
                 ButtonSegment(value: EraserMode.area, label: Text('부분')),
@@ -250,15 +263,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               selected: {ink.eraserMode},
               onSelectionChanged: (v) => app.updateInk((x) => x.eraserMode = v.first),
             ),
-          ]),
-          const SizedBox(height: 16),
-          const _PenCheck(),
+          ),
+          const Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 18), child: _PenCheck()),
         ]),
 
         // ---------------- live
         _Section(
           title: '선생님과 실시간 공유',
-          subtitle: '켜 두면 문제를 풀 때 필기가 선생님 화면에 바로 보여요',
           children: [
             _switch('실시간 공유 켜기', '켜 두면 문제를 풀 때 필기가 선생님 화면에 바로 보여요', s.liveEnabled,
                 (v) => app.updateSettings((x) => x.liveEnabled = v)),
@@ -269,12 +280,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final (label, color) = switch (st) {
                     LiveStatus.online => ('연결됨 · 선생님 화면에 공유 중', AppColors.correct),
                     LiveStatus.connecting => ('연결 중…', AppColors.review),
-                    LiveStatus.error => ('연결 실패 · 주소와 같은 와이파이인지 확인하세요 (자동 재시도 중)', AppColors.wrong),
+                    LiveStatus.error => ('연결 실패 · 같은 와이파이인지 확인하세요 (자동 재시도 중)', AppColors.wrong),
                     LiveStatus.off => ('꺼짐', AppColors.inkMuted),
                   };
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Pill(label, color: color, icon: Icons.podcasts_rounded),
+                  return _Row(
+                    title: '연결 상태',
+                    trailing: Pill(label, color: color, icon: Icons.podcasts_rounded),
                   );
                 },
               ),
@@ -284,11 +295,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // ---------------- content
         _Section(
           title: '교재 업데이트',
-          subtitle: '새로 나온 교재와 고친 문항을 받아요',
           children: [
-            Row(children: [
-              FilledButton.icon(
+            _Row(
+              title: '새로 나온 교재와 고친 문항 받기',
+              sub: app.syncMessage.isEmpty
+                  ? '지금 과목 ${app.bank.subjects.length}개, 문항 ${app.bank.all.length}개가 들어 있어요'
+                  : app.syncMessage,
+              trailing: FilledButton.icon(
                 key: const Key('sync-content'),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
                 onPressed: app.syncing
                     ? null
                     : () async {
@@ -302,26 +317,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : const Icon(Icons.cloud_download_rounded),
                 label: const Text('업데이트 받기'),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(app.syncMessage.isEmpty ? '과목 ${app.bank.subjects.length}개 · 문항 ${app.bank.all.length}개' : app.syncMessage,
-                    style: const TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w600)),
-              ),
-            ]),
+            ),
           ],
         ),
 
         // ---------------- data
         _Section(title: '데이터', children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.inventory_2_outlined),
-            title: Text('${app.profile.name}님의 풀이 기록 ${app.totalSolved}개 · 오답노트 ${app.wrongNote.length}개'),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(foregroundColor: AppColors.wrong),
+          _Row(
+            title: '${app.profile.name}님의 기록',
+            sub: '풀이 기록 ${app.totalSolved}개, 오답노트 ${app.wrongNote.length}개',
+            trailing: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.wrong,
+                side: const BorderSide(color: AppColors.wrongSoft),
+                minimumSize: const Size(0, 44),
+              ),
               onPressed: () async {
                 final ok = await showDialog<bool>(
                   context: context,
@@ -354,6 +364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _Tip(Icons.gesture_rounded, '올가미로 필기를 둘러싸면 옮기기·복제·색 바꾸기를 할 수 있어요.'),
           _Tip(Icons.auto_awesome_rounded, '틀린 문제는 숫자를 바꾼 변형문제로 다시 풀어 보세요.'),
         ]),
+        const SizedBox(height: 4),
         const Center(
           child: Text('Solvit 0.1 · 오픈소스 · 글꼴 Pretendard (SIL OFL)',
               style: TextStyle(fontSize: 12, color: AppColors.inkMuted)),
@@ -362,12 +373,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _switch(String title, String? sub, bool v, ValueChanged<bool> on) => SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: sub == null ? null : Text(sub),
-        value: v,
-        onChanged: on,
+  Widget _switch(String title, String? sub, bool v, ValueChanged<bool> on) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 60),
+        child: SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
+          subtitle: sub == null
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(sub, style: const TextStyle(fontSize: 13, color: AppColors.inkMuted, height: 1.45)),
+                ),
+          value: v,
+          onChanged: on,
+        ),
       );
 
   void _prompt(String title, String initial, Future<void> Function(String) onOk) {
@@ -411,6 +430,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+/// 설정 묶음: 제목은 종이 위에, 항목들은 흰 판 한 장 안에 구분선으로.
 class _Section extends StatelessWidget {
   const _Section({required this.title, this.subtitle, required this.children});
   final String title;
@@ -420,15 +440,55 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SectionHeader(title, subtitle: subtitle),
-            ...children,
+      padding: const EdgeInsets.only(bottom: 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: SectionHeader(title, subtitle: subtitle),
+        ),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const Divider(height: 1, indent: 20, endIndent: 20),
+              children[i],
+            ],
           ]),
         ),
+      ]),
+    );
+  }
+}
+
+/// 설정 한 줄: 제목 (+ 설명) 과 오른쪽 조작. 높이는 60 이상.
+class _Row extends StatelessWidget {
+  const _Row({required this.title, this.sub, this.trailing});
+  final String title;
+  final String? sub;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 60),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
+              if (sub != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(sub!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, color: AppColors.inkMuted, height: 1.45)),
+                ),
+            ]),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 16), trailing!],
+        ]),
       ),
     );
   }
@@ -442,11 +502,11 @@ class _Tip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       child: Row(children: [
-        Icon(icon, size: 20, color: AppColors.accent),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w500))),
+        Icon(icon, size: 20, color: AppColors.inkSoft),
+        const SizedBox(width: 14),
+        Expanded(child: Text(text, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w500, height: 1.45))),
       ]),
     );
   }
@@ -493,14 +553,14 @@ class _PenCheckState extends State<_PenCheck> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: e == true ? AppColors.accentSoft : AppColors.paper,
+          color: e == true ? AppColors.highlightSoft : AppColors.paper,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: e == true ? AppColors.accent : AppColors.line),
+          border: Border.all(color: e == true ? AppColors.ink : AppColors.line),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
           Row(children: [
             Icon(e == true ? Icons.auto_fix_normal_rounded : Icons.edit_rounded,
-                color: e == true ? AppColors.accent : AppColors.ink, size: 20),
+                color: AppColors.ink, size: 20),
             const SizedBox(width: 8),
             Text(
               e == null ? 'S펜 점검' : (e ? '지우개로 인식됨 ✓' : '펜으로 인식됨'),

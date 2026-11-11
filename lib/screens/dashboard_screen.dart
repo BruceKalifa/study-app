@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -11,7 +12,8 @@ import 'exam_setup.dart';
 import 'solve_screen.dart';
 import 'workbook_store_screen.dart';
 
-/// 홈: 오늘의 오답 변형 세트 · 순공 · 내 문제집 · 할 일 · 약점 유형.
+/// 홈: 오늘의 오답 변형 세트 · 순공 · 내 교재 · 할 일 · 약점 유형.
+/// 계산지(모눈) 위의 흑연 글씨 — 강조는 오늘 세트의 형광펜 진도 막대 하나뿐.
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key, required this.onNavigate});
   final ValueChanged<int> onNavigate;
@@ -35,17 +37,18 @@ class DashboardScreen extends StatelessWidget {
       final wide = box.maxWidth >= 1000;
       // 폰 세로: 인사말 아래로 배지를 내려 접는다 (한 줄에 다 넣으면 글자가 잘린다)
       final narrow = box.maxWidth < 620;
+      final gutter = narrow ? 16.0 : 32.0;
       final hello = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${_greeting()}, ${app.profile.name}님',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: narrow ? 23 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+            style: TextStyle(fontSize: narrow ? 23 : 28, fontWeight: FontWeight.w800, letterSpacing: -1.0, height: 1.2)),
         const SizedBox(height: 6),
         Text(
-          '${l.gradeLabel} · ${l.goal} 목표 · ${books.isEmpty ? '내 교재 없음' : '내 교재 ${books.length}권'}',
+          books.isEmpty ? '${l.gradeLabel} · 아직 담은 교재가 없어요' : '${l.gradeLabel} · 내 교재 ${books.length}권',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: narrow ? 14 : 15.5, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: narrow ? 14 : 15, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
         ),
       ]);
       final badges = <Widget>[
@@ -56,11 +59,13 @@ class DashboardScreen extends StatelessWidget {
             onTap: () => onNavigate(4),
             child: Pill('선생님 답변 ${app.unreadAnswers}개', icon: Icons.mark_chat_unread_rounded, color: AppColors.correct),
           ),
-        if (app.streak > 0) Pill('${app.streak}일 연속', icon: Icons.local_fire_department_rounded, color: AppColors.accent),
+        if (app.streak > 0)
+          Pill('${app.streak}일째 공부 중', icon: Icons.local_fire_department_rounded, color: AppColors.inkSoft,
+              background: AppColors.surface),
         if (l.examDate > 0) _DdayBadge(name: l.examName, dday: dday, onTap: () => onNavigate(3)),
       ];
       return ListView(
-        padding: EdgeInsets.fromLTRB(narrow ? 16 : 32, narrow ? 18 : 28, narrow ? 16 : 32, 40),
+        padding: EdgeInsets.fromLTRB(gutter, narrow ? 18 : 28, gutter, 48),
         children: [
           // ---------- header
           if (narrow) ...[
@@ -74,48 +79,21 @@ class DashboardScreen extends StatelessWidget {
               Expanded(child: hello),
               for (final b in badges) ...[const SizedBox(width: 10), b],
             ]),
-          const SizedBox(height: 24),
+          SizedBox(height: narrow ? 20 : 26),
 
-          // ---------- hero: daily set + study time
+          // ---------- hero: 오늘 세트 + 오늘 한 것
           _flex(
             wide,
             [
-              (6, _DailySetCard(narrow: narrow)),
-              (
-                4,
-                Column(children: [
-                  _StudyCard(onOpen: () => onNavigate(3)),
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Expanded(
-                      child: StatTile(
-                        label: '오늘 푼 문제',
-                        value: '${app.todayCount}',
-                        sub: app.todayCount == 0 ? '첫 문제를 풀어 볼까요' : '정답 ${app.todayCorrect}개',
-                        icon: Icons.task_alt_rounded,
-                        color: AppColors.blue,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: StatTile(
-                        label: '오답노트',
-                        value: '${app.wrongNote.length}',
-                        sub: app.dueCount > 0 ? '지금 복습 ${app.dueCount}개' : '복습할 문제 없음',
-                        icon: Icons.assignment_late_rounded,
-                        color: AppColors.review,
-                      ),
-                    ),
-                  ]),
-                ]),
-              ),
+              (13, _DailySetCard(narrow: narrow)),
+              (7, _TodayPanel(fill: wide, onOpenPlanner: () => onNavigate(3), onOpenWrong: () => onNavigate(2))),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 40),
 
           // ---------- workbooks (내 교재)
           SectionHeader('내 교재',
-              subtitle: books.isEmpty ? '문제집을 골라 담으면 여기에서 바로 풀 수 있어요' : '순서대로 풀며 진도를 채워요',
+              subtitle: books.isEmpty ? '교재를 담으면 여기에서 바로 풀 수 있어요' : '순서대로 풀며 진도를 채워요',
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                 TextButton.icon(
                   key: const Key('home-add-books'),
@@ -128,17 +106,27 @@ class DashboardScreen extends StatelessWidget {
           SizedBox(
             height: 178,
             child: books.isEmpty
-                ? Card(
+                ? Material(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(18),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(18),
                       onTap: () => WorkbookStoreScreen.open(context),
-                      child: const Center(
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.collections_bookmark_rounded, color: AppColors.inkMuted, size: 30),
-                          SizedBox(width: 12),
-                          Text('우리 학교 수업 교재를 골라 담아 보세요',
-                              style: TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 15.5)),
-                        ]),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.lineStrong),
+                        ),
+                        child: const Center(
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.collections_bookmark_outlined, color: AppColors.inkSoft, size: 28),
+                            SizedBox(width: 12),
+                            Flexible(
+                              child: Text('우리 학교 수업 교재를 골라 담아 보세요',
+                                  style: TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 15.5)),
+                            ),
+                          ]),
+                        ),
                       ),
                     ),
                   )
@@ -149,9 +137,9 @@ class DashboardScreen extends StatelessWidget {
                     itemBuilder: (context, i) => SizedBox(width: 290, child: WorkbookCard(workbook: books[i])),
                   ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 40),
 
-          // ---------- endless (내 교재에서만) — kEndlessEnabled 가 false 면 모의고사 만들기만 남는다
+          // ---------- endless (내 교재에서만) — kEndlessEnabled 가 false 면 시험처럼 풀기만 남는다
           if (books.isNotEmpty) ...[
             SectionHeader(kEndlessEnabled ? '무한 풀기' : '실전 연습',
                 subtitle: kEndlessEnabled ? '내 교재 문제로 · 맞히면 더 어렵게, 틀리면 쉽게' : '내 교재 문제로 시간을 재며 시험처럼 풀어요'),
@@ -170,18 +158,18 @@ class DashboardScreen extends StatelessWidget {
                     key: Key('endless-wb-${w.id}'),
                     label: w.title,
                     icon: app.bank.subject(w.course) == null ? Icons.menu_book_rounded : courseIcon(app.bank.subject(w.course)!),
-                    color: Color(app.bank.subject(w.course)?.color ?? 0xFF5B6475),
+                    color: Color(app.bank.subject(w.course)?.color ?? 0xFF515A64),
                     onTap: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
                   ),
               _EndlessChip(
                 label: '시험처럼 풀기',
                 icon: Icons.timer_outlined,
-                color: AppColors.inkSoft,
+                color: AppColors.ink,
                 outlined: true,
                 onTap: () => showExamSetup(context),
               ),
             ]),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
           ],
 
           // ---------- todo + weak topics
@@ -256,17 +244,34 @@ class _DdayBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.ink,
-      borderRadius: BorderRadius.circular(16),
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
-            Text(name, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12.5, fontWeight: FontWeight.w700)),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 150),
+              child: Text(name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 12),
             Text(dday > 0 ? 'D-$dday' : (dday == 0 ? 'D-DAY' : 'D+${-dday}'),
-                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.8, height: 1.1)),
+                style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.6,
+                    height: 1.1,
+                    fontFeatures: AppColors.tabular)),
           ]),
         ),
       ),
@@ -274,10 +279,84 @@ class _DdayBadge extends StatelessWidget {
   }
 }
 
+/// 계산지 모눈 (아주 옅게) — 오늘 세트 카드의 바탕.
+class _GridPaper extends CustomPainter {
+  const _GridPaper();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const step = 22.0;
+    final thin = Paint()
+      ..color = AppColors.grid
+      ..strokeWidth = 1;
+    final bold = Paint()
+      ..color = AppColors.grid
+      ..strokeWidth = 1.6;
+    var k = 0;
+    for (var x = step; x < size.width; x += step, k++) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), k % 5 == 4 ? bold : thin);
+    }
+    k = 0;
+    for (var y = step; y < size.height; y += step, k++) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), k % 5 == 4 ? bold : thin);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GridPaper old) => false;
+}
+
+/// 형광펜으로 그은 진도 막대 — 끝이 살짝 비스듬한 굵은 획.
+class _MarkerBar extends StatelessWidget {
+  const _MarkerBar({required this.value, required this.complete});
+  final double value;
+  final bool complete;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 18,
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _MarkerPainter(value.clamp(0.0, 1.0), complete ? AppColors.correct.withValues(alpha: 0.35) : AppColors.highlight),
+      ),
+    );
+  }
+}
+
+class _MarkerPainter extends CustomPainter {
+  _MarkerPainter(this.value, this.color);
+  final double value;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final h = size.height;
+    // 빈 칸: 연필로 그은 가는 밑줄
+    canvas.drawLine(Offset(0, h - 2), Offset(size.width, h - 2), Paint()
+      ..color = AppColors.lineStrong
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round);
+    if (value <= 0) return;
+    final w = math.max(h, size.width * value);
+    const slant = 5.0;
+    final path = Path()
+      ..moveTo(slant, 0)
+      ..lineTo(w, 0)
+      ..lineTo(w - slant, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_MarkerPainter old) => old.value != value || old.color != color;
+}
+
 class _DailySetCard extends StatelessWidget {
   const _DailySetCard({required this.narrow});
 
-  /// 폰 세로 — 고리를 위로 올리고 글을 아래로 (IntrinsicHeight 안이라 LayoutBuilder 를 못 쓴다).
+  /// 폰 세로 — 진도 숫자를 위로 올리고 글을 아래로 (IntrinsicHeight 안이라 LayoutBuilder 를 못 쓴다).
   final bool narrow;
 
   @override
@@ -295,121 +374,151 @@ class _DailySetCard extends StatelessWidget {
         if (!set.done.contains(p.id)) p
     ];
     final hasWrong = variants + review > 0;
-    final white70 = Colors.white.withValues(alpha: 0.72);
     final noBooks = app.myWorkbooks.isEmpty;
+    final d = DateTime.now();
 
-    Widget chip(String label, int n, Color c) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(20)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-            const SizedBox(width: 7),
-            Text('$label $n', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13.5)),
-          ]),
-        );
+    Widget part(String label, int n, Color c) => Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 7),
+          Text(label, style: const TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(width: 5),
+          Text('$n',
+              style: const TextStyle(
+                  color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 14, fontFeatures: AppColors.tabular)),
+        ]);
 
-    final ring = ProgressRing(
-          value: total == 0 ? 0 : done / total,
-          size: narrow ? 120 : 150,
-          stroke: 14,
-          color: set.complete ? AppColors.correct : AppColors.accent,
-          track: Colors.white.withValues(alpha: 0.12),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (set.complete)
-              const Icon(Icons.check_rounded, color: Colors.white, size: 44)
-            else
-              Text('$done',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: narrow ? 32 : 40, fontWeight: FontWeight.w800, letterSpacing: -1.5)),
-            Text(set.complete ? '완료!' : '/ $total 문제', style: TextStyle(color: white70, fontWeight: FontWeight.w700)),
-          ]));
-      final body =
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-            Wrap(spacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Text('오늘의 오답 변형 세트',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: narrow ? 20 : 24, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
-              Text(fmtDate(DateTime.now().millisecondsSinceEpoch, withTime: false), style: TextStyle(color: white70, fontWeight: FontWeight.w600)),
-            ]),
-            const SizedBox(height: 6),
-            Text(
-              total == 0 && noBooks
-                  ? '문제집을 골라 내 교재에 담으면, 내 교재의 진도와 틀린 문제의 변형으로 매일 세트를 만들어 드려요.'
-                  : total == 0
-                      ? '내 교재를 다 풀었어요! 새 문제집을 담아 이어 가세요.'
-                      : hasWrong
-                          ? '틀린 문제를 쌍둥이 문항과 변형으로 다시 풀고, 내 교재의 진도를 채웠어요.'
-                          : '아직 오답이 없어서 내 교재의 다음 문제로 채웠어요. 틀리면 내일 세트에 변형이 나와요.',
-              style: TextStyle(color: white70, fontSize: 15, height: 1.5),
-            ),
-            const SizedBox(height: 14),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              if (variants > 0) chip('오답 변형', variants, AppColors.accent),
-              if (review > 0) chip('복습', review, AppColors.review),
-              if (weak > 0) chip('약점 유형', weak, const Color(0xFFB58CFF)),
-              if (fresh > 0) chip('오늘의 진도', fresh, const Color(0xFF6FC3FF)),
-            ]),
-            const SizedBox(height: 18),
-            if (total == 0)
-              FilledButton.icon(
-                key: const Key('daily-pick-books'),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
-                onPressed: () => WorkbookStoreScreen.open(context),
-                icon: const Icon(Icons.collections_bookmark_rounded),
-                label: Text(noBooks ? '교재 고르러 가기' : '교재 더 담기'),
-              )
-            else
-            FilledButton.icon(
-              key: const Key('daily-start'),
-              style: FilledButton.styleFrom(
-                backgroundColor: set.complete ? Colors.white.withValues(alpha: 0.14) : AppColors.accent,
-                minimumSize: const Size(0, 52),
-              ),
-              onPressed: total == 0
-                  ? null
-                  : () => SolveScreen.open(context,
-                      title: '오늘의 오답 변형 세트',
-                      problems: set.complete || remaining.isEmpty ? app.dailyProblems : remaining,
-                      mode: 'daily'),
-              icon: Icon(set.complete ? Icons.replay_rounded : Icons.play_arrow_rounded),
-              label: Text(set.complete
-                  ? '한 번 더 풀기'
-                  : done == 0
-                      ? '시작하기'
-                      : '이어 풀기 · ${remaining.length}문제 남음'),
-            ),
-          ]);
-    return Container(
-        padding: EdgeInsets.all(narrow ? 18 : 28),
+    final progress = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+        Text(set.complete ? '$total' : '$done',
+            style: TextStyle(
+                fontSize: narrow ? 40 : 52,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -2,
+                height: 1.0,
+                color: AppColors.ink,
+                fontFeatures: AppColors.tabular)),
+        const SizedBox(width: 6),
+        Text('/ $total 문제',
+            style: const TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.inkSoft, fontFeatures: AppColors.tabular)),
+        if (set.complete) ...[
+          const SizedBox(width: 10),
+          const Icon(Icons.check_circle_rounded, color: AppColors.correct, size: 24),
+        ],
+      ]),
+      const SizedBox(height: 12),
+      _MarkerBar(value: total == 0 ? 0 : done / total, complete: set.complete),
+      const SizedBox(height: 8),
+      Text(
+          set.complete
+              ? '오늘 세트를 다 풀었어요'
+              : total == 0
+                  ? '오늘 풀 문제가 아직 없어요'
+                  : '${remaining.length}문제 남았어요',
+          style: const TextStyle(fontSize: 13.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+    ]);
+
+    final body = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+      Text('${d.month}월 ${d.day}일',
+          style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 14)),
+      const SizedBox(height: 4),
+      Text('오늘의 오답 변형 세트',
+          style: TextStyle(
+              color: AppColors.ink, fontSize: narrow ? 21 : 25, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
+      const SizedBox(height: 8),
+      Text(
+        total == 0 && noBooks
+            ? '교재를 담으면, 교재 진도와 틀린 문제의 변형으로 매일 세트를 만들어 드려요.'
+            : total == 0
+                ? '내 교재를 다 풀었어요. 새 교재를 담아 이어 가세요.'
+                : hasWrong
+                    ? '틀린 문제를 쌍둥이 문항과 변형으로 다시 풀고, 교재 진도를 채웠어요.'
+                    : '아직 오답이 없어서 교재의 다음 문제로 채웠어요. 틀리면 내일 세트에 변형이 나와요.',
+        style: const TextStyle(color: AppColors.inkSoft, fontSize: 15, height: 1.55),
+      ),
+      if (variants + review + weak + fresh > 0) ...[
+        const SizedBox(height: 14),
+        Wrap(spacing: 18, runSpacing: 8, children: [
+          if (variants > 0) part('오답 변형', variants, AppColors.accent),
+          if (review > 0) part('복습', review, AppColors.review),
+          if (weak > 0) part('약점 유형', weak, AppColors.wrong),
+          if (fresh > 0) part('오늘의 진도', fresh, AppColors.inkMuted),
+        ]),
+      ],
+      const SizedBox(height: 20),
+      if (total == 0)
+        FilledButton.icon(
+          key: const Key('daily-pick-books'),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
+          onPressed: () => WorkbookStoreScreen.open(context),
+          icon: const Icon(Icons.collections_bookmark_rounded),
+          label: Text(noBooks ? '교재 고르러 가기' : '교재 더 담기'),
+        )
+      else
+        FilledButton.icon(
+          key: const Key('daily-start'),
+          style: FilledButton.styleFrom(
+            backgroundColor: set.complete ? AppColors.ink : AppColors.accent,
+            minimumSize: const Size(0, 54),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+          ),
+          onPressed: () => SolveScreen.open(context,
+              title: '오늘의 오답 변형 세트',
+              problems: set.complete || remaining.isEmpty ? app.dailyProblems : remaining,
+              mode: 'daily'),
+          icon: Icon(set.complete ? Icons.replay_rounded : Icons.edit_rounded, size: 20),
+          label: Text(set.complete
+              ? '한 번 더 풀기'
+              : done == 0
+                  ? '오늘 세트 풀기'
+                  : '이어서 풀기'),
+        ),
+    ]);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1B2A4A), Color(0xFF2B3F6B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: CustomPaint(
+          painter: const _GridPaper(),
+          child: Padding(
+            padding: EdgeInsets.all(narrow ? 20 : 30),
+            child: narrow
+                ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    progress,
+                    const SizedBox(height: 22),
+                    body,
+                  ])
+                : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    Expanded(flex: 3, child: body),
+                    const SizedBox(width: 32),
+                    Expanded(flex: 2, child: progress),
+                  ]),
           ),
         ),
-        child: narrow
-            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Center(child: ring),
-                const SizedBox(height: 18),
-                body,
-              ])
-            : Row(children: [ring, const SizedBox(width: 28), Expanded(child: body)]),
-      );
+      ),
+    );
   }
 }
 
-/// 순공 시간 with a start/stop button (ticks while running).
-class _StudyCard extends StatefulWidget {
-  const _StudyCard({required this.onOpen});
-  final VoidCallback onOpen;
+/// 오늘 한 것 — 순공 타이머 · 오늘 푼 문제 · 오답 복습을 한 판에.
+class _TodayPanel extends StatefulWidget {
+  const _TodayPanel({required this.fill, required this.onOpenPlanner, required this.onOpenWrong});
+
+  /// 넓은 화면: 옆 카드 높이에 맞춰 늘인다 (IntrinsicHeight 안). 좁으면 내용 높이만.
+  final bool fill;
+  final VoidCallback onOpenPlanner;
+  final VoidCallback onOpenWrong;
 
   @override
-  State<_StudyCard> createState() => _StudyCardState();
+  State<_TodayPanel> createState() => _TodayPanelState();
 }
 
-class _StudyCardState extends State<_StudyCard> {
+class _TodayPanelState extends State<_TodayPanel> {
   Timer? _t;
 
   @override
@@ -426,48 +535,112 @@ class _StudyCardState extends State<_StudyCard> {
     super.dispose();
   }
 
+  Widget _stat({required String label, required String value, required String sub, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+          const SizedBox(height: 6),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.1, fontFeatures: AppColors.tabular)),
+          const SizedBox(height: 2),
+          Text(sub,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final ms = app.todayStudyMs;
     final solve = app.solveMsOn(dayKey(DateTime.now()));
     final on = app.studying;
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: widget.onOpen,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Icon(Icons.timer_rounded, size: 18, color: on ? AppColors.accent : AppColors.inkSoft),
-                  const SizedBox(width: 6),
-                  Text(on ? '공부 중' : '오늘 순공',
-                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: on ? AppColors.accent : AppColors.inkSoft)),
+    return Material(
+      color: AppColors.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: AppColors.line),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        // 순공 타이머
+        InkWell(
+          onTap: widget.onOpenPlanner,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    if (on) ...[
+                      Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(color: AppColors.wrong, shape: BoxShape.circle)),
+                      const SizedBox(width: 7),
+                    ],
+                    Text(on ? '공부 중' : '오늘 순공 시간',
+                        style: TextStyle(
+                            fontSize: 13.5, fontWeight: FontWeight.w700, color: on ? AppColors.ink : AppColors.inkSoft)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(fmtStudy(ms),
+                      style: const TextStyle(
+                          fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -1.2, height: 1.1, fontFeatures: AppColors.tabular)),
+                  const SizedBox(height: 2),
+                  Text('+ 문제 푼 시간 ${fmtDuration(solve)}',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
                 ]),
-                const SizedBox(height: 8),
-                Text(fmtStudy(ms),
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1)),
-                Text('+ 문제 풀이 ${fmtDuration(solve)}', style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
-              ]),
-            ),
-            FilledButton.icon(
-              key: const Key('study-toggle'),
-              onPressed: on ? app.stopStudy : app.startStudy,
-              style: FilledButton.styleFrom(
-                backgroundColor: on ? AppColors.wrong : AppColors.ink,
-                minimumSize: const Size(0, 50),
               ),
-              icon: Icon(on ? Icons.stop_rounded : Icons.play_arrow_rounded),
-              label: Text(on ? '멈추기' : '시작'),
+              const SizedBox(width: 10),
+              FilledButton.icon(
+                key: const Key('study-toggle'),
+                onPressed: on ? app.stopStudy : app.startStudy,
+                style: FilledButton.styleFrom(
+                  backgroundColor: on ? AppColors.wrong : AppColors.ink,
+                  minimumSize: const Size(0, 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                ),
+                icon: Icon(on ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                label: Text(on ? '멈추기' : '시작'),
+              ),
+            ]),
+          ),
+        ),
+        const Divider(height: 1),
+        _fillOrFit(
+          Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(
+              child: _stat(
+                label: '오늘 푼 문제',
+                value: '${app.todayCount}',
+                sub: app.todayCount == 0 ? '첫 문제를 풀어 볼까요' : '정답 ${app.todayCorrect}개',
+                onTap: widget.onOpenPlanner,
+              ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: _stat(
+                label: '오답노트',
+                value: '${app.wrongNote.length}',
+                sub: app.dueCount > 0 ? '지금 복습할 것 ${app.dueCount}개' : '복습할 문제 없음',
+                onTap: widget.onOpenWrong,
+              ),
             ),
           ]),
         ),
-      ),
+      ]),
     );
   }
+
+  Widget _fillOrFit(Widget row) => widget.fill ? Expanded(child: row) : IntrinsicHeight(child: row);
 }
 
 /// 1:02:03 / 12:03
@@ -490,23 +663,23 @@ class _EndlessChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: outlined ? Colors.transparent : AppColors.surface,
-      borderRadius: BorderRadius.circular(18),
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 18, 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: outlined ? AppColors.lineStrong : AppColors.line),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.line),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Container(
               width: 34,
               height: 34,
-              decoration: BoxDecoration(color: outlined ? AppColors.paperDeep : color, borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, size: 19, color: outlined ? AppColors.inkSoft : Colors.white),
+              decoration: BoxDecoration(color: outlined ? AppColors.paper : color, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, size: 19, color: outlined ? AppColors.ink : Colors.white),
             ),
             const SizedBox(width: 10),
             Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.3)),

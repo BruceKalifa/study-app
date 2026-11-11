@@ -101,7 +101,7 @@ class _CourseBrowserState extends State<CourseBrowser> {
             LayoutBuilder(builder: (context, hb) {
               final narrow = hb.maxWidth < 600;
               final title = Text(sel?.name ?? '문제집',
-                  style: TextStyle(fontSize: narrow ? 24 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2));
+                  style: TextStyle(fontSize: narrow ? 24 : 28, fontWeight: FontWeight.w800, letterSpacing: -1.0));
               final search = TextField(
                 decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: '유형·단원·내용 검색'),
                 onChanged: (v) => setState(() => _query = v.trim()),
@@ -224,10 +224,11 @@ class _CourseBrowserState extends State<CourseBrowser> {
       out.add(SliverPadding(
         padding: const EdgeInsets.fromLTRB(32, 22, 32, 4),
         sliver: SliverToBoxAdapter(
-          child: Row(children: [
+          child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
             Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
             const SizedBox(width: 8),
-            Text('${list.length}권', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+            Text('${list.length}권',
+                style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
           ]),
         ),
       ));
@@ -239,7 +240,7 @@ class _CourseBrowserState extends State<CourseBrowser> {
             padding: const EdgeInsets.fromLTRB(32, 12, 32, 2),
             sliver: SliverToBoxAdapter(
               child: Text(series,
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.inkMuted, letterSpacing: 0.2)),
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
             ),
           ));
         } else if (w.series.isEmpty) {
@@ -280,7 +281,7 @@ class _CourseBrowserState extends State<CourseBrowser> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
                 decoration: BoxDecoration(
-                  border: Border(left: BorderSide(color: color, width: 5)),
+                  border: Border(left: BorderSide(color: color, width: 4)),
                 ),
                 child: Row(children: [
                   Expanded(
@@ -289,11 +290,12 @@ class _CourseBrowserState extends State<CourseBrowser> {
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
                       const SizedBox(height: 6),
                       Row(children: [
-                        SizedBox(width: 160, child: AccuracyBar(value: solved / all.length, color: color, height: 6)),
+                        SizedBox(width: 160, child: AccuracyBar(value: solved / all.length, color: color, height: 4)),
                         const SizedBox(width: 10),
-                        Text('$solved/${all.length} 풀이'
-                            '${tally != null && tally.solved > 0 ? ' · 정답률 ${pct(tally.accuracy)}' : ''}',
-                            style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+                        Text('$solved / ${all.length} 풀이'
+                            '${tally != null && tally.solved > 0 ? ', 정답률 ${pct(tally.accuracy)}' : ''}',
+                            style: const TextStyle(
+                                fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
                       ]),
                     ]),
                   ),
@@ -366,9 +368,9 @@ class _BookRow extends StatelessWidget {
       child: InkWell(
         onTap: () => WorkbookScreen.open(context, w.id),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+          padding: const EdgeInsets.fromLTRB(16, 13, 12, 13),
           child: Row(children: [
-            Container(width: 6, height: 34, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+            Container(width: 4, height: 36, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -384,14 +386,15 @@ class _BookRow extends StatelessWidget {
             const SizedBox(width: 14),
             // 좁은 화면(폰 세로)에서는 진행 막대를 빼서 교재 이름이 보이게 한다.
             if (MediaQuery.of(context).size.width >= 600) ...[
-              SizedBox(width: 120, child: AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 6)),
+              SizedBox(width: 120, child: AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 4)),
               const SizedBox(width: 10),
             ],
             SizedBox(
               width: MediaQuery.of(context).size.width >= 600 ? 72 : 52,
-              child: Text('$done/$total',
+              child: Text('$done / $total',
                   textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.inkSoft, fontWeight: FontWeight.w700, fontFeatures: AppColors.tabular)),
             ),
             const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),
           ]),
@@ -499,24 +502,29 @@ class LibraryScreen extends StatelessWidget {
           Builder(builder: (context) {
             final title = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('내 교재',
-                  style: TextStyle(fontSize: narrow ? 24 : 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+                  style: TextStyle(fontSize: narrow ? 24 : 28, fontWeight: FontWeight.w800, letterSpacing: -1.0)),
               const SizedBox(height: 4),
               Text(
-                books.isEmpty ? '풀 문제집을 골라 담으면 여기에서 풀 수 있어요' : '${books.length}권 · $solved/$total 문항 풀이',
-                style: TextStyle(fontSize: narrow ? 14 : 15, color: AppColors.inkSoft, fontWeight: FontWeight.w600),
+                books.isEmpty ? '풀 교재를 담으면 여기에서 바로 풀 수 있어요' : '${books.length}권을 담았고, $solved / $total 문항을 풀었어요',
+                style: TextStyle(
+                    fontSize: narrow ? 14 : 15,
+                    color: AppColors.inkSoft,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: AppColors.tabular),
               ),
             ]);
             final buttons = <Widget>[
               if (books.isNotEmpty)
-                OutlinedButton.icon(
+                TextButton.icon(
                   onPressed: () => showExamSetup(context),
+                  style: TextButton.styleFrom(minimumSize: const Size(0, 52)),
                   icon: const Icon(Icons.timer_outlined),
                   label: const Text('시험처럼 풀기'),
                 ),
               FilledButton.icon(
                 key: const Key('lib-add'),
                 onPressed: () => WorkbookStoreScreen.open(context),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 50)),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('교재 담기'),
               ),
@@ -533,7 +541,7 @@ class LibraryScreen extends StatelessWidget {
               Wrap(spacing: 10, runSpacing: 8, children: buttons),
             ]);
           }),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           if (books.isEmpty)
             Card(
               child: Padding(
@@ -556,9 +564,9 @@ class LibraryScreen extends StatelessWidget {
               _CourseHeader(courseId: e.key),
               GridView.count(
                 crossAxisCount: cols,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-                childAspectRatio: 1.75,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.7,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 // 같은 시리즈(FLOW TYPE…)는 한 칸으로 묶고, 누르면 회차를 고른다
@@ -567,7 +575,7 @@ class LibraryScreen extends StatelessWidget {
                     g.length == 1 ? WorkbookCard(workbook: g.first) : _SeriesCard(books: g),
                 ],
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 32),
             ],
         ],
       );
@@ -597,47 +605,18 @@ class _SeriesCard extends StatelessWidget {
       final (d, t) = app.workbookProgress(w);
       return t > 0 && d == t;
     }).length;
-    return Card(
+    return KeyedSubtree(
       key: Key('seriescard-$series'),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: BookCover(
+        color: color,
+        stage: first.stage,
+        meta: '${books.length}회차',
+        title: series,
+        subtitle: doneBooks == 0 ? '회차를 골라 풀어요' : '$doneBooks회차 완주',
+        done: done,
+        total: total,
+        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted, size: 20),
         onTap: () => SeriesScreen.open(context, series),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Container(width: 10, color: color),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Pill(first.stage, color: stageColor(first.stage), dense: true),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text('${books.length}회차',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted, size: 20),
-                ]),
-                const SizedBox(height: 10),
-                Text(series,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 17.5, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.25)),
-                const SizedBox(height: 4),
-                Text(doneBooks == 0 ? '회차를 골라 푸세요' : '$doneBooks회차 완주',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted)),
-                const Spacer(),
-                AccuracyBar(value: total == 0 ? 0 : done / total, color: color, height: 6),
-                const SizedBox(height: 6),
-                Text('$done / $total 문항',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.inkSoft)),
-              ]),
-            ),
-          ),
-        ]),
       ),
     );
   }
@@ -656,24 +635,21 @@ class _CourseHeader extends StatelessWidget {
     return LayoutBuilder(builder: (context, box) {
       final narrow = box.maxWidth < 620; // 폰 세로에서는 글자 없이 아이콘만
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-            child: Icon(c == null ? Icons.menu_book_rounded : courseIcon(c), color: Colors.white, size: 19),
-          ),
-          const SizedBox(width: 10),
+          Icon(c == null ? Icons.menu_book_rounded : courseIcon(c), color: color, size: 20),
+          const SizedBox(width: 8),
           Flexible(
             child: Text(c?.name ?? courseId,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           if (t.solved > 0)
-            Text('정답률 ${pct(t.accuracy)}', style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+            Text('정답률 ${pct(t.accuracy)}',
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
           const Spacer(),
           if (narrow) ...[
             if (kEndlessEnabled)

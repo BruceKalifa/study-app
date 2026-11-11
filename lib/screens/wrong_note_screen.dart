@@ -53,21 +53,28 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
         if (solvedIds.contains(s.id)) s
     ];
 
+    final counts = {
+      0: due.length,
+      1: app.wrongNote.length,
+      2: app.resolvedWrong.length,
+      3: app.bookmarks.length,
+    };
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
       children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           const Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('오답노트', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+              Text('오답노트', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -1.0)),
               SizedBox(height: 4),
-              Text('틀린 문제는 자동으로 모이고, 1일 → 3일 → 7일 간격으로 다시 풀면 졸업해요.',
-                  style: TextStyle(color: AppColors.inkSoft, fontSize: 15)),
+              Text('틀린 문제는 여기 모여요. 1일, 3일, 7일 뒤에 다시 맞히면 졸업해요.',
+                  style: TextStyle(color: AppColors.inkSoft, fontSize: 15, fontWeight: FontWeight.w500)),
             ]),
           ),
           if (due.isNotEmpty)
             FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
               onPressed: () => SolveScreen.open(
                 context,
                 title: '오답 복습',
@@ -81,34 +88,72 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
               label: Text('복습 시작 (${due.length})'),
             ),
         ]),
-        const SizedBox(height: 20),
-        Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          for (final (i, label) in [(0, '오늘 복습'), (1, '전체 오답'), (2, '졸업한 문제'), (3, '북마크')])
-            ChoiceChip(label: Text(label), selected: _tab == i, onSelected: (_) => setState(() => _tab = i)),
-          if (solvedCourses.isNotEmpty) ...[
-            Container(width: 1, height: 24, color: AppColors.line, margin: const EdgeInsets.symmetric(horizontal: 6)),
-            ChoiceChip(
-                label: const Text('전체 과목'), selected: _subject == null, onSelected: (_) => setState(() => _subject = null)),
-          ],
-          for (final s in solvedCourses)
-            ChoiceChip(
-              key: Key('wn-subject-${s.id}'),
-              label: Text(s.name),
-              selected: _subject == s.id,
-              selectedColor: Color(s.color),
-              onSelected: (_) => setState(() => _subject = s.id),
+        const SizedBox(height: 22),
+        // 상태: 한 줄짜리 구분 버튼 (개수는 고정폭 숫자)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<int>(
+              key: const Key('wn-tabs'),
+              showSelectedIcon: false,
+              segments: [
+                for (final (i, label) in [(0, '오늘 복습'), (1, '전체 오답'), (2, '졸업한 문제'), (3, '북마크')])
+                  ButtonSegment(
+                    value: i,
+                    label: Text.rich(TextSpan(children: [
+                      TextSpan(text: label),
+                      if (counts[i]! > 0)
+                        TextSpan(
+                            text: '  ${counts[i]}',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
+                    ])),
+                  ),
+              ],
+              selected: {_tab},
+              onSelectionChanged: (v) => setState(() => _tab = v.first),
             ),
-        ]),
-        const SizedBox(height: 20),
+          ),
+        ),
+        // 과목: 조용한 칩 (선택하면 흑연 바탕)
+        if (solvedCourses.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ChoiceChip(
+              label: const Text('모든 과목'),
+              selected: _subject == null,
+              selectedColor: AppColors.ink,
+              labelStyle: TextStyle(
+                  fontWeight: FontWeight.w700, color: _subject == null ? Colors.white : AppColors.inkSoft),
+              onSelected: (_) => setState(() => _subject = null),
+            ),
+            for (final s in solvedCourses)
+              ChoiceChip(
+                key: Key('wn-subject-${s.id}'),
+                avatar: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(color: Color(s.color), shape: BoxShape.circle),
+                ),
+                label: Text(s.name),
+                selected: _subject == s.id,
+                selectedColor: AppColors.ink,
+                labelStyle: TextStyle(
+                    fontWeight: FontWeight.w700, color: _subject == s.id ? Colors.white : AppColors.inkSoft),
+                onSelected: (_) => setState(() => _subject = s.id),
+              ),
+          ]),
+        ],
+        const SizedBox(height: 24),
         if (list.isEmpty)
           EmptyState(
-            icon: _tab == 3 ? Icons.bookmark_border_rounded : Icons.celebration_rounded,
+            icon: _tab == 3 ? Icons.bookmark_border_rounded : Icons.check_circle_outline_rounded,
             title: _tab == 0
                 ? '지금 복습할 문제가 없어요'
                 : _tab == 3
                     ? '북마크한 문제가 없어요'
                     : '여기는 비어 있어요',
-            message: _tab == 0 ? '틀린 문제는 다음 날 이곳에 다시 나타나요.' : null,
+            message: _tab == 0 ? '오늘 틀린 문제는 내일 이곳에 다시 나와요.' : null,
           )
         else
           LayoutBuilder(builder: (context, box) {
@@ -144,107 +189,142 @@ class _WrongCard extends StatelessWidget {
     if (p == null) return const SizedBox();
     final color = Color(app.bank.subject(p.subjectId)?.color ?? 0xFF2F6BFF);
     final wrongAns = state.lastWrongAnswer;
+    final dueNow = state.isDue(DateTime.now().millisecondsSinceEpoch);
+    final hasInk = state.lastWrongAttemptId != null &&
+        app.attempts.any((a) => a.id == state.lastWrongAttemptId && a.hasInk);
+    final right = p.isEssay
+        ? expectedDisplay(p)
+        : p.isChoice
+            ? circled(int.tryParse(p.answer) ?? 0)
+            : '${p.answer} ${p.answerUnit ?? ''}'.trim();
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Container(height: 5, color: color),
-        Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Pill(p.subjectName, color: color, dense: true),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(p.topic.isEmpty ? p.unit : p.topic,
-                    overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
-              ),
-              const Spacer(),
-              if (state.inWrongNote) ...[
-                _StageDots(stage: state.reviewStage),
-                const SizedBox(width: 8),
-                Pill(_when(state.nextReviewAt),
-                    color: state.isDue(DateTime.now().millisecondsSinceEpoch) ? AppColors.accent : AppColors.inkSoft,
-                    dense: true),
-              ] else if (state.resolvedAt != null)
-                const Pill('졸업', color: AppColors.correct, icon: Icons.school_rounded, dense: true),
-            ]),
-            const SizedBox(height: 12),
-            ProblemStem(p, maxLines: 4, style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.6)),
-            const SizedBox(height: 12),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // 머리: 과목 색 점 + 과목, 유형 · 오른쪽에 복습 단계
+          Row(children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text(p.subjectName,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(p.topic.isEmpty ? p.unit : p.topic,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.3)),
+            ),
+            const Spacer(),
+            if (state.inWrongNote) ...[
+              _StageDots(stage: state.reviewStage),
+              const SizedBox(width: 10),
+              Text(_when(state.nextReviewAt),
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700, color: dueNow ? AppColors.accent : AppColors.inkMuted)),
+            ] else if (state.resolvedAt != null)
+              const Pill('졸업', color: AppColors.correct, icon: Icons.school_rounded, dense: true),
+          ]),
+          const SizedBox(height: 14),
+          ProblemStem(p, maxLines: 4, style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.6)),
+          const SizedBox(height: 14),
+          // 내 답 / 정답 — 종이색 한 칸에 나란히
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(color: AppColors.paper, borderRadius: BorderRadius.circular(12)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (wrongAns != null)
                     _kv('내 답', p.isChoice ? circled(int.tryParse(wrongAns) ?? 0) : wrongAns, AppColors.wrong),
-                  _kv(p.isEssay ? '모범' : '정답', p.isEssay ? expectedDisplay(p) : p.isChoice ? circled(int.tryParse(p.answer) ?? 0) : '${p.answer} ${p.answerUnit ?? ''}',
-                      AppColors.correct),
-                  _kv('기록', '${state.attempts}번 풀이 · ${state.wrong}번 틀림', AppColors.inkSoft),
+                  _kv(p.isEssay ? '모범' : '정답', right, AppColors.correct),
+                  const SizedBox(height: 2),
+                  Text('${state.attempts}번 풀어서 ${state.wrong}번 틀렸어요',
+                      style: const TextStyle(
+                          fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
                 ]),
               ),
-              if (state.lastWrongAttemptId != null &&
-                  app.attempts.any((a) => a.id == state.lastWrongAttemptId && a.hasInk))
+              if (hasInk) ...[
+                const SizedBox(width: 12),
                 SizedBox(width: 170, child: InkThumbnail(attemptId: state.lastWrongAttemptId!, height: 96)),
+              ],
             ]),
-            if (state.note.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppColors.reviewSoft, borderRadius: BorderRadius.circular(12)),
-                child: Text('📝 ${state.note}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w600)),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 44), backgroundColor: color),
-                onPressed: () => SolveScreen.open(context, title: '다시 풀기', mode: 'review', problems: [p]),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('다시 풀기'),
-              ),
-              if (p.hasTemplate)
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
-                  onPressed: () => SolveScreen.open(context,
-                      title: '변형으로 복습', mode: 'variant', problems: app.variantsFor(p, 3)),
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                  label: const Text('변형 3문제'),
+          ),
+          if (state.note.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(color: AppColors.highlightSoft, borderRadius: BorderRadius.circular(12)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.sticky_note_2_outlined, size: 17, color: AppColors.inkSoft),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(state.note, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w600)),
                 ),
+              ]),
+            ),
+          ],
+          const SizedBox(height: 12),
+          // 동작: 주 동작 하나(다시 풀기) + 글자 단추
+          Wrap(spacing: 4, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 48), padding: const EdgeInsets.symmetric(horizontal: 18)),
+              onPressed: () => SolveScreen.open(context, title: '다시 풀기', mode: 'review', problems: [p]),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('다시 풀기'),
+            ),
+            const SizedBox(width: 4),
+            if (p.hasTemplate)
               TextButton.icon(
-                onPressed: () => _editNote(context, app, state),
-                icon: const Icon(Icons.sticky_note_2_outlined, size: 18),
-                label: const Text('메모'),
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                onPressed: () => SolveScreen.open(context,
+                    title: '변형으로 복습', mode: 'variant', problems: app.variantsFor(p, 3)),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('변형 3문제'),
               ),
+            TextButton.icon(
+              style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: () => _showSolution(context, p),
+              icon: const Icon(Icons.menu_book_outlined, size: 18),
+              label: const Text('해설'),
+            ),
+            TextButton.icon(
+              style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: () => _editNote(context, app, state),
+              icon: const Icon(Icons.sticky_note_2_outlined, size: 18),
+              label: const Text('메모'),
+            ),
+            if (app.signedIn && !app.isTeacher)
               TextButton.icon(
-                onPressed: () => _showSolution(context, p),
-                icon: const Icon(Icons.menu_book_outlined, size: 18),
-                label: const Text('해설'),
+                key: Key('wn-ask-${p.id}'),
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+                onPressed: () => AskTeacherScreen.open(context, problem: p),
+                icon: const Icon(Icons.contact_support_outlined, size: 18),
+                label: const Text('선생님께 질문'),
               ),
-              if (app.signedIn && !app.isTeacher)
-                TextButton.icon(
-                  key: Key('wn-ask-${p.id}'),
-                  onPressed: () => AskTeacherScreen.open(context, problem: p),
-                  icon: const Icon(Icons.contact_support_outlined, size: 18),
-                  label: const Text('선생님께 질문'),
-                ),
-              if (state.inWrongNote)
-                TextButton.icon(
-                  onPressed: () => app.markResolved(state.baseId),
-                  icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-                  label: const Text('이해했어요'),
-                ),
-            ]),
+            if (state.inWrongNote)
+              TextButton.icon(
+                style: TextButton.styleFrom(minimumSize: const Size(0, 48), foregroundColor: AppColors.correct),
+                onPressed: () => app.markResolved(state.baseId),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                label: const Text('이해했어요'),
+              ),
           ]),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 
   Widget _kv(String k, String v, Color c) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
-        child: Row(children: [
-          SizedBox(width: 40, child: Text(k, style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w600))),
-          Flexible(child: Text(v, style: TextStyle(color: c, fontWeight: FontWeight.w800))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+          SizedBox(
+              width: 44,
+              child: Text(k, style: const TextStyle(fontSize: 13, color: AppColors.inkMuted, fontWeight: FontWeight.w600))),
+          Flexible(
+            child: Text(v,
+                style: TextStyle(fontSize: 16, color: c, fontWeight: FontWeight.w800, fontFeatures: AppColors.tabular)),
+          ),
         ]),
       );
 
@@ -308,12 +388,12 @@ class _StageDots extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         for (var i = 0; i < total; i++)
           Container(
-            width: 16,
-            height: 6,
-            margin: const EdgeInsets.only(right: 3),
+            width: 14,
+            height: 4,
+            margin: EdgeInsets.only(left: i == 0 ? 0 : 3),
             decoration: BoxDecoration(
-              color: i < stage ? AppColors.correct : AppColors.line,
-              borderRadius: BorderRadius.circular(3),
+              color: i < stage ? AppColors.correct : AppColors.lineStrong,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
       ]),
