@@ -61,12 +61,19 @@ class Handwriting {
     final r = _recognizer;
     if (r == null || strokes.isEmpty) return const [];
     try {
-      final whole = await _read(r, strokes, width: width, height: height);
+      final whole = [
+        if (shape != AnswerShape.other) ...await _readSigned(r, strokes, shape: shape, list: list),
+        ...await _read(r, strokes, width: width, height: height),
+      ];
       // 분수를 위아래로 쓴 경우 (분자 / 가로줄 / 분모): 한 줄로 읽으면 "34" 처럼 되므로 따로 읽어 잇는다
       final f = splitFraction(strokes);
       if (f != null && shape != AnswerShape.other) {
-        Future<List<String>> part(List<InkStroke> ss) async =>
-            ss.isEmpty ? const [''] : [for (final t in await _read(r, ss)) cleanAnswer(t, shape: shape, keepComma: list)];
+        Future<List<String>> part(List<InkStroke> ss) async => ss.isEmpty
+            ? const ['']
+            : [
+                for (final t in [...await _readSigned(r, ss, shape: shape, list: list), ...await _read(r, ss)])
+                  cleanAnswer(t, shape: shape, keepComma: list)
+              ];
         final combos = combineFraction(
           await part(f.before),
           await part(f.numerator),
@@ -98,6 +105,201 @@ class Handwriting {
         : null;
     final cands = await r.recognize(ink, context: ctx);
     return [for (final c in cands) c.text];
+  }
+
+  /// 부호(+ − =)와 허수단위 i 는 모양이 뚜렷하니 획 모양으로 직접 찾고, 그 사이 숫자 덩어리만 인식기에 맡긴다.
+  /// 한 줄로 통째 읽으면 "-3i+45" 가 "-31+45" 처럼 i 가 1, + 가 t·1 로 읽히기 쉽다.
+  /// 부호를 하나도 못 찾으면 빈 목록 (통째 읽은 것만 쓴다).
+  Future<List<String>> _readSigned(mlkit.DigitalInkRecognizer r, List<InkStroke> strokes,
+      {required AnswerShape shape, bool list = false}) async {
+    final tokens = tokenize(strokes, findI: shape == AnswerShape.complex);
+    if (tokens == null) return const [];
+    final parts = <List<String>>[];
+    for (final t in tokens) {
+      if (t.op != null) {
+        parts.add([t.op!]);
+        continue;
+      }
+      final raws = await _read(r, t.strokes);
+      final c = <String>[];
+      // 덩어리는 숫자부터 (i 는 이미 따로 찾았다), 복소수 답이면 l·I 를 i 로 읽은 것도 뒤에
+      for (final raw in raws.take(4)) {
+        final n = cleanAnswer(raw, shape: AnswerShape.numeric, keepComma: list);
+        if (n.isNotEmpty && !c.contains(n)) c.add(n);
+      }
+      if (shape == AnswerShape.complex) {
+        for (final raw in raws.take(2)) {
+          for (final v in variants(raw, shape: shape, list: list)) {
+            if (v.isNotEmpty && !c.contains(v)) c.add(v);
+          }
+        }
+      }
+      if (c.isNotEmpty) parts.add(c);
+    }
+    return combineParts(parts);
+  }
+
+  /// 획들 → 왼쪽부터 [InkToken] (부호 / 숫자 덩어리). 부호가 하나도 없으면 null.
+  /// + : 거의 수평인 획과 거의 수직인 획이 서로의 가운데쯤에서 엇갈린 것.
+  /// i : 작은 점 바로 아래의 짧은 세로획 ([findI] 일 때만).
+  /// − : 다른 획과 좌우로 겹치지 않는 수평 획 (5 의 윗줄·7 의 가로줄·√ 의 지붕·분수 줄은 겹친다).
+  /// = : 서로 겹친 수평 획 둘.
+  @visibleForTesting
+  static List<InkToken>? tokenize(List<InkStroke> strokes, {bool findI = true}) {
+    final ss = [for (final s in strokes) if (s.points.isNotEmpty) s];
+    if (ss.isEmpty) return null;
+    final box = {for (final s in ss) s: _boxOf(s)};
+    final hs = [for (final s in ss) box[s]!.height]..sort();
+    final lineH = math.max(hs[math.min(hs.length - 1, (hs.length * 0.75).floor())], 8.0);
+
+    bool flat(Rect b) => b.width >= lineH * 0.25 && b.height <= math.max(b.width * 0.3, lineH * 0.12);
+    bool tall(Rect b) => b.height >= lineH * 0.25 && b.width <= b.height * 0.45;
+    bool dot(Rect b) => math.max(b.width, b.height) <= math.max(lineH * 0.25, 3.0);
+
+    final used = <InkStroke>{};
+    final ops = <(String, Rect)>[];
+
+    // + 
+    for (final a in ss) {
+      if (used.contains(a) || !flat(box[a]!)) continue;
+      final ba = box[a]!;
+      for (final v in ss) {
+        if (identical(v, a) || used.contains(v) || !tall(box[v]!)) continue;
+        final bv = box[v]!;
+        final ratio = ba.width / bv.height;
+        if (ratio < 0.35 || ratio > 2.8 || bv.height > lineH * 1.4) continue;
+        final cx = bv.center.dx, cy = ba.center.dy;
+        if (cx < ba.left + ba.width * 0.15 || cx > ba.right - ba.width * 0.15) continue;
+        if (cy < bv.top + bv.height * 0.2 || cy > bv.bottom - bv.height * 0.2) continue;
+        used..add(a)..add(v);
+        ops.add(('+', ba.expandToInclude(bv)));
+        break;
+      }
+    }
+    // i
+    if (findI) {
+      for (final t in ss) {
+        if (used.contains(t)) continue;
+        final bt = box[t]!;
+        if (bt.height < lineH * 0.25 || bt.height > lineH * 1.25 || bt.width > bt.height * 0.6) continue;
+        InkStroke? best;
+        var bestD = double.infinity;
+        for (final d in ss) {
+          if (identical(d, t) || used.contains(d)) continue;
+          final bd = box[d]!;
+          if (!dot(bd) || math.max(bd.width, bd.height) > bt.height * 0.6) continue;
+          final dx = (bd.center.dx - bt.center.dx).abs();
+          final gap = bt.top - bd.bottom;
+          if (dx > math.max(bt.height * 0.35, bt.width) || bd.center.dy > bt.top + bt.height * 0.1) continue;
+          if (gap > bt.height * 0.9) continue;
+          final dist = dx + gap.abs();
+          if (dist < bestD) {
+            bestD = dist;
+            best = d;
+          }
+        }
+        if (best != null) {
+          used..add(t)..add(best);
+          ops.add(('i', bt.expandToInclude(box[best]!)));
+        }
+      }
+    }
+    // − and =
+    final rest = [for (final s in ss) if (!used.contains(s)) s];
+    if (rest.isNotEmpty) {
+      var top = double.infinity, bottom = -double.infinity;
+      for (final s in rest) {
+        top = math.min(top, box[s]!.top);
+        bottom = math.max(bottom, box[s]!.bottom);
+      }
+      double overlap(Rect a, Rect b) => math.max(0, math.min(a.right, b.right) - math.max(a.left, b.left));
+      final flats = [
+        for (final s in rest)
+          if (flat(box[s]!) && box[s]!.width <= lineH * 2.5) s
+      ];
+      final taken = <InkStroke>{};
+      for (final m in flats) {
+        if (taken.contains(m)) continue;
+        final bm = box[m]!;
+        InkStroke? twin;
+        var clash = false;
+        for (final o in rest) {
+          if (identical(o, m)) continue;
+          final bo = box[o]!;
+          if (overlap(bm, bo) <= bm.width * 0.25) continue;
+          if (twin == null && flats.contains(o) && !taken.contains(o) && overlap(bm, bo) >= math.min(bm.width, bo.width) * 0.5) {
+            twin = o;
+          } else {
+            clash = true;
+            break;
+          }
+        }
+        if (clash) continue;
+        if (twin != null) {
+          taken..add(m)..add(twin);
+          ops.add(('=', bm.expandToInclude(box[twin]!)));
+        } else if (rest.length == 1 || (bm.center.dy >= top - lineH * 0.2 && bm.center.dy <= bottom + lineH * 0.2)) {
+          taken.add(m);
+          ops.add(('-', bm));
+        }
+      }
+      used.addAll(taken);
+    }
+    if (ops.isEmpty) return null;
+
+    // 부호 사이의 획들을 왼쪽부터 덩어리로
+    ops.sort((a, b) => a.$2.center.dx.compareTo(b.$2.center.dx));
+    final groups = List.generate(ops.length + 1, (_) => <InkStroke>[]);
+    for (final s in ss) {
+      if (used.contains(s)) continue;
+      final cx = box[s]!.center.dx;
+      var k = 0;
+      while (k < ops.length && ops[k].$2.center.dx < cx) {
+        k++;
+      }
+      groups[k].add(s);
+    }
+    return [
+      for (var k = 0; k <= ops.length; k++) ...[
+        if (groups[k].isNotEmpty) InkToken.strokes(groups[k]),
+        if (k < ops.length) InkToken.op(ops[k].$1),
+      ]
+    ];
+  }
+
+  static Rect _boxOf(InkStroke s) {
+    var x0 = double.infinity, y0 = double.infinity, x1 = -double.infinity, y1 = -double.infinity;
+    for (final p in s.points) {
+      x0 = math.min(x0, p.x);
+      y0 = math.min(y0, p.y);
+      x1 = math.max(x1, p.x);
+      y1 = math.max(y1, p.y);
+    }
+    return Rect.fromLTRB(x0, y0, x1, y1);
+  }
+
+  /// 부분마다의 후보 (좋은 것부터) → 이어 붙인 후보들, 앞 후보들의 합이 작은 것부터.
+  @visibleForTesting
+  static List<String> combineParts(List<List<String>> parts, {int limit = 6}) {
+    if (parts.isEmpty) return const [];
+    final ps = [for (final p in parts) p.take(3).toList()];
+    var acc = <(String, int)>[('', 0)];
+    for (final p in ps) {
+      final next = [
+        for (final a in acc)
+          for (var j = 0; j < p.length; j++) ('${a.$1}${p[j]}', a.$2 + j)
+      ];
+      // 점수가 같으면 앞 조각의 순서대로 (정렬이 순서를 지키게)
+      final order = [for (var k = 0; k < next.length; k++) k]
+        ..sort((x, y) => next[x].$2 != next[y].$2 ? next[x].$2.compareTo(next[y].$2) : x.compareTo(y));
+      acc = [for (final k in order.take(24)) next[k]];
+    }
+    final out = <String>[];
+    for (final a in acc) {
+      if (!out.contains(a.$1)) out.add(a.$1);
+      if (out.length >= limit) break;
+    }
+    return out;
   }
 
   /// 획들이 위아래로 쓴 분수인지 본다: 가로줄 하나와 그 위(분자)·아래(분모)에 획이 있으면 나눈다.
@@ -281,6 +483,16 @@ class Handwriting {
     await _recognizer?.close();
     _recognizer = null;
   }
+}
+
+/// 한 줄 답을 나눈 조각: 부호(+ − = i) 하나, 또는 그 사이 숫자 덩어리의 획들.
+class InkToken {
+  const InkToken.op(String this.op) : strokes = const [];
+  const InkToken.strokes(this.strokes) : op = null;
+  final String? op;
+  final List<InkStroke> strokes;
+  @override
+  String toString() => op ?? '[${strokes.map((s) => s.id).join(',')}]';
 }
 
 /// 위아래로 쓴 분수를 나눈 획들.

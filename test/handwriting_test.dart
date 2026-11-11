@@ -94,6 +94,63 @@ void main() {
       expect(Handwriting.splitFraction([eq1, eq2, three]), isNull);
     });
 
+    // 글자 높이 ≈ 40 으로 "-3i+45" 를 쓴 획들
+    List<InkStroke> minus3iPlus45() => [
+          st('m', [[0, 40], [18, 41]], 0),
+          st('3', [[28, 20], [45, 24], [32, 38], [46, 50], [28, 60]], 1),
+          st('i', [[55, 35], [56, 60]], 2),
+          st('dot', [[55, 26], [56, 27]], 3),
+          st('ph', [[68, 42], [92, 41]], 4),
+          st('pv', [[80, 29], [81, 54]], 5),
+          st('4a', [[104, 20], [100, 45], [122, 45]], 6),
+          st('4b', [[116, 30], [116, 60]], 7),
+          st('5a', [[145, 20], [132, 22], [132, 38], [148, 42], [146, 58], [130, 60]], 8),
+          st('5b', [[133, 19], [150, 19]], 9),
+        ];
+
+    test('+ · − · i 는 획 모양으로 찾고 숫자 덩어리만 따로 읽는다 (-3i+45)', () {
+      final t = Handwriting.tokenize(minus3iPlus45())!;
+      expect(t.map((e) => e.toString()).toList(), ['-', '[3]', 'i', '+', '[4a,4b,5a,5b]']);
+      // 숫자 답이면 i 를 찾지 않는다 (점+세로획은 숫자 덩어리로)
+      final n = Handwriting.tokenize(minus3iPlus45(), findI: false)!;
+      expect(n.map((e) => e.toString()).toList(), ['-', '[3,i,dot]', '+', '[4a,4b,5a,5b]']);
+      expect(Handwriting.combineParts([['-'], ['3', '8'], ['i'], ['+'], ['45', '4S']]).first, '-3i+45');
+      expect(Handwriting.combineParts([['-'], ['3', '8'], ['i'], ['+'], ['45', '46']]),
+          containsAllInOrder(['-3i+45', '-8i+45']));
+      final ranked = Handwriting.rank([
+        ...Handwriting.combineParts([['-'], ['3'], ['i'], ['+'], ['45']]),
+        '-31+45',
+      ], shape: AnswerShape.complex);
+      expect(ranked.first, '-3i+45');
+      final p = Problem(id: 'z', subjectId: 'math', subjectName: '수학', stem: 'q', answer: '45-3i');
+      expect(Grader.grade(p, ranked.first).correct, isTrue);
+      expect(Grader.grade(p, '-31+45').correct, isFalse);
+    });
+
+    test('− 로 착각하지 않는 수평 획: 5 의 윗줄, 7 의 가로줄, √ 지붕, 밑줄 / = 는 =', () {
+      // 5 의 윗줄만 있는 답 "5" → 부호 없음
+      final five = minus3iPlus45().where((s) => s.id.startsWith('5')).toList();
+      expect(Handwriting.tokenize(five), isNull);
+      // 7 + 가로줄
+      final seven = [st('7', [[0, 20], [20, 20], [8, 60]], 0), st('bar', [[4, 40], [18, 40]], 1)];
+      expect(Handwriting.tokenize(seven), isNull);
+      // 답 밑에 그은 밑줄
+      final under = [...five, st('u', [[125, 66], [155, 66]], 10)];
+      expect(Handwriting.tokenize(under), isNull);
+      // = 3
+      final eq = [st('e1', [[0, 34], [20, 34]], 0), st('e2', [[0, 46], [20, 46]], 1),
+        st('3', [[28, 20], [45, 24], [32, 38], [46, 50], [28, 60]], 2)];
+      expect(Handwriting.tokenize(eq)!.map((e) => e.toString()).toList(), ['=', '[3]']);
+      expect(Handwriting.cleanAnswer(Handwriting.combineParts([['='], ['3']]).first, shape: AnswerShape.numeric), '3');
+      // 1 - 2
+      final oneMinusTwo = [st('1', [[5, 20], [5, 60]], 0), st('m', [[15, 40], [30, 40]], 1),
+        st('2', [[38, 25], [50, 20], [52, 35], [38, 60], [55, 60]], 2)];
+      expect(Handwriting.tokenize(oneMinusTwo)!.map((e) => e.toString()).toList(), ['[1]', '-', '[2]']);
+      // -i
+      final minusI = [st('m', [[0, 40], [15, 40]], 0), st('i', [[25, 30], [25, 58]], 1), st('d', [[25, 20], [26, 21]], 2)];
+      expect(Handwriting.tokenize(minusI)!.map((e) => e.toString()).toList(), ['-', 'i']);
+    });
+
     test('분수 후보가 한 줄로 읽은 것보다 앞', () {
       final combos = Handwriting.combineFraction([''], ['3', 'B'], ['4'], ['']);
       expect(Handwriting.rank([...combos, '34'], shape: AnswerShape.numeric).first, '3/4');
