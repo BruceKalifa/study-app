@@ -177,7 +177,11 @@ void main() {
     await tester.pumpWidget(_app(s!));
     await tester.pump(const Duration(seconds: 1));
     expect(find.byKey(const Key('daily-start')), findsOneWidget);
-    for (final tab in ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '설정', '홈']) {
+    // 통계·기록은 학습관리 안으로 들어갔고, 연습장·내 문제(출제)는 학생 화면에서 뺐다. 질문은 계정이 있을 때만.
+    for (final gone in ['통계', '기록', '연습장', '내 문제', '질문']) {
+      expect(find.text(gone), findsNothing, reason: gone);
+    }
+    for (final tab in ['내 교재', '오답노트', '학습관리', '커뮤니티', '설정', '홈']) {
       await tester.ensureVisible(find.text(tab).first); // the rail comes first (and scrolls)
       await tester.pump();
       await tester.tap(find.text(tab).first);
@@ -525,7 +529,7 @@ void main() {
     await tester.tap(find.byKey(const Key('daily-pick-books')));
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('문제집 고르기'), findsOneWidget);
+    expect(find.text('교재 고르기'), findsOneWidget);
     await tester.tap(find.byKey(const Key('store-course-math')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.ensureVisible(find.byKey(const Key('store-add-wb-math1-concept')));
@@ -677,7 +681,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('학습관리: to-do, 순공 timer, 모의고사 성적', (tester) async {
+  testWidgets('학습관리: to-do, 순공 timer, 분석·풀이 기록 칸, 학부모 리포트·등급 성적은 없음', (tester) async {
     _tabletSize(tester);
     final app = (await tester.runAsync(_state))!;
     await tester.pumpWidget(_app(app));
@@ -696,19 +700,17 @@ void main() {
     await tester.tap(find.byKey(const Key('planner-study-toggle')));
     await tester.pump();
     expect(app.studying, isFalse);
-    await tester.ensureVisible(find.byKey(const Key('score-add')));
-    await tester.tap(find.byKey(const Key('score-add')));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.enterText(find.byKey(const Key('score-name')), '9월 모의평가');
-    await tester.tap(find.byKey(const Key('score-국어-2')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('score-수학-3')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('score-save')));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(app.scores.single.grades, {'국어': 2, '수학': 3});
+    expect(find.textContaining('학부모'), findsNothing);
+    expect(find.byKey(const Key('score-add')), findsNothing);
+    await tester.tap(find.text('분석'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('단원별 성취도'), findsOneWidget);
+    await tester.tap(find.text('풀이 기록'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('전체'), findsWidgets);
+    await tester.tap(find.text('플래너'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('todo-input')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

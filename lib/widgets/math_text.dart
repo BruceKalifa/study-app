@@ -69,13 +69,106 @@ class MathText extends StatelessWidget {
     return t.replaceAll(RegExp(r'\n{2,}'), '\n').trim();
   }
 
+  static const _fnNames =
+      'arcsin|arccos|arctan|sinh|cosh|tanh|coth|sech|csch|sin|cos|tan|sec|csc|cot|log|ln|exp|lim|max|min|det|deg|arg|gcd';
+
+  /// 수식(TeX) 을 그리기 전에 흔한 잘못 쓴 꼴을 고친다.
+  ///  · `^(…)`·`_(…)` → `^{…}`·`_{…}` (그대로면 "(" 만 올라가서 tan^(-1) 처럼 보인다)
+  ///  · 백슬래시 없이 쓴 함수 이름 + 첨자: `tan^{-1}` → `\tan^{-1}`
+  ///  · `\tag{1}` → `(1)` (줄 안 수식에서는 지원하지 않아 통째로 깨진다)
+  ///  · 짝이 안 맞는 `\left`·`\right` 는 빼고 괄호만 남긴다
+  static String fixTex(String s) {
+    var t = _parenScripts(s);
+    t = t.replaceAllMapped(RegExp('(?<![\\\\A-Za-z{])($_fnNames)(?=\\s*[\\^_])'), (m) => '\\${m[1]}');
+    t = t.replaceAllMapped(RegExp(r'\\tag\*?\{([^{}]*)\}'), (m) => '\\qquad(${m[1]})');
+    final lefts = RegExp(r'\\left(?![a-zA-Z])').allMatches(t).length;
+    final rights = RegExp(r'\\right(?![a-zA-Z])').allMatches(t).length;
+    if (lefts != rights) {
+      t = t.replaceAll(RegExp(r'\\(left|right)(?![a-zA-Z])\.?'), '');
+    }
+    return t;
+  }
+
+  static String _parenScripts(String s) {
+    if (!s.contains('^(') && !s.contains('_(')) return s;
+    final b = StringBuffer();
+    var i = 0;
+    while (i < s.length) {
+      final c = s[i];
+      if ((c == '^' || c == '_') && i + 1 < s.length && s[i + 1] == '(' && (i == 0 || s[i - 1] != '\\')) {
+        var depth = 0, j = i + 1;
+        for (; j < s.length; j++) {
+          if (s[j] == '(') depth++;
+          if (s[j] == ')' && --depth == 0) break;
+        }
+        if (j < s.length) {
+          final inner = _parenScripts(s.substring(i + 2, j));
+          // f^(n)·y^(4) 같은 "n계 도함수" 표기는 괄호를 살린다
+          final keep = RegExp(r'^\s*([A-Za-z]|\d+|[ivx]+)\s*$').hasMatch(inner);
+          b
+            ..write(c)
+            ..write('{')
+            ..write(keep ? '($inner)' : inner)
+            ..write('}');
+          i = j + 1;
+          continue;
+        }
+      }
+      b.write(c);
+      i++;
+    }
+    return b.toString();
+  }
+
+  /// `$` 밖에 글자 그대로 쓴 첨자 수식 (tan^(-1), x^2, e^(2x) …) → 수식 조각 `$…$`.
+  static final RegExp _asciiPower = RegExp(
+      r'(?<![\w\\$])((?:' + _fnNames + r')|[A-Za-z]|\d+(?:\.\d+)?|\))\^(\([^()]*\)|\{[^{}]*\}|-?[A-Za-z0-9]+)');
+
+  @visibleForTesting
+  static List<(bool, String)> asciiMath(String text) {
+    if (!text.contains('^')) return [(false, text)];
+    final out = <(bool, String)>[];
+    var last = 0;
+    for (final m in _asciiPower.allMatches(text)) {
+      final base = m[1]!;
+      if (base == ')') continue; // 괄호 묶음은 앞쪽까지 알 수 없어 그대로 둔다
+      if (m.start > last) out.add((false, text.substring(last, m.start)));
+      out.add((true, fixTex('$base^${m[2]}')));
+      last = m.end;
+    }
+    if (last == 0) return [(false, text)];
+    if (last < text.length) out.add((false, text.substring(last)));
+    return out;
+  }
+
+  static const _sup = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+    '-': '⁻', '+': '⁺', '=': '⁼', '(': '⁽', ')': '⁾', 'n': 'ⁿ', 'i': 'ⁱ', 'x': 'ˣ', 'k': 'ᵏ', 'T': 'ᵀ',
+  };
+  static const _sub = {
+    '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+    '-': '₋', '+': '₊', 'n': 'ₙ', 'i': 'ᵢ', 'x': 'ₓ', 'k': 'ₖ', 'j': 'ⱼ', 'm': 'ₘ',
+  };
+  static String _script(String body, Map<String, String> table, String mark) {
+    final t = body.replaceAll(' ', '');
+    if (t.isNotEmpty && t.split('').every(table.containsKey)) return t.split('').map((c) => table[c]).join();
+    return t.length == 1 ? '$mark$t' : '$mark($t)';
+  }
+
   /// Plain-text rendering (for previews / lists): strips LaTeX commands and markup lightly.
   static String plain(String s) {
     var t = compact(s).replaceAll('**', '').replaceAll('__', '');
     t = t.replaceAll(RegExp(r'^\s*\|[-:| ]+\|\s*$', multiLine: true), '');
     t = t.replaceAll(RegExp(r'\s*\|\s*'), ' ').replaceAll(RegExp(r'\n{2,}'), '\n');
-    t = t.replaceAll(r'$', '');
+    t = fixTex(t.replaceAll(r'$', ''));
     t = t.replaceAllMapped(RegExp(r'\\[dt]?frac\{([^{}]*)\}\{([^{}]*)\}'), (m) => '${m[1]}/${m[2]}');
+    // 함수 이름은 남기고 (\tan → tan), 첨자는 위·아래 글자로 (tan⁻¹, x², a₁)
+    t = t.replaceAllMapped(RegExp('\\\\($_fnNames)(?![a-zA-Z])'), (m) => m[1]!);
+    t = t.replaceAllMapped(RegExp(r'\\operatorname\{([^{}]*)\}'), (m) => m[1]!);
+    t = t.replaceAllMapped(RegExp(r'\^\{([^{}]*)\}'), (m) => _script(m[1]!, _sup, '^'));
+    t = t.replaceAllMapped(RegExp(r'\^(-?[0-9A-Za-z])'), (m) => _script(m[1]!, _sup, '^'));
+    t = t.replaceAllMapped(RegExp(r'_\{([^{}]*)\}'), (m) => _script(m[1]!, _sub, '_'));
+    t = t.replaceAllMapped(RegExp(r'_([0-9A-Za-z])'), (m) => _script(m[1]!, _sub, '_'));
     t = t.replaceAllMapped(RegExp(r'\\text\{([^{}]*)\}'), (m) => m[1] ?? '');
     t = t.replaceAllMapped(RegExp(r'\\sqrt\{([^{}]*)\}'), (m) => '√${m[1]}');
     const map = {
@@ -83,8 +176,12 @@ class MathText extends StatelessWidget {
       r'\approx': '≈', r'\theta': 'θ', r'\alpha': 'α', r'\beta': 'β', r'\lambda': 'λ', r'\omega': 'ω',
       r'\Delta': 'Δ', r'\pi': 'π', r'\mu': 'μ', r'\rho': 'ρ', r'\sigma': 'σ', r'\circ': '°', r'\Omega': 'Ω',
       r'\infty': '∞', r'\to': '→', r'\rightarrow': '→', r'\,': ' ', r'\left': '', r'\right': '',
+      r'\neq': '≠', r'\leq': '≤', r'\geq': '≥', r'\cdots': '⋯', r'\ldots': '…', r'\dots': '…', r'\partial': '∂',
+      r'\nabla': '∇', r'\int': '∫', r'\sum': 'Σ', r'\phi': 'φ', r'\varphi': 'φ', r'\epsilon': 'ε',
+      r'\varepsilon': 'ε', r'\quad': ' ', r'\qquad': '  ', r'\;': ' ', r'\!': '',
     };
-    map.forEach((k, v) => t = t.replaceAll(k, v));
+    // \le 가 \left 의 앞부분을 바꾸지 않게 명령어 경계에서만
+    map.forEach((k, v) => t = t.replaceAll(RegExp(RegExp.escape(k) + (RegExp(r'[a-zA-Z]$').hasMatch(k) ? r'(?![a-zA-Z])' : '')), v));
     t = t.replaceAll(RegExp(r'\\[a-zA-Z]+'), '');
     t = t.replaceAll(RegExp(r'[{}]'), '');
     return t;
@@ -238,10 +335,11 @@ class MathText extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Math.tex(
-              tex,
+              fixTex(tex),
               mathStyle: MathStyle.display,
               textStyle: TextStyle(fontSize: fs * mathScale, color: base.color),
-              onErrorFallback: (err) => Text(tex, style: base.copyWith(fontStyle: FontStyle.italic)),
+              // 그래도 못 그리면 TeX 명령어 대신 읽을 수 있는 글자로 (tan⁻¹x)
+              onErrorFallback: (err) => Text(plain('\$$tex\$'), style: base),
             ),
           ),
         ),
@@ -362,7 +460,10 @@ class MathText extends StatelessWidget {
             decorationThickness: under ? 1.6 : null,
           )
         : null;
-    for (final (isMath, text) in parts) {
+    final pieces0 = [
+      for (final (isMath, text) in parts) ...(isMath ? [(true, text)] : asciiMath(text)),
+    ];
+    for (final (isMath, text) in pieces0) {
       if (!isMath) {
         var last = 0;
         for (final m in _marks.allMatches(text)) {
@@ -378,12 +479,12 @@ class MathText extends StatelessWidget {
         continue;
       }
       final formula = Math.tex(
-        text,
+        fixTex(text),
         // display-size fractions read better on a tablet; compact previews and TeX 원문 keep text size
         mathStyle: maxLines == null && !texStyle ? MathStyle.display : MathStyle.text,
         // only size + colour: weight/family from the surrounding text would switch KaTeX to upright glyphs
         textStyle: TextStyle(fontSize: (base.fontSize ?? 16) * mathScale, color: base.color),
-        onErrorFallback: (err) => Text(text, style: base.copyWith(fontStyle: FontStyle.italic)),
+        onErrorFallback: (err) => Text(plain('\$$text\$'), style: base),
       );
       // Break long formulas at relations/operators so they wrap like text;
       // any single piece that is still too wide is scaled down instead of overflowing.

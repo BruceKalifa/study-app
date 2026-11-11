@@ -2,18 +2,21 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../app/app_state.dart';
-import '../app/learner.dart';
 import '../app/theme.dart';
 import '../widgets/common.dart';
-import 'community_screen.dart' show RankingPanel;
 import 'dashboard_screen.dart' show fmtStudy;
+import 'history_screen.dart';
+import 'stats_screen.dart';
 
-/// 학습관리: D-day · 순공 타이머 · 오늘 할 일 · 이번 주 · 모의고사 성적 · 주간 리포트.
+/// 학습관리 — 세 칸:
+/// 플래너 (시험 D-day · 순공 타이머 · 오늘 할 일 · 이번 주) / 분석 (통계) / 풀이 기록.
 class PlannerScreen extends StatefulWidget {
-  const PlannerScreen({super.key});
+  const PlannerScreen({super.key, this.initialView = 0});
+
+  /// 0 플래너 · 1 분석 · 2 풀이 기록
+  final int initialView;
 
   @override
   State<PlannerScreen> createState() => _PlannerScreenState();
@@ -22,6 +25,7 @@ class PlannerScreen extends StatefulWidget {
 class _PlannerScreenState extends State<PlannerScreen> {
   Timer? _tick;
   final _todo = TextEditingController();
+  late int _view = widget.initialView;
 
   @override
   void initState() {
@@ -40,6 +44,42 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 18),
+      child: Wrap(
+        spacing: 20,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
+        children: [
+          const Text('학습관리', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+          SegmentedButton<int>(
+            key: const Key('planner-view'),
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 0, label: Text('플래너'), icon: Icon(Icons.event_note_rounded, size: 18)),
+              ButtonSegment(value: 1, label: Text('분석'), icon: Icon(Icons.insights_rounded, size: 18)),
+              ButtonSegment(value: 2, label: Text('풀이 기록'), icon: Icon(Icons.history_rounded, size: 18)),
+            ],
+            selected: {_view},
+            onSelectionChanged: (v) => setState(() => _view = v.first),
+          ),
+        ],
+      ),
+    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      header,
+      Expanded(
+        child: switch (_view) {
+          1 => const StatsScreen(embedded: true),
+          2 => const HistoryScreen(embedded: true),
+          _ => _planner(context),
+        },
+      ),
+    ]);
+  }
+
+  Widget _planner(BuildContext context) {
     final app = AppScope.of(context);
     return LayoutBuilder(builder: (context, box) {
       final wide = box.maxWidth >= 1000;
@@ -53,24 +93,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
             )
           : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [a, const SizedBox(height: 16), b]);
       return ListView(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+        padding: const EdgeInsets.fromLTRB(32, 4, 32, 40),
         children: [
-          const Text('학습관리', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-          const SizedBox(height: 4),
-          const Text('시험까지 남은 날, 공부 시간, 할 일과 성적을 한곳에서 관리해요',
-              style: TextStyle(fontSize: 15.5, color: AppColors.inkSoft)),
-          const SizedBox(height: 22),
           pair(_ddayCard(app), _timerCard(app), fa: 2, fb: 3),
           const SizedBox(height: 18),
           pair(_todoCard(app), _weekCard(app), fa: 1, fb: 1),
-          const SizedBox(height: 18),
-          _scoresCard(app, wide),
-          const SizedBox(height: 18),
-          _reportCard(app),
-          if (app.community != null) ...[
-            const SizedBox(height: 18),
-            const RankingPanel(compact: true),
-          ],
         ],
       );
     });
@@ -81,7 +108,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
     final l = app.learner;
     final d = app.dDay;
     final date = l.examDate == 0 ? null : DateTime.fromMillisecondsSinceEpoch(l.examDate);
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: () => _editDday(app),
+      child: Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -89,7 +119,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text(l.examName, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(date == null ? '다음 시험' : l.examName,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 16, fontWeight: FontWeight.w700)),
           const Spacer(),
           IconButton(
             key: const Key('dday-edit'),
@@ -98,8 +129,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
             icon: const Icon(Icons.edit_calendar_rounded, color: Colors.white),
           ),
         ]),
-        Text(date == null ? '시험을 정해요' : (d > 0 ? 'D-$d' : (d == 0 ? 'D-DAY' : 'D+${-d}')),
-            style: const TextStyle(color: Colors.white, fontSize: 52, fontWeight: FontWeight.w800, letterSpacing: -2)),
+        Text(date == null ? '시험 일정 정하기' : (d > 0 ? 'D-$d' : (d == 0 ? 'D-DAY' : 'D+${-d}')),
+            style: TextStyle(
+                color: Colors.white, fontSize: date == null ? 30 : 52, fontWeight: FontWeight.w800, letterSpacing: -1.5)),
+        if (date == null)
+          Text('중간·기말고사, 인적성, 편입시험 날짜를 넣으면 남은 날을 세어 드려요',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w600)),
         if (date != null)
           Text('${date.year}년 ${date.month}월 ${date.day}일',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w600)),
@@ -110,13 +145,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
             style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14),
           ),
       ]),
+      ),
     );
   }
 
   Future<void> _editDday(AppState app) async {
     final name = TextEditingController(text: app.learner.examName);
     var date = app.learner.examDate == 0
-        ? defaultSuneungDate(DateTime.now())
+        ? DateTime.now().add(const Duration(days: 28))
         : DateTime.fromMillisecondsSinceEpoch(app.learner.examDate);
     final ok = await showDialog<bool>(
       context: context,
@@ -124,7 +160,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
         builder: (ctx, set) => AlertDialog(
           title: const Text('목표 시험'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: name, decoration: const InputDecoration(labelText: '시험 이름 (예: 중간고사, 2학기 중간고사)')),
+            TextField(controller: name, decoration: const InputDecoration(labelText: '시험 이름 (예: 공업수학 중간고사)')),
             const SizedBox(height: 14),
             Wrap(spacing: 8, children: [
               for (final n in ['중간고사', '기말고사', '인적성', 'NCS', '편입시험', '퀴즈'])
@@ -225,7 +261,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
               child: TextField(
                 key: const Key('todo-input'),
                 controller: _todo,
-                decoration: const InputDecoration(hintText: '예) 수학Ⅰ 지수함수 20문제, 영어 단어 50개', isDense: true),
+                decoration: const InputDecoration(hintText: '예) 공업수학 2장 연습문제, 인적성 수리 20문제', isDense: true),
                 onSubmitted: (_) => add(),
               ),
             ),
@@ -311,224 +347,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
       ),
     );
   }
-
-  // ---------------------------------------------------------------- scores
-  Widget _scoresCard(AppState app, bool wide) {
-    final list = app.scoresByDate;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            const Text('모의고사 성적', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-            const SizedBox(width: 10),
-            const Text('등급 추이를 기록해요', style: TextStyle(color: AppColors.inkMuted)),
-            const Spacer(),
-            FilledButton.icon(
-              key: const Key('score-add'),
-              onPressed: () => _editScore(app, null),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('성적 입력'),
-            ),
-          ]),
-          const SizedBox(height: 14),
-          if (list.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Text('모의고사를 보면 과목별 등급을 입력해 보세요. 추이 그래프로 보여 드려요.',
-                  style: TextStyle(color: AppColors.inkMuted)),
-            )
-          else ...[
-            SizedBox(height: 220, child: CustomPaint(size: Size.infinite, painter: _GradeChart(list))),
-            const SizedBox(height: 10),
-            Wrap(spacing: 14, runSpacing: 6, children: [
-              for (final (i, s) in _subjectsIn(list).indexed) _Legend(color: _chartColors[i % _chartColors.length], label: s),
-            ]),
-            const SizedBox(height: 12),
-            for (final s in list.reversed)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800)),
-                subtitle: Text(
-                  [for (final e in s.grades.entries) '${e.key} ${e.value}등급${s.raw[e.key] != null ? '(${s.raw[e.key]})' : ''}']
-                      .join('  ·  '),
-                ),
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.paperDeep,
-                  child: Text(s.average == null ? '-' : s.average!.toStringAsFixed(1),
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.ink)),
-                ),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(fmtDate(s.date, withTime: false), style: const TextStyle(color: AppColors.inkMuted)),
-                  IconButton(onPressed: () => _editScore(app, s), icon: const Icon(Icons.edit_rounded, size: 19)),
-                  IconButton(onPressed: () => app.removeScore(s.id), icon: const Icon(Icons.delete_outline_rounded, size: 19)),
-                ]),
-              ),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  Future<void> _editScore(AppState app, ExamScore? old) async {
-    final name = TextEditingController(text: old?.name ?? '');
-    final grades = <String, int>{...?old?.grades};
-    final raw = {for (final s in kScoreSubjects) s: TextEditingController(text: old?.raw[s]?.toString() ?? '')};
-    var date = old == null ? DateTime.now() : DateTime.fromMillisecondsSinceEpoch(old.date);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, set) => AlertDialog(
-          title: Text(old == null ? '모의고사 성적 입력' : '성적 고치기'),
-          content: SizedBox(
-            width: 560,
-            child: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                TextField(
-                  key: const Key('score-name'),
-                  controller: name,
-                  decoration: const InputDecoration(labelText: '시험 이름 (예: 9월 모의평가)'),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () async {
-                    final p = await showDatePicker(
-                        context: ctx, initialDate: date, firstDate: DateTime(2020), lastDate: DateTime(2035));
-                    if (p != null) set(() => date = p);
-                  },
-                  icon: const Icon(Icons.event_rounded),
-                  label: Text('${date.year}.${date.month}.${date.day}'),
-                ),
-                const SizedBox(height: 6),
-                for (final s in kScoreSubjects)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: Row(children: [
-                      SizedBox(width: 64, child: Text(s, style: const TextStyle(fontWeight: FontWeight.w800))),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(children: [
-                            for (var g = 1; g <= 9; g++)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: ChoiceChip(
-                                  key: Key('score-$s-$g'),
-                                  label: Text('$g'),
-                                  selected: grades[s] == g,
-                                  onSelected: (v) => set(() => v ? grades[s] = g : grades.remove(s)),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ),
-                          ]),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 64,
-                        child: TextField(
-                          controller: raw[s],
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(hintText: '점수', isDense: true),
-                        ),
-                      ),
-                    ]),
-                  ),
-              ]),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
-            FilledButton(key: const Key('score-save'), onPressed: () => Navigator.pop(ctx, true), child: const Text('저장')),
-          ],
-        ),
-      ),
-    );
-    if (ok == true && grades.isNotEmpty) {
-      app.saveScore(ExamScore(
-        id: old?.id ?? app.newId(),
-        name: name.text.trim().isEmpty ? '모의고사' : name.text.trim(),
-        date: DateTime(date.year, date.month, date.day).millisecondsSinceEpoch,
-        grades: grades,
-        raw: {
-          for (final e in raw.entries)
-            if (int.tryParse(e.value.text.trim()) case final v?) e.key: v
-        },
-      ));
-    }
-  }
-
-  // ---------------------------------------------------------------- report
-  String _report(AppState app) {
-    final now = DateTime.now();
-    final days = [for (var i = 6; i >= 0; i--) DateTime(now.year, now.month, now.day).subtract(Duration(days: i))];
-    var solved = 0, correct = 0, study = 0;
-    for (final d in days) {
-      final t = app.daily[dayKey(d)];
-      solved += t?.solved ?? 0;
-      correct += t?.correct ?? 0;
-      study += app.studyMsOn(dayKey(d));
-    }
-    final weak = app.weakTopics.take(3).map((e) => e.$1).join(', ');
-    final b = StringBuffer()
-      ..writeln('[Solvit 주간 리포트] ${app.profile.name} (${app.learner.gradeLabel})')
-      ..writeln('· 기간: ${days.first.month}/${days.first.day} ~ ${days.last.month}/${days.last.day}')
-      ..writeln('· 순공 시간: ${fmtDuration(study)}')
-      ..writeln('· 푼 문제: $solved문제 (정답률 ${solved == 0 ? '-' : pct(correct / solved)})')
-      ..writeln('· 연속 학습: ${app.streak}일')
-      ..writeln('· 오답노트: ${app.wrongNote.length}문제 (해결 ${app.resolvedWrong.length})');
-    if (weak.isNotEmpty) b.writeln('· 보완할 유형: $weak');
-    if (app.learner.examDate > 0) b.writeln('· ${app.learner.examName} D-${app.dDay}');
-    return b.toString().trim();
-  }
-
-  Widget _reportCard(AppState app) {
-    final text = _report(app);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Text('주간 리포트', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-            const SizedBox(width: 10),
-            const Text('학부모님께 그대로 보내도 돼요', style: TextStyle(color: AppColors.inkMuted)),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: text));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('리포트를 복사했어요. 메신저에 붙여 넣으세요.')));
-              },
-              icon: const Icon(Icons.copy_rounded),
-              label: const Text('복사하기'),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.paper, borderRadius: BorderRadius.circular(14)),
-            child: Text(text, style: const TextStyle(height: 1.7, fontWeight: FontWeight.w600)),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-const _chartColors = [
-  Color(0xFFD9534F),
-  Color(0xFFE0703B),
-  Color(0xFF2F9E6E),
-  Color(0xFF8C5BD6),
-  Color(0xFF2F6BFF),
-  Color(0xFF0EA5E9),
-];
-
-List<String> _subjectsIn(List<ExamScore> list) {
-  final out = <String>[];
-  for (final s in kScoreSubjects) {
-    if (list.any((e) => e.grades.containsKey(s))) out.add(s);
-  }
-  return out;
 }
 
 class _Legend extends StatelessWidget {
@@ -585,63 +403,4 @@ class _WeekBars extends CustomPainter {
 
   @override
   bool shouldRepaint(_WeekBars old) => true;
-}
-
-/// 등급 line chart: 1등급 at the top.
-class _GradeChart extends CustomPainter {
-  _GradeChart(this.list);
-  final List<ExamScore> list;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const left = 34.0, bottom = 26.0, top = 8.0;
-    final w = size.width - left - 10, h = size.height - bottom - top;
-    final grid = Paint()
-      ..color = const Color(0xFFE6E0D5)
-      ..strokeWidth = 1;
-    final tp = TextPainter(textDirection: TextDirection.ltr);
-    double y(num g) => top + h * (g - 1) / 8;
-    for (var g = 1; g <= 9; g++) {
-      canvas.drawLine(Offset(left, y(g)), Offset(left + w, y(g)), grid);
-      tp.text = TextSpan(text: '$g', style: const TextStyle(fontFamily: AppTheme.font, fontSize: 11.5, color: AppColors.inkMuted, fontWeight: FontWeight.w700));
-      tp.layout();
-      tp.paint(canvas, Offset(left - 10 - tp.width, y(g) - tp.height / 2));
-    }
-    final n = list.length;
-    double x(int i) => n == 1 ? left + w / 2 : left + w * i / (n - 1);
-    for (var i = 0; i < n; i++) {
-      tp.text = TextSpan(
-          text: list[i].name.length > 8 ? list[i].name.substring(0, 8) : list[i].name,
-          style: const TextStyle(fontFamily: AppTheme.font, fontSize: 11.5, color: AppColors.inkSoft, fontWeight: FontWeight.w700));
-      tp.layout();
-      tp.paint(canvas, Offset((x(i) - tp.width / 2).clamp(0, size.width - tp.width), size.height - bottom + 6));
-    }
-    final subjects = _subjectsIn(list);
-    for (final (k, s) in subjects.indexed) {
-      final c = _chartColors[k % _chartColors.length];
-      final line = Paint()
-        ..color = c
-        ..strokeWidth = 3
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      final path = Path();
-      var started = false;
-      for (var i = 0; i < n; i++) {
-        final g = list[i].grades[s];
-        if (g == null) continue;
-        final p = Offset(x(i), y(g));
-        if (!started) {
-          path.moveTo(p.dx, p.dy);
-          started = true;
-        } else {
-          path.lineTo(p.dx, p.dy);
-        }
-        canvas.drawCircle(p, 5, Paint()..color = c);
-      }
-      canvas.drawPath(path, line);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GradeChart old) => true;
 }

@@ -121,7 +121,7 @@ class DashboardScreen extends StatelessWidget {
                   key: const Key('home-add-books'),
                   onPressed: () => WorkbookStoreScreen.open(context),
                   icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('문제집 담기'),
+                  label: const Text('교재 담기'),
                 ),
                 if (books.isNotEmpty) TextButton(onPressed: () => onNavigate(1), child: const Text('전체 보기')),
               ])),
@@ -136,7 +136,7 @@ class DashboardScreen extends StatelessWidget {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Icon(Icons.collections_bookmark_rounded, color: AppColors.inkMuted, size: 30),
                           SizedBox(width: 12),
-                          Text('개념서 · 유형서 · 기출 · N제 · 모의고사 중에서 골라 담아 보세요',
+                          Text('우리 학교 수업 교재를 골라 담아 보세요',
                               style: TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 15.5)),
                         ]),
                       ),
@@ -153,8 +153,8 @@ class DashboardScreen extends StatelessWidget {
 
           // ---------- endless (내 교재에서만) — kEndlessEnabled 가 false 면 모의고사 만들기만 남는다
           if (books.isNotEmpty) ...[
-            SectionHeader(kEndlessEnabled ? '무한 풀기' : '모의고사',
-                subtitle: kEndlessEnabled ? '내 교재 문제로 · 맞히면 더 어렵게, 틀리면 쉽게' : '내 교재 문제로 시험처럼 풀어요'),
+            SectionHeader(kEndlessEnabled ? '무한 풀기' : '실전 연습',
+                subtitle: kEndlessEnabled ? '내 교재 문제로 · 맞히면 더 어렵게, 틀리면 쉽게' : '내 교재 문제로 시간을 재며 시험처럼 풀어요'),
             Wrap(spacing: 12, runSpacing: 12, children: [
               if (kEndlessEnabled)
                 _EndlessChip(
@@ -174,7 +174,7 @@ class DashboardScreen extends StatelessWidget {
                     onTap: () => SolveScreen.endless(context, workbookId: w.id, title: w.title),
                   ),
               _EndlessChip(
-                label: '모의고사 만들기',
+                label: '시험처럼 풀기',
                 icon: Icons.timer_outlined,
                 color: AppColors.inkSoft,
                 outlined: true,
@@ -356,7 +356,7 @@ class _DailySetCard extends StatelessWidget {
                 style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
                 onPressed: () => WorkbookStoreScreen.open(context),
                 icon: const Icon(Icons.collections_bookmark_rounded),
-                label: Text(noBooks ? '문제집 고르러 가기' : '문제집 더 담기'),
+                label: Text(noBooks ? '교재 고르러 가기' : '교재 더 담기'),
               )
             else
             FilledButton.icon(

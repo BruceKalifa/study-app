@@ -11,7 +11,10 @@ import 'solve_screen.dart';
 import '../widgets/problem_stem.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.embedded = false});
+
+  /// 학습관리 안의 한 칸으로 넣을 때: 큰 제목 없이.
+  final bool embedded;
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -36,20 +39,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+      padding: widget.embedded ? const EdgeInsets.fromLTRB(32, 4, 32, 40) : const EdgeInsets.fromLTRB(32, 28, 32, 40),
       children: [
         Row(children: [
-          const Expanded(
-            child: Text('풀이 기록', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+          Expanded(
+            child: widget.embedded
+                ? const Text('기록을 누르면 그때 쓴 필기를 다시 재생해 볼 수 있어요.',
+                    style: TextStyle(color: AppColors.inkSoft, fontSize: 15))
+                : const Text('풀이 기록', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
           ),
           for (final (i, l) in [(0, '전체'), (1, '정답'), (2, '오답')]) ...[
             ChoiceChip(label: Text(l), selected: _filter == i, onSelected: (_) => setState(() => _filter = i)),
             const SizedBox(width: 8),
           ],
         ]),
-        const SizedBox(height: 6),
-        const Text('기록을 누르면 그때 쓴 필기를 다시 재생해 볼 수 있어요.',
-            style: TextStyle(color: AppColors.inkSoft, fontSize: 15)),
+        if (!widget.embedded) ...[
+          const SizedBox(height: 6),
+          const Text('기록을 누르면 그때 쓴 필기를 다시 재생해 볼 수 있어요.',
+              style: TextStyle(color: AppColors.inkSoft, fontSize: 15)),
+        ],
         const SizedBox(height: 20),
         if (shown.isEmpty)
           const EmptyState(icon: Icons.history_rounded, title: '아직 기록이 없어요', message: '문제를 풀면 여기에 차곡차곡 쌓여요.'),

@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ]),
 
         // ---------------- study
-        _Section(title: '학년 · 목표 · 내 교재', subtitle: '오늘의 세트는 내 교재의 문제로 만들어져요', children: [
+        _Section(title: '학교 · 목표 · 내 교재', subtitle: '오늘의 세트는 내 교재의 문제로 만들어져요', children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.school_outlined),
@@ -188,7 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _switch('정답이면 자동으로 다음 문제', null, s.autoAdvance, (v) => app.updateSettings((x) => x.autoAdvance = v)),
           _switch('전체화면으로 풀기', '문제와 필기 공간만 남겨요 (풀이 화면에서 바로 켜고 끌 수 있어요)', s.fullscreenSolve,
               (v) => app.updateSettings((x) => x.fullscreenSolve = v)),
-          _switch('시험지 글꼴 (명조)', '문제를 모의고사 시험지처럼 명조체로 보여줘요', s.examFont,
+          _switch('시험지 글꼴 (명조)', '문제를 시험지처럼 명조체로 보여줘요', s.examFont,
               (v) => app.updateSettings((x) => x.examFont = v)),
           if (app.isTeacher)
             _switch('출처·머리표 보기 (선생님)', '문항 옆의 출처·변형(원: …)·기출 표시를 앱에서도 봐요 (학생에게는 항상 안 보여요)', s.showOrigin,
@@ -260,13 +260,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: '선생님과 실시간 공유',
           subtitle: '켜 두면 문제를 풀 때 필기가 선생님 화면에 바로 보여요',
           children: [
-            ListTile(
-              key: const Key('server-address'),
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.dns_outlined, color: AppColors.inkSoft),
-              title: const Text('서버', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(app.serverAddress, style: const TextStyle(color: AppColors.inkSoft)),
-            ),
             _switch('실시간 공유 켜기', '켜 두면 문제를 풀 때 필기가 선생님 화면에 바로 보여요', s.liveEnabled,
                 (v) => app.updateSettings((x) => x.liveEnabled = v)),
             if (app.live != null)
@@ -290,8 +283,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         // ---------------- content
         _Section(
-          title: '문항 받기',
-          subtitle: '서버(출제 도구)에서 새로 만든 문항과 문제집을 받아요',
+          title: '교재 업데이트',
+          subtitle: '새로 나온 교재와 고친 문항을 받아요',
           children: [
             Row(children: [
               FilledButton.icon(
@@ -307,7 +300,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: app.syncing
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.cloud_download_rounded),
-                label: const Text('새 문항 받기'),
+                label: const Text('업데이트 받기'),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -323,8 +316,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.inventory_2_outlined),
-            title: Text('문제 ${app.bank.all.length}개 · 변형 가능 ${app.bank.all.where(app.hasVariant).length}개'),
-            subtitle: Text('${app.profile.name}님의 기록 ${app.totalSolved}개 · 오답노트 ${app.wrongNote.length}개'),
+            title: Text('${app.profile.name}님의 풀이 기록 ${app.totalSolved}개 · 오답노트 ${app.wrongNote.length}개'),
           ),
           Align(
             alignment: Alignment.centerLeft,

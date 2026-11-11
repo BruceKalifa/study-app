@@ -4,16 +4,12 @@ import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../services/live_sync.dart';
 import 'dashboard_screen.dart';
-import 'editor_screen.dart';
-import 'history_screen.dart';
 import 'community_screen.dart';
 import 'library_screen.dart';
 import 'onboarding_screen.dart';
 import 'planner_screen.dart';
 import 'questions_screen.dart';
-import 'scratch_screen.dart';
 import 'settings_screen.dart';
-import 'stats_screen.dart';
 import 'wrong_note_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -29,9 +25,15 @@ class _Dest {
   const _Dest(this.icon, this.activeIcon, this.label);
 }
 
+/// 학생 화면의 탭 번호 (홈에서 다른 탭으로 보낼 때 쓴다).
+abstract final class StudentTab {
+  static const home = 0, books = 1, wrong = 2, planner = 3, questions = 4, community = 5, settings = 6;
+}
+
 class HomeShellState extends State<HomeShell> {
   int _tab = 0;
 
+  /// 공부에 꼭 필요한 것만: 통계·풀이 기록은 학습관리 안으로, 연습장·내 문제(출제)는 뺐다.
   static const _dests = [
     _Dest(Icons.home_outlined, Icons.home_rounded, '홈'),
     _Dest(Icons.collections_bookmark_outlined, Icons.collections_bookmark_rounded, '내 교재'),
@@ -39,14 +41,16 @@ class HomeShellState extends State<HomeShell> {
     _Dest(Icons.event_note_outlined, Icons.event_note_rounded, '학습관리'),
     _Dest(Icons.contact_support_outlined, Icons.contact_support_rounded, '질문'),
     _Dest(Icons.forum_outlined, Icons.forum_rounded, '커뮤니티'),
-    _Dest(Icons.insights_outlined, Icons.insights_rounded, '통계'),
-    _Dest(Icons.history_rounded, Icons.history_rounded, '기록'),
-    _Dest(Icons.draw_outlined, Icons.draw_rounded, '연습장'),
-    _Dest(Icons.edit_note_outlined, Icons.edit_note_rounded, '내 문제'),
     _Dest(Icons.settings_outlined, Icons.settings_rounded, '설정'),
   ];
 
   void go(int tab) => setState(() => _tab = tab);
+
+  /// 질문은 선생님과 연결된 계정에서만 보인다 (혼자 쓰면 보낼 곳이 없다).
+  List<int> _visible(AppState app) => [
+        for (var i = 0; i < _dests.length; i++)
+          if (i != StudentTab.questions || app.signedIn) i
+      ];
 
   Widget _page(int i) {
     switch (i) {
@@ -62,27 +66,19 @@ class HomeShellState extends State<HomeShell> {
         return const QuestionsScreen();
       case 5:
         return const CommunityScreen();
-      case 6:
-        return const StatsScreen();
-      case 7:
-        return const HistoryScreen();
-      case 8:
-        return const ScratchScreen();
-      case 9:
-        return const EditorScreen();
       default:
         return const SettingsScreen();
     }
   }
 
   /// 폰 아래 막대에 두는 탭 (나머지는 더보기).
-  static const _phoneTabs = [0, 1, 2, 4];
+  static const _phoneTabs = [0, 1, 2, 3];
 
   static Widget _badged(Widget icon, int n) => n <= 0 ? icon : Badge(label: Text('$n'), child: icon);
 
   /// 더보기 — 아래 막대에 없는 화면들.
   Future<void> _showMore(BuildContext context) async {
-    final rest = [for (var i = 0; i < _dests.length; i++) if (!_phoneTabs.contains(i)) i];
+    final rest = [for (final i in _visible(AppScope.read(context))) if (!_phoneTabs.contains(i)) i];
     final picked = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
@@ -163,6 +159,7 @@ class HomeShellState extends State<HomeShell> {
         _Rail(
           index: _tab,
           dests: _dests,
+          visible: _visible(app),
           onTap: go,
           due: due,
           answers: app.unreadAnswers,
@@ -188,9 +185,11 @@ class _Rail extends StatelessWidget {
     required this.profileColor,
     required this.live,
     required this.liveEnabled,
+    required this.visible,
   });
   final int index;
   final List<_Dest> dests;
+  final List<int> visible;
   final ValueChanged<int> onTap;
   final int due;
   final int answers;
@@ -225,7 +224,8 @@ class _Rail extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               child: Column(children: [
-                for (var i = 0; i < dests.length; i++)
+                for (final i in visible)
+                  if (i != StudentTab.settings)
                   _RailItem(
                     dest: dests[i],
                     selected: index == i,
@@ -250,7 +250,7 @@ class _Rail extends StatelessWidget {
               ),
             ),
           GestureDetector(
-            onTap: () => onTap(11),
+            onTap: () => onTap(StudentTab.settings),
             child: Tooltip(
               message: profileName,
               child: CircleAvatar(

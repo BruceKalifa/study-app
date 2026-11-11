@@ -118,13 +118,26 @@ class _KeypadSheetState extends State<_KeypadSheet> {
                 child: Row(children: [
                   const Text('답', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkMuted)),
                   const SizedBox(width: 14),
+                  // 답은 늘 한 줄 — 길면 글자를 줄인다 (좁을 때 숫자가 한 글자씩 세로로 서지 않게)
                   Expanded(
-                    child: Text(_t.isEmpty ? '—' : _t,
-                        key: const Key('keypad-value'),
-                        style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                    flex: 3,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(_t.isEmpty ? '—' : _t,
+                          key: const Key('keypad-value'),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                    ),
                   ),
                   if (unit != null && unit.isNotEmpty)
-                    Text(unit, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+                    Flexible(
+                      child: Text(unit,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.inkSoft)),
+                    ),
                 ]),
               ),
               if (others.isNotEmpty) ...[

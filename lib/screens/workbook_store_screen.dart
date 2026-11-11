@@ -23,7 +23,7 @@ class WorkbookStoreScreen extends StatelessWidget {
     final n = app.learner.workbooks.length;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('문제집 고르기'),
+        title: const Text('교재 고르기'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

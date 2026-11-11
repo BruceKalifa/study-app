@@ -107,20 +107,17 @@ Future<AppState> _seeded() async {
   s.seedAttempts(list);
   s.completeOnboarding(
       name: '선주',
-      grade: '고2',
-      goal: '수능',
+      grade: '한양대',
+      goal: '중간고사 대비',
       courses: const [],
       workbooks: const ['wb-phy1-concept', 'wb-phy1-real1', 'wb-math1-concept', 'wb-math-real1', 'wb-earth1-mock1']);
-  s.addTodo('수학Ⅰ 지수함수 20문제');
-  s.addTodo('영어 단어 Day 12');
+  s.updateLearner((l) {
+    l.examName = '공업수학 중간고사';
+    l.examDate = DateTime.now().add(const Duration(days: 12)).millisecondsSinceEpoch;
+  });
+  s.addTodo('공업수학 2장 연습문제 10문제');
+  s.addTodo('미적분학 퀴즈 범위 복습');
   s.toggleTodo(s.todos.first.id);
-  for (final (i, (name, g)) in [
-    ('3월 학력평가', {'국어': 3, '수학': 4, '영어': 2, '탐구1': 3}),
-    ('6월 모의평가', {'국어': 2, '수학': 3, '영어': 2, '탐구1': 3}),
-    ('9월 모의평가', {'국어': 2, '수학': 2, '영어': 1, '탐구1': 2}),
-  ].indexed) {
-    s.saveScore(ExamScore(id: 'e$i', name: name, date: now - (200 - i * 90) * Duration.millisecondsPerDay, grades: g));
-  }
   return s;
 }
 
@@ -415,7 +412,7 @@ void main() {
     }
 
     // 2..11 tabs
-    const tabs = ['내 교재', '오답노트', '학습관리', '질문', '커뮤니티', '통계', '기록', '연습장', '내 문제', '설정'];
+    const tabs = ['내 교재', '오답노트', '학습관리', '커뮤니티', '설정'];
     for (var i = 0; i < tabs.length; i++) {
       await tester.ensureVisible(find.text(tabs[i]).first);
       await tester.pump();
@@ -429,15 +426,17 @@ void main() {
           await tester.pump(const Duration(milliseconds: 100));
         }
       }
-      if (tabs[i] == '연습장') {
-        final c = tester.getCenter(find.byType(HomeShell));
-        await _write(tester, c + const Offset(-200, 50), _axisX());
-        await _write(tester, c + const Offset(-200, 50), _axisY());
-        await _write(tester, c + const Offset(-50, -60), _parabola());
-        await _write(tester, c + const Offset(150, 140), _wave());
+      await _shot(tester, '${(i + 2).toString().padLeft(2, '0')}_${['shelf', 'wrongnote', 'planner', 'community', 'settings'][i]}');
+      if (tabs[i] == '학습관리') {
+        await tester.tap(find.text('분석'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await _shot(tester, '04b_planner_stats');
+        await tester.tap(find.text('풀이 기록'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await _shot(tester, '04c_planner_history');
+        await tester.tap(find.text('플래너'));
+        await tester.pump(const Duration(milliseconds: 300));
       }
-      await _shot(tester,
-          '${(i + 2).toString().padLeft(2, '0')}_${['shelf', 'wrongnote', 'planner', 'questions_offline', 'community', 'stats', 'history', 'scratch', 'editor', 'settings'][i]}');
     }
 
     // onboarding (fresh learner)
@@ -457,11 +456,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     }
     await _shot(tester, '21_onboarding_books');
-    await tester.tap(find.byKey(const Key('store-course-math')));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.byKey(const Key('store-add-wb-math1-concept')));
-    await tester.pump(const Duration(milliseconds: 300));
-    await _shot(tester, '21b_onboarding_books_math');
+    if (find.byKey(const Key('store-course-math')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const Key('store-course-math')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('store-add-wb-math1-concept')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await _shot(tester, '21b_onboarding_books_math');
+    }
 
     // welcome (login)
     final fresh2 = (await tester.runAsync(() async {

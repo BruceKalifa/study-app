@@ -43,7 +43,7 @@ class _ExamSetupState extends State<_ExamSetup> {
       title: const Row(children: [
         Icon(Icons.timer_rounded, color: AppColors.accent),
         SizedBox(width: 8),
-        Text('모의고사 모드'),
+        Text('시험처럼 풀기'),
       ]),
       content: SizedBox(
         width: 520,
@@ -104,7 +104,7 @@ class _ExamSetupState extends State<_ExamSetup> {
               for (final p in picked) _variants && app.hasVariant(p) ? app.makeVariant(p) : p,
             ];
             final name = _subject == null ? '전 과목' : (app.bank.subject(_subject!)?.name ?? '');
-            Navigator.pop(context, ('모의고사 · $name ${problems.length}문항', problems, _minutes * 60000));
+            Navigator.pop(context, ('실전 연습 · $name ${problems.length}문항', problems, _minutes * 60000));
           },
           icon: const Icon(Icons.play_arrow_rounded),
           label: const Text('시작'),

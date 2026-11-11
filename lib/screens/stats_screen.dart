@@ -7,7 +7,10 @@ import '../app/theme.dart';
 import '../widgets/common.dart';
 
 class StatsScreen extends StatelessWidget {
-  const StatsScreen({super.key});
+  const StatsScreen({super.key, this.embedded = false});
+
+  /// 학습관리 안의 한 칸으로 넣을 때: 제목 없이 내용만.
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -30,13 +33,21 @@ class StatsScreen extends StatelessWidget {
             icon: Icons.timer_outlined,
             color: AppColors.review),
       ];
+      // 과목별은 내 교재 과목과 실제로 푼 과목만 (안 하는 과목이 "아직 없음" 으로 줄줄이 나오지 않게)
+      final mine = {for (final w in app.myWorkbooks) w.course};
+      final subjects = [
+        for (final s in app.bank.subjects)
+          if (mine.contains(s.id) || app.subjectTally(s.id).solved > 0) s
+      ];
       return ListView(
-        padding: const EdgeInsets.fromLTRB(32, 28, 32, 40),
+        padding: embedded ? const EdgeInsets.fromLTRB(32, 4, 32, 40) : const EdgeInsets.fromLTRB(32, 28, 32, 40),
         children: [
-          const Text('학습 통계', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-          const SizedBox(height: 4),
-          const Text('문제를 풀 때마다 자동으로 쌓이고 업데이트돼요.', style: TextStyle(color: AppColors.inkSoft, fontSize: 15)),
-          const SizedBox(height: 20),
+          if (!embedded) ...[
+            const Text('학습 통계', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
+            const SizedBox(height: 4),
+            const Text('문제를 풀 때마다 자동으로 쌓이고 업데이트돼요.', style: TextStyle(color: AppColors.inkSoft, fontSize: 15)),
+            const SizedBox(height: 20),
+          ],
           IntrinsicHeight(
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               for (var i = 0; i < tiles.length; i++) ...[
@@ -75,7 +86,9 @@ class StatsScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const SectionHeader('과목별'),
-                  for (final s in app.bank.subjects) ...[
+                  if (subjects.isEmpty)
+                    const Text('교재를 담고 문제를 풀면 과목별로 보여 드려요.', style: TextStyle(color: AppColors.inkMuted)),
+                  for (final s in subjects) ...[
                     _barRow(s.name, app.subjectTally(s.id), Color(s.color), app.coverage(s)),
                     const SizedBox(height: 14),
                   ],

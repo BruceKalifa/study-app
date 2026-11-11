@@ -186,7 +186,7 @@ class _CourseBrowserState extends State<CourseBrowser> {
           TextButton.icon(
             onPressed: () => showExamSetup(context, subjectId: _subject),
             icon: const Icon(Icons.timer_outlined),
-            label: const Text('모의고사'),
+            label: const Text('시험처럼 풀기'),
           ),
           TextButton.icon(
             onPressed: () => CourseBrowser.openQuickVariant(context, subjectId: _subject),
@@ -511,14 +511,14 @@ class LibraryScreen extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => showExamSetup(context),
                   icon: const Icon(Icons.timer_outlined),
-                  label: const Text('모의고사 만들기'),
+                  label: const Text('시험처럼 풀기'),
                 ),
               FilledButton.icon(
                 key: const Key('lib-add'),
                 onPressed: () => WorkbookStoreScreen.open(context),
                 style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 50)),
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('문제집 담기'),
+                label: const Text('교재 담기'),
               ),
             ];
             if (!narrow) {
@@ -541,12 +541,12 @@ class LibraryScreen extends StatelessWidget {
                 child: EmptyState(
                   icon: Icons.collections_bookmark_rounded,
                   title: '내 교재가 비어 있어요',
-                  message: '개념서부터 N제·모의고사까지, 과목과 커리큘럼별로 골라 담아 보세요.\n담은 문제집으로 오늘의 세트가 만들어져요.',
+                  message: '우리 학교 수업 교재와 인적성 교재를 골라 담아 보세요.\n담은 교재로 오늘의 세트가 만들어져요.',
                   action: FilledButton.icon(
                     key: const Key('lib-empty-add'),
                     onPressed: () => WorkbookStoreScreen.open(context),
                     icon: const Icon(Icons.storefront_rounded),
-                    label: const Text('문제집 고르러 가기'),
+                    label: const Text('교재 고르러 가기'),
                   ),
                 ),
               ),

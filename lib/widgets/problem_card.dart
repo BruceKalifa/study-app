@@ -679,6 +679,10 @@ class _AnswerBox extends StatelessWidget {
   Widget build(BuildContext context) {
     const sans = AppTheme.font;
     final u = unit ?? '';
+    return LayoutBuilder(builder: (context, box) {
+    // 칸이 좁으면 답칸도 줄인다 (단위 글자가 한 글자씩 세로로 서지 않게)
+    final unitW = u.isEmpty ? 0.0 : math.min(160.0, 26.0 * u.length + 14);
+    final boxW = box.maxWidth.isFinite ? math.max(160.0, math.min(330.0, box.maxWidth - unitW)) : 330.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -687,7 +691,7 @@ class _AnswerBox extends StatelessWidget {
           children: [
             Container(
               key: boxKey,
-              width: 330,
+              width: boxW,
               height: 104,
               decoration: BoxDecoration(
                 color: const Color(0x08000000),
@@ -713,7 +717,7 @@ class _AnswerBox extends StatelessWidget {
             ),
             if (u.isNotEmpty) ...[
               const SizedBox(width: 14),
-              Flexible(child: Text(u, style: const TextStyle(fontSize: 26))),
+              Flexible(child: Text(u, maxLines: 1, softWrap: false, overflow: TextOverflow.fade, style: const TextStyle(fontSize: 26))),
             ],
           ],
         ),
@@ -728,6 +732,7 @@ class _AnswerBox extends StatelessWidget {
               Text('인식된 답', style: TextStyle(fontFamily: sans, fontSize: 17, fontWeight: FontWeight.w700, color: color)),
               Text(u.isEmpty ? text! : '${text!} $u',
                   key: const Key('recognized-answer'),
+                  softWrap: false,
                   style: const TextStyle(fontFamily: sans, fontSize: 22, fontWeight: FontWeight.w800, height: 1.3)),
               if (reveal == null)
                 const Text('  다르면 답칸을 손가락으로 톡',
@@ -742,5 +747,6 @@ class _AnswerBox extends StatelessWidget {
         ),
       ],
     );
+    });
   }
 }

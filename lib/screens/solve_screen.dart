@@ -903,7 +903,14 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             Text(has ? '답  ' : '답칸에 쓰면 자동 인식',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
             if (has)
-              Text(answerDisplay(p, answer), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Text(answerDisplay(p, answer),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              ),
             const SizedBox(width: 6),
             const Icon(Icons.edit_rounded, size: 17, color: AppColors.inkMuted),
           ]),
