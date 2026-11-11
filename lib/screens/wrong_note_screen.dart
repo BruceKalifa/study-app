@@ -92,9 +92,7 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
         // 상태: 한 줄짜리 구분 버튼 (개수는 고정폭 숫자)
         Align(
           alignment: Alignment.centerLeft,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<int>(
+          child: SegmentedButton<int>(
               key: const Key('wn-tabs'),
               showSelectedIcon: false,
               segments: [
@@ -113,7 +111,6 @@ class _WrongNoteScreenState extends State<WrongNoteScreen> {
               selected: {_tab},
               onSelectionChanged: (v) => setState(() => _tab = v.first),
             ),
-          ),
         ),
         // 과목: 조용한 칩 (선택하면 흑연 바탕)
         if (solvedCourses.isNotEmpty) ...[
