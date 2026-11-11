@@ -8,6 +8,7 @@ import '../widgets/math_text.dart';
 import '../widgets/problem_card.dart' show showsOrigin;
 import '../widgets/workbook_card.dart' show stageColor, workbookLevelColor;
 import 'answer_key_screen.dart';
+import 'concept_book_screen.dart';
 import 'concept_screen.dart';
 import 'solve_screen.dart';
 
@@ -57,6 +58,13 @@ class _WorkbookScreenState extends State<WorkbookScreen> {
     final showConcepts = _show != 'problem';
     final showProblems = _show != 'concept';
     void openConcept(Concept c) {
+      // 원본 PDF 개념책: 쪽을 넘겨 읽는 책 화면
+      if (c.pdf != null) {
+        final book = [for (final x in readOrder) if (x.pdf != null) x];
+        final i = book.indexWhere((x) => x.id == c.id);
+        ConceptBookScreen.open(context, concepts: book, index: i < 0 ? 0 : i, workbookId: w.id, color: color);
+        return;
+      }
       final i = readOrder.indexWhere((x) => x.id == c.id);
       ConceptScreen.open(context, concepts: readOrder, index: i < 0 ? 0 : i, workbookId: w.id, color: color);
     }

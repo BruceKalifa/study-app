@@ -4,10 +4,15 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:study_app/app/app_state.dart';
 import 'package:study_app/app/storage.dart';
+import 'package:study_app/app/theme.dart';
+import 'package:study_app/core/problem_bank.dart';
 import 'package:study_app/core/problem.dart';
 import 'package:study_app/pdf/pdf_store.dart';
 import 'package:study_app/pdf/pdf_view.dart';
+import 'package:study_app/screens/concept_book_screen.dart';
+import 'package:study_app/screens/solve_screen.dart';
 import 'package:study_app/services/content_import.dart';
 import 'package:study_app/widgets/problem_card.dart';
 
@@ -139,6 +144,53 @@ void main() {
       expect(keys.choiceAt(r1.center, p.choiceCount), 1);
       expect(r1.left, lessThan(r3.left), reason: 'PDF 에서처럼 왼쪽부터');
       await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('개념책: 태블릿 가로는 두 쪽 펼침, 다시 볼래·이해했어요, 예제는 일반 풀이 화면으로', (tester) async {
+      PdfRasterizer.current = _FakeRaster();
+      addTearDown(() => PdfRasterizer.current = PdfiumRasterizer());
+      tester.view.physicalSize = const Size(2960, 1848);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(tester.view.reset);
+      final s = (await tester.runAsync(() async {
+        final st = AppState(
+            storage: MemoryStorage(), baseBank: ProblemBank(const []), enableLive: false, autoSyncBooks: false);
+        await st.init();
+        await st.importBooks(gzip.encode(utf8.encode(jsonEncode(_bundle()))));
+        return st;
+      }))!;
+      final concepts = s.bank.conceptsOf(s.bank.workbook('pdf-book')!);
+      expect(concepts.single.pdf, isNotNull);
+      await tester.pumpWidget(AppScope(
+        state: s,
+        child: MaterialApp(theme: AppTheme.light(), home: ConceptBookScreen(concepts: concepts)),
+      ));
+      for (var i = 0; i < 6; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byType(PdfRegionView), findsNWidgets(2), reason: '3·4쪽 펼침');
+      expect(find.text('3–4쪽'), findsOneWidget);
+      expect(find.text('풀어 보기'), findsOneWidget, reason: '3쪽 예제에 단추');
+      await tester.tap(find.byKey(const Key('book-review')));
+      await tester.pump();
+      expect(s.isConceptReview('c1'), isTrue);
+      await tester.tap(find.byKey(const Key('book-understood')));
+      await tester.pump();
+      expect(s.isConceptRead('c1'), isTrue);
+      expect(s.isConceptReview('c1'), isFalse, reason: '이해했으면 다시 볼래는 내린다');
+      // 목차 → 예제만 모아 풀기 = 일반 풀이 화면
+      await tester.tap(find.byKey(const Key('book-toc')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('toc-c1')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('book-all-examples')));
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 150));
+      }
+      expect(find.byType(SolveScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 }

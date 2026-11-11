@@ -153,6 +153,7 @@ class AppState extends ChangeNotifier {
     todos = [];
     scores = [];
     readConcepts = <String>{};
+    reviewConcepts = <String>{};
     _syncedUpTo = 0;
     me = null;
     final raw = await storage.read(_pp('state.json'));
@@ -181,6 +182,7 @@ class AppState extends ChangeNotifier {
         todos = [for (final x in (j['todos'] as List? ?? const [])) TodoItem.fromJson(m(x))];
         scores = [for (final x in (j['scores'] as List? ?? const [])) ExamScore.fromJson(m(x))];
         readConcepts = {for (final x in (j['readConcepts'] as List? ?? const [])) '$x'};
+        reviewConcepts = {for (final x in (j['reviewConcepts'] as List? ?? const [])) '$x'};
         _syncedUpTo = (j['synced'] as num?)?.toInt() ?? 0;
       } catch (e) {
         debugPrint('state.json broken: $e');
@@ -381,6 +383,7 @@ class AppState extends ChangeNotifier {
       'todos': [for (final x in todos) x.toJson()],
       'scores': [for (final x in scores) x.toJson()],
       if (readConcepts.isNotEmpty) 'readConcepts': readConcepts.toList(),
+      if (reviewConcepts.isNotEmpty) 'reviewConcepts': reviewConcepts.toList(),
       'synced': _syncedUpTo,
     });
     await storage.write(_pp('state.json'), data);
@@ -621,6 +624,20 @@ class AppState extends ChangeNotifier {
     if (read ? !readConcepts.add(id) : !readConcepts.remove(id)) return;
     _changed();
   }
+
+  /// "다시 볼래" 로 표시한 개념 (개념책 목차에 책갈피로 보인다).
+  Set<String> reviewConcepts = <String>{};
+
+  bool isConceptReview(String id) => reviewConcepts.contains(id);
+
+  void setConceptReview(String id, bool on) {
+    if (on ? !reviewConcepts.add(id) : !reviewConcepts.remove(id)) return;
+    if (on) readConcepts.remove(id);
+    _changed();
+  }
+
+  /// 개념책 원본 PDF 한 쪽에 한 필기 (쪽마다 하나).
+  String conceptPageNotePath(String conceptId, int page) => conceptNotePath('$conceptId@p$page');
 
   /// 개념 페이지에 한 필기가 들어 있는 파일 (개념마다 하나).
   String conceptNotePath(String conceptId) => 'concept_notes/${Uri.encodeComponent(conceptId)}.json';
