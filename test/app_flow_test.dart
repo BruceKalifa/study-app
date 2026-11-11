@@ -181,7 +181,8 @@ void main() {
     for (final gone in ['통계', '기록', '연습장', '내 문제', '질문']) {
       expect(find.text(gone), findsNothing, reason: gone);
     }
-    for (final tab in ['내 교재', '오답노트', '학습관리', '커뮤니티', '설정', '홈']) {
+    // 설정은 막대 아래 내 이름 동그라미로 간다
+    for (final tab in ['내 교재', '오답노트', '학습관리', '커뮤니티', '홈']) {
       await tester.ensureVisible(find.text(tab).first); // the rail comes first (and scrolls)
       await tester.pump();
       await tester.tap(find.text(tab).first);
@@ -189,6 +190,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       expect(tester.takeException(), isNull, reason: 'tab $tab');
     }
+    await tester.tap(find.byTooltip('학생'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('설정'), findsOneWidget);
   });
 
   testWidgets('solve: write with stylus, answer choice + short, grade, record, results', (tester) async {
@@ -704,7 +708,7 @@ void main() {
     expect(find.byKey(const Key('score-add')), findsNothing);
     await tester.tap(find.text('분석'));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('단원별 성취도'), findsOneWidget);
+    expect(find.text('정답률'), findsWidgets);
     await tester.tap(find.text('풀이 기록'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('전체'), findsWidgets);
@@ -776,7 +780,7 @@ void main() {
     expect(c.contains(r'$$'), isFalse);
     expect(c, contains('[그림]'));
     expect(MathText.plain(src), isNot(contains('svg')));
-    expect(MathText.plain(src), contains('a_n+1=a_n/2'));
+    expect(MathText.plain(src), contains('aₙ₊₁=aₙ/2'));
   });
 
   testWidgets('TeX 원문 교재: boxes, display math, figures and the 머리표 render; no 배점', (tester) async {

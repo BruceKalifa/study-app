@@ -414,9 +414,10 @@ void main() {
     // 2..11 tabs
     const tabs = ['내 교재', '오답노트', '학습관리', '커뮤니티', '설정'];
     for (var i = 0; i < tabs.length; i++) {
-      await tester.ensureVisible(find.text(tabs[i]).first);
+      final target = tabs[i] == '설정' ? find.byTooltip(app.profile.name) : find.text(tabs[i]).first;
+      await tester.ensureVisible(target);
       await tester.pump();
-      await tester.tap(find.text(tabs[i]).first);
+      await tester.tap(target);
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
