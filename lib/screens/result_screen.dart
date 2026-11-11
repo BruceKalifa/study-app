@@ -192,12 +192,13 @@ class ResultScreen extends StatelessWidget {
               Text('${i + 1}번',
                   style: const TextStyle(fontWeight: FontWeight.w800, fontFeatures: AppColors.tabular)),
               const SizedBox(width: 8),
-              Flexible(child: Pill(p.topic.isNotEmpty ? p.topic : p.unit, color: color, dense: true)),
-              if (p.isVariant || p.isTwin) ...[
-                const SizedBox(width: 6),
-                const Pill('변형', color: AppColors.accent, dense: true),
-              ],
-              const Spacer(),
+              Expanded(
+                child: Wrap(spacing: 6, runSpacing: 4, children: [
+                  Pill(p.topic.isNotEmpty ? p.topic : p.unit, color: color, dense: true),
+                  if (p.isVariant || p.isTwin) const Pill('변형', color: AppColors.accent, dense: true),
+                ]),
+              ),
+              const SizedBox(width: 12),
               Text(fmtDuration(it.timeMs),
                   style: const TextStyle(
                       fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),

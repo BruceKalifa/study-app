@@ -332,11 +332,9 @@ class _MarkerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final h = size.height;
-    // 빈 칸: 연필로 그은 가는 밑줄
-    canvas.drawLine(Offset(0, h - 2), Offset(size.width, h - 2), Paint()
-      ..color = AppColors.lineStrong
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round);
+    // 빈 칸: 옅은 형광펜 자리 (0 이어도 어디까지 칠할지 보이게)
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, h), const Radius.circular(3)),
+        Paint()..color = AppColors.highlightSoft);
     if (value <= 0) return;
     final w = math.max(h, size.width * value);
     const slant = 5.0;

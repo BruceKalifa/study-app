@@ -639,18 +639,21 @@ class _CourseHeader extends StatelessWidget {
         child: Row(children: [
           Icon(c == null ? Icons.menu_book_rounded : courseIcon(c), color: color, size: 20),
           const SizedBox(width: 8),
-          Flexible(
-            child: Text(c?.name ?? courseId,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+          Expanded(
+            child: Row(children: [
+              Flexible(
+                child: Text(c?.name ?? courseId,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+              ),
+              const SizedBox(width: 12),
+              if (t.solved > 0)
+                Text('정답률 ${pct(t.accuracy)}',
+                    style: const TextStyle(
+                        fontSize: 13, color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
+            ]),
           ),
-          const SizedBox(width: 12),
-          if (t.solved > 0)
-            Text('정답률 ${pct(t.accuracy)}',
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontFeatures: AppColors.tabular)),
-          const Spacer(),
           if (narrow) ...[
             if (kEndlessEnabled)
               IconButton(

@@ -206,12 +206,12 @@ class _WrongCard extends StatelessWidget {
             Text(p.subjectName,
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
             const SizedBox(width: 10),
-            Flexible(
+            Expanded(
               child: Text(p.topic.isEmpty ? p.unit : p.topic,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: -0.3)),
             ),
-            const Spacer(),
+            const SizedBox(width: 12),
             if (state.inWrongNote) ...[
               _StageDots(stage: state.reviewStage),
               const SizedBox(width: 10),
