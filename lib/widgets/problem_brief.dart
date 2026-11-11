@@ -5,6 +5,7 @@ import '../core/problem.dart';
 import 'common.dart';
 import 'math_text.dart';
 import 'problem_card.dart' show TexLabel, showsOrigin;
+import 'problem_stem.dart';
 
 /// Compact read-only view of a problem (선생님 화면 · 질문 · 오답 상세):
 /// stem, <보기>, choices (정답 green, 학생 답 red), the student's answer and optionally the 해설.
@@ -44,7 +45,7 @@ class ProblemBrief extends StatelessWidget {
       ]),
       if (origin && p.label != null) ...[const SizedBox(height: 10), TexLabel(p, fontSize: fs - 3.5)],
       const SizedBox(height: 12),
-      MathText(p.stem, texStyle: p.texStyle, style: TextStyle(fontSize: fs, color: AppColors.ink, height: 1.7, fontFamily: _face(p))),
+      ProblemStem(p, style: TextStyle(fontSize: fs, color: AppColors.ink, height: 1.7, fontFamily: _face(p))),
       if (p.boxItems.isNotEmpty) ...[
         const SizedBox(height: 10),
         Container(

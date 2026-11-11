@@ -13,6 +13,7 @@ dependencies:
   path_provider: ^2.1.6
   file_selector: ^1.0.3 # 자료요청 글에 PDF 첨부 (공식 패키지 — file_picker 는 compileSdk 가 맞지 않아 빌드가 막혔다)
   open_filex: ^4.5.0 # 받은 PDF 를 PDF 앱으로 열기
+  pdfrx: ^2.12.0 # 원본 PDF 를 그대로 그린다 (pdfium — 크롬과 같은 PDF 엔진)
   google_mlkit_digital_ink_recognition: ^0.16.1
   web_socket_channel: ^3.0.3
   flutter_svg: ^2.0.10

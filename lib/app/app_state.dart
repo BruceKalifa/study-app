@@ -18,6 +18,7 @@ import '../services/live_sync.dart';
 import 'goals.dart';
 import 'learner.dart';
 import 'records.dart';
+import '../pdf/pdf_store.dart';
 import 'storage.dart';
 import 'theme.dart';
 
@@ -32,7 +33,10 @@ class AppState extends ChangeNotifier {
   AppState({required this.storage, required ProblemBank baseBank, this.enableLive = true, this.autoSyncBooks = true})
       : _baseBank = baseBank,
         _contentBank = baseBank,
-        bank = baseBank;
+        bank = baseBank {
+    // 교재 파일의 원본 PDF 를 그릴 때 꺼내는 곳
+    PdfStore.instance = PdfStore(storage);
+  }
 
   final Storage storage;
 

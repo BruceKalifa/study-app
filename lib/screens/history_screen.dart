@@ -8,6 +8,7 @@ import '../widgets/common.dart';
 import '../widgets/ink_preview.dart';
 import '../widgets/math_text.dart';
 import 'solve_screen.dart';
+import '../widgets/problem_stem.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -173,7 +174,7 @@ class AttemptDetailScreen extends StatelessWidget {
                   ]),
                   const SizedBox(height: 18),
                   if (p != null) ...[
-                    MathText(p.stem, style: const TextStyle(fontSize: 16, color: AppColors.ink, height: 1.7)),
+                    ProblemStem(p, style: const TextStyle(fontSize: 16, color: AppColors.ink, height: 1.7)),
                     if (p.boxItems.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       for (final b in p.boxItems)

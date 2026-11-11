@@ -1,5 +1,9 @@
 // Problem / Subject / Template models. See docs/problem-schema.md.
 
+import 'pdf_ref.dart';
+
+export 'pdf_ref.dart';
+
 enum ProblemType { choice, short }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +233,9 @@ class Problem {
   /// 배점 (null → 난이도로 2·3·4점, 0 → 표시하지 않음).
   final int? points;
 
+  /// 원본 PDF 의 문항 영역 — 있으면 본문 대신 PDF 를 그대로 그린다 ([stem] 은 검색·목록용 글).
+  final PdfRegion? pdf;
+
   const Problem({
     required this.id,
     required this.subjectId,
@@ -259,6 +266,7 @@ class Problem {
     this.labelColor,
     this.texStyle = false,
     this.points,
+    this.pdf,
   });
 
   bool get isTwin => twinOf != null;
@@ -269,6 +277,14 @@ class Problem {
   bool get isVariant => variantOf != null;
   bool get hasTemplate => template != null;
   bool get isChoice => type == ProblemType.choice;
+
+  /// 선지 수 — 원본 PDF 문항은 PDF 에서 찾은 선지 자리 수 (못 찾았으면 5).
+  int get choiceCount {
+    if (choices.isNotEmpty) return choices.length;
+    final r = pdf;
+    if (r != null && isChoice) return r.choices.isNotEmpty ? r.choices.length : 5;
+    return 0;
+  }
 
   /// `subjectId`/`subjectName` keys inside [j] (as written by [toJson]) take
   /// precedence; the named arguments are used when the JSON lacks them
@@ -326,6 +342,7 @@ class Problem {
       labelColor: j['labelColor'] == null ? null : parseColor(j['labelColor'], 0xFF000000),
       texStyle: j['texStyle'] == true,
       points: _int(j['points']),
+      pdf: PdfRegion.fromJson(j['pdf']),
     );
   }
 
@@ -362,6 +379,7 @@ class Problem {
     if (labelColor != null) m['labelColor'] = colorToHex(labelColor!);
     if (texStyle) m['texStyle'] = true;
     if (points != null) m['points'] = points;
+    if (pdf != null) m['pdf'] = pdf!.toJson();
     return m;
   }
 
@@ -423,6 +441,7 @@ class Problem {
       labelColor: labelColor,
       texStyle: texStyle,
       points: points,
+      pdf: pdf,
     );
   }
 
@@ -480,6 +499,9 @@ class Concept {
 
   /// 3D 모션 그래픽 수업 (docs/lesson3d.md) — `Solvit3D.lesson(…)` 이 든 HTML 한 장. 있으면 앱이 3D 수업으로 연다.
   final String lesson3d;
+
+  /// 원본 PDF 의 쪽들 — 있으면 개념책 화면에서 PDF 그대로 넘겨 읽는다.
+  final PdfPages? pdf;
   const Concept({
     required this.id,
     this.title = '',
@@ -492,6 +514,7 @@ class Concept {
     this.links = const <String>[],
     this.images = const <String>[],
     this.lesson3d = '',
+    this.pdf,
   });
 
   factory Concept.fromJson(Map<String, dynamic> j) {
@@ -508,6 +531,7 @@ class Concept {
       links: _strList(j['links']),
       images: _strList(j['images']),
       lesson3d: _str(j['lesson3d']),
+      pdf: PdfPages.fromJson(j['pdf']),
     );
   }
 
@@ -523,6 +547,7 @@ class Concept {
         if (links.isNotEmpty) 'links': links,
         if (images.isNotEmpty) 'images': images,
         if (lesson3d.isNotEmpty) 'lesson3d': lesson3d,
+        if (pdf != null) 'pdf': pdf!.toJson(),
       };
 
   /// 이 개념이 설명하는 문제인가 — 문제 유형을 `·` 로 나눈 토막이 연결 이름과 같으면.

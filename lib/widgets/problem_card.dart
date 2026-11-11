@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/app_state.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
+import '../pdf/pdf_view.dart';
 import 'common.dart';
 import 'math_text.dart';
 
@@ -227,7 +228,77 @@ class ProblemSheet extends StatelessWidget {
     );
   }
 
+  /// 원본 PDF 문항: PDF 영역을 그대로, 객관식은 PDF 에 찍힌 ①~⑤ 자리를 눌러 고른다.
+  Widget _pdfColumn(Problem p, PdfRegion r, int? correctChoice, double columnWidth) {
+    // 원문 글자(약 9~10pt)가 앱 글자(25)와 비슷한 크기가 되도록, 칸보다 넓으면 칸에 맞춘다
+    final width = math.min(columnWidth, r.rect.width * kPdfUnitsPerPt);
+    final count = p.choiceCount;
+    final overlay = p.isChoice && r.choices.isNotEmpty
+        ? LayoutBuilder(builder: (context, box) {
+            final k = box.maxWidth / r.rect.width;
+            return Stack(children: [
+              for (var i = 0; i < r.choices.length && i < count; i++)
+                _PdfChoice(
+                  key: Key('choice-${i + 1}'),
+                  keyForTap: i < keys.choices.length ? keys.choices[i] : null,
+                  glyph: Rect.fromLTRB((r.choices[i].x0 - r.rect.x0) * k, (r.choices[i].y0 - r.rect.y0) * k,
+                      (r.choices[i].x1 - r.rect.x0) * k, (r.choices[i].y1 - r.rect.y0) * k),
+                  selected: selectedChoice == i + 1,
+                  correct: revealAnswer && correctChoice == i + 1,
+                ),
+            ]);
+          })
+        : null;
+    return SizedBox(
+      width: columnWidth,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Stack(clipBehavior: Clip.none, children: [
+          SizedBox(width: width, child: PdfRegionView.region(r, overlay: overlay)),
+          if (mark != null)
+            Positioned(
+              left: -40,
+              top: -18,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOutCubic,
+                builder: (context, t, _) => CustomPaint(
+                  size: const Size(66, 62),
+                  painter: _MarkPainter(correct: mark!, progress: t),
+                ),
+              ),
+            ),
+        ]),
+        // 원문에 선지 자리를 못 찾은 객관식: 번호만 아래에 따로
+        if (p.isChoice && r.choices.isEmpty) ...[
+          const SizedBox(height: 22),
+          _Choices(
+            choices: [for (var i = 0; i < count; i++) ''],
+            keys: keys.choices,
+            selected: selectedChoice,
+            correct: revealAnswer ? correctChoice : null,
+            color: color,
+          ),
+        ],
+        if (!p.isChoice) ...[
+          const SizedBox(height: 22),
+          _AnswerBox(
+            boxKey: keys.answerBox,
+            unit: p.answerUnit,
+            empty: answerBoxEmpty,
+            text: answerText,
+            note: answerNote,
+            reveal: revealAnswer ? p.answer : null,
+            color: color,
+          ),
+        ],
+      ]),
+    );
+  }
+
   Widget _problemColumn(Problem p, int? correctChoice, double columnWidth, bool origin) {
+    final pdf = p.pdf;
+    if (pdf != null) return _pdfColumn(p, pdf, correctChoice, columnWidth);
     return SizedBox(
               width: columnWidth,
               child: Column(
@@ -476,6 +547,53 @@ class _Choices extends StatelessWidget {
     );
   }
 }
+
+/// 원본 PDF 의 선지 글자(①…) 위 — 누르는 자리(글자보다 넉넉히)와 고른 표시.
+class _PdfChoice extends StatelessWidget {
+  const _PdfChoice({super.key, required this.keyForTap, required this.glyph, required this.selected, required this.correct});
+  final GlobalKey? keyForTap;
+  final Rect glyph;
+  final bool selected;
+  final bool correct;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = math.max(glyph.width, glyph.height);
+    final c = glyph.center;
+    // 누르는 자리: 글자 왼쪽 조금 ~ 오른쪽으로 글자 4개만큼 (선지 글이 이어지는 쪽)
+    final hit = Rect.fromLTRB(glyph.left - d * 0.8, glyph.top - d * 0.9, glyph.right + d * 4, glyph.bottom + d * 0.9);
+    return Stack(clipBehavior: Clip.none, children: [
+      Positioned.fromRect(rect: hit, child: KeyedSubtree(key: keyForTap, child: const SizedBox.expand())),
+      if (selected)
+        Positioned(
+          left: c.dx - d * 0.62,
+          top: c.dy - d * 0.62,
+          child: IgnorePointer(
+            child: Container(
+              width: d * 1.24,
+              height: d * 1.24,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x551B2A4A)),
+            ),
+          ),
+        ),
+      if (correct)
+        Positioned(
+          left: c.dx - d * 0.95,
+          top: c.dy - d * 0.95,
+          child: IgnorePointer(
+            child: Container(
+              width: d * 1.9,
+              height: d * 1.9,
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFE0353B), width: 3)),
+            ),
+          ),
+        ),
+    ]);
+  }
+}
+
+/// 원본 PDF 를 문제지에 놓을 때 1포인트 = 몇 단위 (원문 9~10pt 글자가 앱 본문 글자 25 와 비슷하게).
+const double kPdfUnitsPerPt = 2.6;
 
 class _ChoiceItem extends StatelessWidget {
   const _ChoiceItem({required this.n, required this.text, required this.selected, required this.correct, required this.color});

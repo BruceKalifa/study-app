@@ -9,6 +9,7 @@ import '../widgets/ink_preview.dart';
 import '../widgets/math_text.dart';
 import 'questions_screen.dart' show AskTeacherScreen;
 import 'solve_screen.dart';
+import '../widgets/problem_stem.dart';
 
 class WrongNoteScreen extends StatefulWidget {
   const WrongNoteScreen({super.key});
@@ -167,7 +168,7 @@ class _WrongCard extends StatelessWidget {
                 const Pill('졸업', color: AppColors.correct, icon: Icons.school_rounded, dense: true),
             ]),
             const SizedBox(height: 12),
-            MathText(p.stem, maxLines: 4, style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.6)),
+            ProblemStem(p, maxLines: 4, style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.6)),
             const SizedBox(height: 12),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(

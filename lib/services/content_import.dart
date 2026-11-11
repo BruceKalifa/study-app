@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../app/storage.dart';
+import '../pdf/pdf_store.dart';
 import '../core/problem.dart';
 import '../core/problem_bank.dart';
 
@@ -136,6 +137,8 @@ class ContentImport {
     var books = await list();
     for (var k = 0; k < all.length; k++) {
       final bundle = parsed[k];
+      // 원본 PDF 는 따로 둔다 (그릴 때 바로 꺼내게). 교재 JSON 에도 남겨 서버에 다시 올릴 때 함께 간다.
+      await (PdfStore.instance ?? PdfStore(storage)).putAll(all[k]['pdfs']);
       await storage.write('imports/${bundle.id}.json', jsonEncode(all[k]));
       books = books.where((b) => b.id != bundle.id).toList()
         ..add(ImportedBook(bundle.id, bundle.title, bundle.problemCount, DateTime.now().millisecondsSinceEpoch, sha));

@@ -472,7 +472,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   bool _onTapPage(Offset pos, bool stylus) {
     final p = _p;
     if (p.isChoice) {
-      final n = _sheet.choiceAt(pos, p.choices.length);
+      final n = _sheet.choiceAt(pos, p.choiceCount);
       if (n == null) return false;
       if (!_locked) {
         HapticFeedback.selectionClick();
