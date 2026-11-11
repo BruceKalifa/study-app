@@ -15,10 +15,10 @@ class Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: dense ? 8 : 10, vertical: dense ? 3 : 5),
+      padding: EdgeInsets.symmetric(horizontal: dense ? 7 : 10, vertical: dense ? 2.5 : 5),
       decoration: BoxDecoration(
-        color: background ?? color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
+        color: background ?? color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(dense ? 6 : 8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -29,7 +29,11 @@ class Pill extends StatelessWidget {
           ],
           Text(label,
               style: TextStyle(
-                  fontSize: dense ? 11.5 : 12.5, fontWeight: FontWeight.w700, color: color, letterSpacing: -0.1)),
+                  fontSize: dense ? 11.5 : 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                  letterSpacing: -0.1,
+                  fontFeatures: AppColors.tabular)),
         ],
       ),
     );
@@ -135,36 +139,43 @@ class StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 라벨 한 줄 (작은 색 점 또는 아이콘) → 큰 고정폭 숫자 → 보조 글. 아이콘을 색 네모에 가두지 않는다.
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(children: [
-              if (icon != null) ...[
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(9)),
-                  child: Icon(icon, size: 17, color: color),
-                ),
-                const SizedBox(width: 10),
-              ],
+              if (icon != null)
+                Icon(icon, size: 16, color: color)
+              else
+                Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 7),
               Flexible(
                 child: Text(label,
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.inkSoft),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.inkSoft),
                     overflow: TextOverflow.ellipsis),
               ),
             ]),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -1, color: AppColors.ink, height: 1.1)),
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.2,
+                    color: AppColors.ink,
+                    height: 1.05,
+                    fontFeatures: AppColors.tabular)),
             if (sub != null) ...[
-              const SizedBox(height: 4),
-              Text(sub!, style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
+              Text(sub!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
             ],
           ],
         ),
@@ -191,16 +202,17 @@ class SectionHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: AppColors.ink)),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: AppColors.ink)),
                 if (subtitle != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(subtitle!, style: const TextStyle(fontSize: 13, color: AppColors.inkMuted)),
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(subtitle!,
+                        style: const TextStyle(fontSize: 13, color: AppColors.inkMuted, fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          if (trailing != null) Padding(padding: const EdgeInsets.only(left: 12), child: trailing!),
         ],
       ),
     );
@@ -222,21 +234,21 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(color: AppColors.paperDeep, borderRadius: BorderRadius.circular(24)),
-              child: Icon(icon, size: 36, color: AppColors.inkMuted),
-            ),
-            const SizedBox(height: 18),
+            Icon(icon, size: 40, color: AppColors.lineStrong),
+            const SizedBox(height: 14),
             Text(title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.ink, letterSpacing: -0.3)),
             if (message != null) ...[
               const SizedBox(height: 6),
-              Text(message!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.inkMuted)),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Text(message!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.inkMuted, fontWeight: FontWeight.w500)),
+              ),
             ],
-            if (action != null) ...[const SizedBox(height: 18), action!],
+            if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
       ),
@@ -257,7 +269,7 @@ class AccuracyBar extends StatelessWidget {
       child: Container(
         height: height,
         width: double.infinity,
-        color: color.withValues(alpha: 0.14),
+        color: AppColors.paperDeep,
         alignment: Alignment.centerLeft,
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: value.clamp(0.0, 1.0)),
@@ -288,9 +300,12 @@ class ResultMark extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.13), shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: c == null ? AppColors.paperDeep : color.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+      ),
       child: Icon(c == null ? Icons.remove_rounded : (c ? Icons.circle_outlined : Icons.close_rounded),
-          size: size * 0.62, color: color),
+          size: size * 0.6, color: color),
     );
   }
 }
