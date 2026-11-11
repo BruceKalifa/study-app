@@ -785,7 +785,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
           ]);
 
     return Scaffold(
-      backgroundColor: _full ? const Color(0xFFE9E6DF) : AppColors.paper,
+      backgroundColor: _full ? const Color(0xFFE3E7E2) : AppColors.paper,
       body: Stack(children: [
         Column(children: [
           if (!_full) SafeArea(bottom: false, child: _topBar(app, color)),
@@ -864,7 +864,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(32),
           border: Border.all(color: AppColors.line),
-          boxShadow: const [BoxShadow(color: Color(0x221B2A4A), blurRadius: 22, offset: Offset(0, 8))],
+          boxShadow: const [BoxShadow(color: Color(0x221C2126), blurRadius: 22, offset: Offset(0, 8))],
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: children),
       );
@@ -1031,7 +1031,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.line),
-        boxShadow: const [BoxShadow(color: Color(0x0F1B2A4A), blurRadius: 18, offset: Offset(0, 6))],
+        boxShadow: const [BoxShadow(color: Color(0x0F1C2126), blurRadius: 18, offset: Offset(0, 6))],
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         const SizedBox(width: 8),
@@ -1276,7 +1276,7 @@ class _NavButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: const BorderRadius.all(Radius.circular(32)),
             boxShadow: enabled
-                ? const [BoxShadow(color: Color(0x1A1B2A4A), blurRadius: 20, offset: Offset(0, 8))]
+                ? const [BoxShadow(color: Color(0x1A1C2126), blurRadius: 20, offset: Offset(0, 8))]
                 : null,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: trailing ? [tx, ic] : [ic, tx]),

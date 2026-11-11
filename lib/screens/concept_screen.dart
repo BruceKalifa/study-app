@@ -157,7 +157,7 @@ class _ConceptScreenState extends State<ConceptScreen> with WidgetsBindingObserv
     final ps = _problems();
     final lesson = c.lesson3d.isNotEmpty;
     return Scaffold(
-      backgroundColor: const Color(0xFFE9E6DF),
+      backgroundColor: const Color(0xFFE3E7E2),
       appBar: AppBar(
         title: Text(c.title.isEmpty ? '개념' : c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [

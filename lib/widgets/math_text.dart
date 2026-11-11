@@ -247,7 +247,7 @@ class MathText extends StatelessWidget {
             child: Container(
               width: double.infinity,
               padding: EdgeInsets.fromLTRB(fs * 0.62, fs * 0.36, fs * 0.62, fs * 0.36),
-              decoration: BoxDecoration(border: Border.all(color: base.color ?? const Color(0xFF1B2A4A), width: 1.1)),
+              decoration: BoxDecoration(border: Border.all(color: base.color ?? const Color(0xFF1C2126), width: 1.1)),
               child: _structured(inner, base, align),
             ),
           ));
@@ -420,8 +420,8 @@ class MathText extends StatelessWidget {
     }
     final cols = data.fold<int>(0, (m, r) => r.length > m ? r.length : m);
     if (cols == 0) return const SizedBox();
-    final line = BorderSide(color: base.color ?? const Color(0xFF1B2A4A), width: 1);
-    final thin = BorderSide(color: (base.color ?? const Color(0xFF1B2A4A)).withValues(alpha: 0.35), width: 0.8);
+    final line = BorderSide(color: base.color ?? const Color(0xFF1C2126), width: 1);
+    final thin = BorderSide(color: (base.color ?? const Color(0xFF1C2126)).withValues(alpha: 0.35), width: 0.8);
     final cellStyle = base.copyWith(height: 1.35, fontSize: (base.fontSize ?? 16) * 0.92);
     return Table(
       defaultColumnWidth: const FlexColumnWidth(),
@@ -430,7 +430,7 @@ class MathText extends StatelessWidget {
       children: [
         for (var r = 0; r < data.length; r++)
           TableRow(
-            decoration: BoxDecoration(color: header && r == 0 ? const Color(0x0F1B2A4A) : null),
+            decoration: BoxDecoration(color: header && r == 0 ? const Color(0x0F1C2126) : null),
             children: [
               for (var c = 0; c < cols; c++)
                 Padding(

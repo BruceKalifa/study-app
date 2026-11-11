@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 
 /// 앱 이름 — 바꿀 때는 여기와 tools/patch_android.sh 의 android:label 을 함께 고친다.
@@ -11,33 +13,45 @@ const bool kEndlessEnabled = false;
 
 const String kDefaultServer = 'https://pulinote-server.onrender.com';
 
-/// Design tokens — "paper & ink": warm paper surfaces, deep ink navy text,
-/// one coral accent, subject colours for wayfinding.
+/// Design tokens — "engineering pad" (공학용 계산지):
+/// 서늘한 회녹색 종이, 흑연(graphite) 글자, 설계도 파랑 하나, 형광펜 노랑은 강조 한 곳에만.
+/// (따뜻한 크림 종이 + 코랄 은 흔한 생성형 기본값이라 버렸다)
 class AppColors {
-  static const paper = Color(0xFFF5F2EC);
-  static const paperDeep = Color(0xFFECE7DE);
+  static const paper = Color(0xFFF1F3F0);
+  static const paperDeep = Color(0xFFE6EAE5);
   static const surface = Color(0xFFFFFFFF);
-  static const sheet = Color(0xFFFFFDF8);
-  static const line = Color(0xFFE6E0D5);
-  static const lineStrong = Color(0xFFD5CDBF);
+  static const sheet = Color(0xFFFDFEFC);
+  static const line = Color(0xFFDDE2DB);
+  static const lineStrong = Color(0xFFC6CEC4);
 
-  static const ink = Color(0xFF1B2A4A);
-  static const inkSoft = Color(0xFF4A5672);
-  static const inkMuted = Color(0xFF8A90A0);
+  /// 모눈 (계산지 격자)
+  static const grid = Color(0xFFE4EAE2);
 
-  static const accent = Color(0xFFFF6B4A);
-  static const accentSoft = Color(0xFFFFE6DE);
-  static const blue = Color(0xFF2F6BFF);
-  static const blueSoft = Color(0xFFE3ECFF);
+  static const ink = Color(0xFF1C2126);
+  static const inkSoft = Color(0xFF515A64);
+  static const inkMuted = Color(0xFF858E98);
 
-  static const correct = Color(0xFF169C6B);
-  static const correctSoft = Color(0xFFDDF5EA);
-  static const wrong = Color(0xFFE5484D);
-  static const wrongSoft = Color(0xFFFDE4E4);
-  static const review = Color(0xFFE8A317);
-  static const reviewSoft = Color(0xFFFFF2D6);
+  /// 설계도 파랑 — 주요 동작·진행 (흰 글자가 올라간다)
+  static const accent = Color(0xFF2B59C3);
+  static const accentSoft = Color(0xFFE4EBFA);
+  static const blue = Color(0xFF2B59C3);
+  static const blueSoft = Color(0xFFE4EBFA);
 
-  static const rail = Color(0xFF1B2A4A);
+  /// 형광펜 — 선택된 것·오늘 할 것 밑줄. 배경으로만 쓰고 위에는 흑연 글자.
+  static const highlight = Color(0xFFFFE45C);
+  static const highlightSoft = Color(0xFFFFF6BF);
+
+  static const correct = Color(0xFF16956A);
+  static const correctSoft = Color(0xFFDDF3E9);
+  static const wrong = Color(0xFFE0443F);
+  static const wrongSoft = Color(0xFFFCE3E2);
+  static const review = Color(0xFFC77D0A);
+  static const reviewSoft = Color(0xFFFCEFD6);
+
+  static const rail = Color(0xFF1C2126);
+
+  /// 숫자는 고정폭 (진도·시간이 바뀔 때 글자가 흔들리지 않게)
+  static const tabular = [FontFeature.tabularFigures()];
 }
 
 class AppTheme {
@@ -89,6 +103,10 @@ class AppTheme {
         bodyMedium: t.bodyMedium?.copyWith(height: 1.5, color: AppColors.ink),
         labelLarge: t.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      }),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.paper,
         foregroundColor: AppColors.ink,
@@ -103,8 +121,19 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           side: const BorderSide(color: AppColors.line),
+        ),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.inkSoft,
+          selectedBackgroundColor: AppColors.ink,
+          selectedForegroundColor: Colors.white,
+          side: const BorderSide(color: AppColors.line),
+          textStyle: const TextStyle(fontFamily: font, fontSize: 14.5, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -113,7 +142,7 @@ class AppTheme {
           foregroundColor: Colors.white,
           minimumSize: const Size(64, 52),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: const TextStyle(fontFamily: font, fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
@@ -123,7 +152,7 @@ class AppTheme {
           minimumSize: const Size(64, 52),
           side: const BorderSide(color: AppColors.lineStrong),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           textStyle: const TextStyle(fontFamily: font, fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
@@ -137,9 +166,10 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         selectedColor: AppColors.ink,
         side: const BorderSide(color: AppColors.line),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         labelStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w600, color: AppColors.ink),
         secondaryLabelStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w700, color: Colors.white),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         showCheckmark: false,
       ),
       inputDecorationTheme: InputDecorationTheme(

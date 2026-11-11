@@ -514,7 +514,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xE61B2A4A),
+                color: const Color(0xE61C2126),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(msg, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
@@ -560,7 +560,7 @@ class InkCanvasState extends State<InkCanvas> with SingleTickerProviderStateMixi
         child: ClipRect(
           child: Stack(
             children: [
-              Positioned.fill(child: ColoredBox(color: const Color(0xFFE9E6DF))),
+              Positioned.fill(child: ColoredBox(color: const Color(0xFFE3E7E2))),
               Positioned(
                 left: 0,
                 top: 0,

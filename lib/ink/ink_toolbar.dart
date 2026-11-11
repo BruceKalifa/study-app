@@ -35,7 +35,7 @@ class InkToolbar extends StatelessWidget {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AppColors.line),
-            boxShadow: const [BoxShadow(color: Color(0x0F1B2A4A), blurRadius: 18, offset: Offset(0, 6))],
+            boxShadow: const [BoxShadow(color: Color(0x0F1C2126), blurRadius: 18, offset: Offset(0, 6))],
           ),
           child: Row(
             children: [
@@ -484,7 +484,7 @@ class _Segment extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: i == index ? AppColors.surface : Colors.transparent,
                   borderRadius: BorderRadius.circular(9),
-                  boxShadow: i == index ? const [BoxShadow(color: Color(0x141B2A4A), blurRadius: 6)] : null,
+                  boxShadow: i == index ? const [BoxShadow(color: Color(0x141C2126), blurRadius: 6)] : null,
                 ),
                 child: Text(labels[i],
                     style: TextStyle(

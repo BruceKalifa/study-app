@@ -577,7 +577,7 @@ class _PdfChoice extends StatelessWidget {
             child: Container(
               width: d * 1.24,
               height: d * 1.24,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x551B2A4A)),
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x551C2126)),
             ),
           ),
         ),

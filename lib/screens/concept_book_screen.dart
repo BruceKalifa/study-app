@@ -284,7 +284,7 @@ class _ConceptBookScreenState extends State<ConceptBookScreen> with WidgetsBindi
     final last = _shown.isEmpty ? _cursor : _cursor + _shown.length - 1;
     return Scaffold(
       key: _scaffold,
-      backgroundColor: const Color(0xFFE9E6DF),
+      backgroundColor: const Color(0xFFE3E7E2),
       drawer: Drawer(width: 400, child: _toc(app, color)),
       appBar: AppBar(
         leading: const BackButton(),
@@ -314,7 +314,7 @@ class _ConceptBookScreenState extends State<ConceptBookScreen> with WidgetsBindi
                         : InkCanvas(
                             key: _canvas,
                             controller: ink,
-                            paperColor: const Color(0xFFE9E6DF),
+                            paperColor: const Color(0xFFE3E7E2),
                             onTapPage: _onTap,
                             underlay: _spreadView(color),
                           ),
@@ -571,7 +571,7 @@ class _SolveChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.ink,
         borderRadius: BorderRadius.circular(999),
-        boxShadow: const [BoxShadow(color: Color(0x401B2A4A), blurRadius: 6, offset: Offset(0, 2))],
+        boxShadow: const [BoxShadow(color: Color(0x401C2126), blurRadius: 6, offset: Offset(0, 2))],
       ),
       child: const Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.edit_rounded, size: 14, color: Colors.white),

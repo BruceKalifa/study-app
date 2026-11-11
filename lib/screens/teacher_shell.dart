@@ -135,10 +135,10 @@ class _RailButton extends StatelessWidget {
                 width: 56,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: selected ? Colors.white.withValues(alpha: 0.14) : Colors.transparent,
+                  color: selected ? AppColors.highlight : Colors.transparent,
                   borderRadius: BorderRadius.circular(17),
                 ),
-                child: Icon(icon, color: selected ? Colors.white : Colors.white60, size: 23),
+                child: Icon(icon, color: selected ? AppColors.ink : Colors.white60, size: 23),
               ),
               if (badge != null)
                 Positioned(

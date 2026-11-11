@@ -63,7 +63,7 @@ class _Lesson3DViewState extends State<Lesson3DView> {
       final c = _c ??
           (WebViewController()
             ..setJavaScriptMode(JavaScriptMode.unrestricted)
-            ..setBackgroundColor(const Color(0xFFF7F5EF))
+            ..setBackgroundColor(const Color(0xFFF1F3F0))
             ..setNavigationDelegate(NavigationDelegate(
               // 처음 불러온 페이지 밖으로는 못 나간다 (링크·주소 이동 모두 막는다)
               onNavigationRequest: (r) => r.url == 'about:blank' ? NavigationDecision.navigate : NavigationDecision.prevent,
@@ -89,7 +89,7 @@ class _Lesson3DViewState extends State<Lesson3DView> {
     if (_error != null || c == null) {
       return Container(
         key: const Key('lesson3d-view'),
-        color: const Color(0xFFF7F5EF),
+        color: const Color(0xFFF1F3F0),
         alignment: Alignment.center,
         child: _error != null
             ? Text(_error!, style: const TextStyle(color: AppColors.inkSoft, fontWeight: FontWeight.w700))
@@ -98,7 +98,7 @@ class _Lesson3DViewState extends State<Lesson3DView> {
     }
     return Stack(key: const Key('lesson3d-view'), children: [
       Positioned.fill(child: WebViewWidget(controller: c)),
-      if (!_ready) const Positioned.fill(child: ColoredBox(color: Color(0xFFF7F5EF), child: Center(child: CircularProgressIndicator()))),
+      if (!_ready) const Positioned.fill(child: ColoredBox(color: Color(0xFFF1F3F0), child: Center(child: CircularProgressIndicator()))),
     ]);
   }
 }

@@ -133,7 +133,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: const [BoxShadow(color: Color(0x1A1B2A4A), blurRadius: 40, offset: Offset(0, 16))],
+        boxShadow: const [BoxShadow(color: Color(0x1A1C2126), blurRadius: 40, offset: Offset(0, 16))],
       ),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 220),

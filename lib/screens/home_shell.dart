@@ -212,10 +212,10 @@ class _Rail extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.accent,
+              color: AppColors.highlight,
               borderRadius: BorderRadius.circular(15),
             ),
-            child: const Icon(Icons.draw_rounded, color: Colors.white, size: 26),
+            child: const Icon(Icons.draw_rounded, color: AppColors.ink, size: 26),
           ),
           const SizedBox(height: 6),
           const Text(kAppName,
@@ -291,11 +291,11 @@ class _RailItem extends StatelessWidget {
                 width: 56,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: selected ? Colors.white.withValues(alpha: 0.14) : Colors.transparent,
+                  color: selected ? AppColors.highlight : Colors.transparent,
                   borderRadius: BorderRadius.circular(17),
                 ),
                 child: Icon(selected ? dest.activeIcon : dest.icon,
-                    color: selected ? Colors.white : Colors.white60, size: 23),
+                    color: selected ? AppColors.ink : Colors.white60, size: 23),
               ),
               if (badge != null)
                 Positioned(
