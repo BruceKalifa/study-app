@@ -6,6 +6,7 @@ import '../core/grader.dart';
 import '../core/problem.dart';
 import '../screens/concept_screen.dart';
 import 'math_text.dart';
+import 'problem_stem.dart';
 
 /// Result shown after grading.
 class GradedAnswer {
@@ -274,8 +275,8 @@ Future<void> showSolutionSheet(BuildContext context, Problem p, GradedAnswer? g)
               ),
           ]),
           const SizedBox(height: 16),
-          MathText(p.solution.isEmpty ? '해설이 없어요.' : p.solution,
-              texStyle: p.texStyle,
+          ProblemSolution(p,
+              empty: '해설이 없어요.',
               style: TextStyle(
                   fontSize: 18, color: AppColors.ink, height: 1.8, fontFamily: p.texStyle ? AppTheme.texSerif : null)),
           if ((p.hint ?? '').isNotEmpty) ...[

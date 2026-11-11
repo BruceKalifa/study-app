@@ -192,7 +192,7 @@ def find_regions(pdf, page, want, anchor_re):
     for k, (ci, y, head) in enumerate(starts):
         cl, cr = cols[ci]
         nxt = [s for s in starts if s[0] == ci and s[1] > y + 1]
-        y_end = min(s[1] for s in nxt) - 4 if nxt else bottom
+        y_end = min(s[1] for s in nxt) - 8 if nxt else bottom  # 다음 머리의 상자 띠가 들어오지 않게
         box = ink_box(img, cl + 1, y - 4, cr - 1, y_end, skip_x=rules)
         if box is None:
             notes.append(f'{page}쪽 {k + 1}번째 문항: 잉크가 없어요')

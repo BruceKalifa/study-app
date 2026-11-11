@@ -236,6 +236,9 @@ class Problem {
   /// 원본 PDF 의 문항 영역 — 있으면 본문 대신 PDF 를 그대로 그린다 ([stem] 은 검색·목록용 글).
   final PdfRegion? pdf;
 
+  /// 원본 PDF 의 해설 영역 — 있으면 해설 글 대신 그대로 보여 준다.
+  final PdfRegion? solutionPdf;
+
   const Problem({
     required this.id,
     required this.subjectId,
@@ -267,6 +270,7 @@ class Problem {
     this.texStyle = false,
     this.points,
     this.pdf,
+    this.solutionPdf,
   });
 
   bool get isTwin => twinOf != null;
@@ -277,6 +281,8 @@ class Problem {
   bool get isVariant => variantOf != null;
   bool get hasTemplate => template != null;
   bool get isChoice => type == ProblemType.choice;
+
+  bool get hasSolution => solution.trim().isNotEmpty || solutionPdf != null;
 
   /// 선지 수 — 원본 PDF 문항은 PDF 에서 찾은 선지 자리 수 (못 찾았으면 5).
   int get choiceCount {
@@ -343,6 +349,7 @@ class Problem {
       texStyle: j['texStyle'] == true,
       points: _int(j['points']),
       pdf: PdfRegion.fromJson(j['pdf']),
+      solutionPdf: PdfRegion.fromJson(j['solutionPdf']),
     );
   }
 
@@ -380,6 +387,7 @@ class Problem {
     if (texStyle) m['texStyle'] = true;
     if (points != null) m['points'] = points;
     if (pdf != null) m['pdf'] = pdf!.toJson();
+    if (solutionPdf != null) m['solutionPdf'] = solutionPdf!.toJson();
     return m;
   }
 
@@ -442,6 +450,7 @@ class Problem {
       texStyle: texStyle,
       points: points,
       pdf: pdf,
+      solutionPdf: solutionPdf,
     );
   }
 

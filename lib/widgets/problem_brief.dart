@@ -112,12 +112,11 @@ class ProblemBrief extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.correct)),
         ]),
       ],
-      if (showSolution && p.solution.trim().isNotEmpty) ...[
+      if (showSolution && p.hasSolution) ...[
         const Divider(height: 28),
         const Text('해설', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 6),
-        MathText(p.solution,
-            texStyle: p.texStyle,
+        ProblemSolution(p,
             style: TextStyle(fontSize: fs - 1, color: AppColors.ink, height: 1.7, fontFamily: _face(p))),
       ],
     ]);

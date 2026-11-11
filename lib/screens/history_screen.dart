@@ -201,7 +201,7 @@ class AttemptDetailScreen extends StatelessWidget {
                     const Divider(height: 32),
                     const Text('해설', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                     const SizedBox(height: 8),
-                    MathText(p.solution, style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.7)),
+                    ProblemSolution(p, style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.7)),
                   ],
                 ]),
               ),

@@ -40,3 +40,27 @@ class ProblemStem extends StatelessWidget {
     });
   }
 }
+
+/// 해설 — 원본 PDF 해설 영역이 있으면 그대로, 아니면 글.
+class ProblemSolution extends StatelessWidget {
+  const ProblemSolution(this.problem, {super.key, required this.style, this.empty});
+  final Problem problem;
+  final TextStyle style;
+
+  /// 해설이 없을 때 보일 글 (null 이면 아무것도).
+  final String? empty;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = problem.solutionPdf;
+    if (r == null) {
+      final t = problem.solution.trim().isEmpty ? (empty ?? '') : problem.solution;
+      return MathText(t, texStyle: problem.texStyle, style: style);
+    }
+    final perPt = (style.fontSize ?? 16) / 9.5;
+    return LayoutBuilder(builder: (context, box) {
+      final w = box.maxWidth.isFinite ? box.maxWidth.clamp(0.0, r.rect.width * perPt) : r.rect.width * perPt;
+      return SizedBox(width: w, child: PdfRegionView.region(r));
+    });
+  }
+}

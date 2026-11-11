@@ -284,8 +284,7 @@ class _WrongCard extends StatelessWidget {
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
-            child: MathText(p.solution,
-                texStyle: p.texStyle,
+            child: ProblemSolution(p,
                 style: TextStyle(
                     fontSize: 16, color: AppColors.ink, height: 1.7, fontFamily: p.texStyle ? AppTheme.texSerif : null)),
           ),
