@@ -17,6 +17,7 @@ class GradedAnswer {
 }
 
 String expectedDisplay(Problem p) {
+  if (p.isEssay) return p.answer.isEmpty ? '${p.essayMax}점 만점' : p.answer;
   if (p.isChoice) {
     final n = int.tryParse(p.answer);
     return n == null ? p.answer : circled(n);
@@ -27,6 +28,7 @@ String expectedDisplay(Problem p) {
 
 /// How an answer reads in the UI ("3번" for a choice, "12 m/s" for a short answer).
 String answerDisplay(Problem p, String answer) {
+  if (p.isEssay) return answer;
   if (p.isChoice) return circled(int.tryParse(answer) ?? 0);
   final u = p.answerUnit;
   return u == null || u.isEmpty ? answer : '$answer $u';
@@ -335,4 +337,156 @@ List<Widget> _relatedConcepts(BuildContext context, Problem p) {
         ),
     ]),
   ];
+}
+
+
+/// 서술형 스스로 채점 — 모범 답안을 보며 채점 기준마다 했는지 고른다.
+/// 점수를 돌려준다 (닫으면 null). 화면 위쪽에 내 풀이가 보이도록 반쯤만 덮는다.
+Future<int?> showEssaySelfGrade(BuildContext context, Problem p, {Color color = AppColors.blue}) {
+  return showModalBottomSheet<int>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppColors.paper,
+    barrierColor: Colors.black26,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+    builder: (ctx) => _EssaySheet(problem: p, color: color),
+  );
+}
+
+class _EssaySheet extends StatefulWidget {
+  const _EssaySheet({required this.problem, required this.color});
+  final Problem problem;
+  final Color color;
+  @override
+  State<_EssaySheet> createState() => _EssaySheetState();
+}
+
+class _EssaySheetState extends State<_EssaySheet> {
+  late final List<bool> _done = List.filled(widget.problem.rubric.length, false);
+  int? _level; // 채점 기준이 없을 때: 0 틀림 · 1 일부 · 2 다 맞음
+
+  int get _max => widget.problem.essayMax;
+  int? get _score {
+    final r = widget.problem.rubric;
+    if (r.isNotEmpty) {
+      var s = 0;
+      for (var i = 0; i < r.length; i++) {
+        if (_done[i]) s += r[i].points;
+      }
+      return s;
+    }
+    return switch (_level) { 2 => _max, 1 => (_max / 2).round(), 0 => 0, _ => null };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.problem;
+    final score = _score;
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.62,
+      maxChildSize: 0.94,
+      minChildSize: 0.3,
+      builder: (ctx, scroll) => Column(children: [
+        Expanded(
+          child: ListView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(28, 14, 28, 16),
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(color: AppColors.lineStrong, borderRadius: BorderRadius.circular(3)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(children: [
+                Icon(Icons.rule_rounded, color: widget.color),
+                const SizedBox(width: 8),
+                const Text('스스로 채점', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const SizedBox(width: 10),
+                Text('모범 답안과 내 풀이를 비교해 보세요',
+                    style: TextStyle(color: AppColors.inkMuted.withValues(alpha: 0.9), fontWeight: FontWeight.w600)),
+              ]),
+              const SizedBox(height: 16),
+              if (p.answer.isNotEmpty) ...[
+                Row(children: [
+                  const Text('최종 답  ', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.inkMuted)),
+                  Flexible(child: MathText(p.answer, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800))),
+                ]),
+                const SizedBox(height: 12),
+              ],
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: ProblemSolution(p,
+                    empty: '모범 답안이 없어요.',
+                    style: TextStyle(
+                        fontSize: 17, color: AppColors.ink, height: 1.8, fontFamily: p.texStyle ? AppTheme.texSerif : null)),
+              ),
+              const SizedBox(height: 20),
+              Text(p.rubric.isEmpty ? '얼마나 맞았나요?' : '채점 기준 · 한 것만 체크',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              if (p.rubric.isNotEmpty)
+                for (var i = 0; i < p.rubric.length; i++)
+                  CheckboxListTile(
+                    key: Key('rubric-$i'),
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: widget.color,
+                    value: _done[i],
+                    onChanged: (v) => setState(() => _done[i] = v ?? false),
+                    title: MathText(p.rubric[i].text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    secondary: Text('${p.rubric[i].points}점',
+                        style: TextStyle(fontWeight: FontWeight.w800, color: _done[i] ? widget.color : AppColors.inkMuted)),
+                  )
+              else
+                Wrap(spacing: 10, runSpacing: 10, children: [
+                  for (final (v, label, c) in [
+                    (2, '다 맞았어요', AppColors.correct),
+                    (1, '일부만 맞았어요', AppColors.review),
+                    (0, '틀렸어요', AppColors.wrong),
+                  ])
+                    ChoiceChip(
+                      key: Key('essay-level-$v'),
+                      label: Text(label),
+                      selected: _level == v,
+                      selectedColor: c.withValues(alpha: 0.16),
+                      labelStyle: TextStyle(fontWeight: FontWeight.w800, color: _level == v ? c : AppColors.ink),
+                      onSelected: (_) => setState(() => _level = v),
+                    ),
+                ]),
+            ],
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 6, 28, 16),
+            child: Row(children: [
+              Text(score == null ? '- / $_max점' : '$score / $_max점',
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: score == null ? AppColors.inkMuted : (score == _max ? AppColors.correct : AppColors.ink))),
+              const Spacer(),
+              FilledButton.icon(
+                key: const Key('essay-confirm'),
+                onPressed: score == null && p.rubric.isEmpty ? null : () => Navigator.pop(context, score ?? 0),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 52), backgroundColor: widget.color),
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('점수 확정'),
+              ),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
 }

@@ -118,7 +118,7 @@ def generic_course(name):
 
 STAGES = ('개념', '유형', '기출', 'N제', '모의고사')
 CONCEPT_KINDS = ('개념', '실전개념', '공식 정리')
-SECTIONS = ('문제', '선택지', '해설', '본문', '보기')
+SECTIONS = ('문제', '선택지', '해설', '본문', '보기', '채점기준')
 CIRCLED = '①②③④⑤⑥⑦⑧⑨'
 # <보기> 항목 머리 (ㄱ. ㄴ. ㄷ. / 가. 나. / (가) (나))
 BOX_HEAD = re.compile(r'^\s*(?:\(?\s*([ㄱ-ㅎ가-힣])\s*[.)]|\(\s*([ㄱ-ㅎ가-힣])\s*\))\s*(.*)$')
@@ -182,6 +182,21 @@ def clean(text, figs, problems, where):
     s = re.sub(r'\[\s*그림\s*[:：]\s*([^\]]+)\]', fig, text)
     s = re.sub(r'\n{3,}', '\n\n', s)
     return s.strip()
+
+
+def parse_rubric(text):
+    """[채점기준] 줄들 → [{'text','points'}]. "치환을 바르게 세운다 (2점)" / "치환 | 2" / "- 최종 답 1점"."""
+    out = []
+    for line in (text or '').splitlines():
+        t = line.strip().lstrip('-•·*').strip()
+        if not t:
+            continue
+        m = re.match(r'^(.*?)[\s|:·\-]*\(?\s*(\d+)\s*점?\s*\)?\s*$', t)
+        if m and m.group(1).strip():
+            out.append({'text': m.group(1).strip(), 'points': int(m.group(2))})
+        else:
+            out.append({'text': t, 'points': 1})
+    return out
 
 
 def split_choices(text, problems, where):
@@ -405,9 +420,11 @@ def build(folder, outdir=None):
         if not stem:
             problems.append(f'{where}: [문제] 가 비어 있어요')
         answer = head.get('정답', '').strip()
-        if not answer:
-            problems.append(f'{where}: 정답이 비어 있어요 (앱 채점에 꼭 필요해요)')
         kind = head.get('형식', '').strip()
+        is_essay = kind.startswith('서술')
+        # 서술형은 스스로 채점 — 최종 답은 있으면 보여 주고, 없어도 된다
+        if not answer and not is_essay:
+            problems.append(f'{where}: 정답이 비어 있어요 (앱 채점에 꼭 필요해요)')
         choices = split_choices(body.get('선택지', ''), problems, where) if body.get('선택지') else []
         box = split_box(clean(body.get('보기', ''), figs, problems, where)) if body.get('보기') else []
         is_choice = kind.startswith('객관') or (not kind and len(choices) >= 2)
@@ -434,12 +451,18 @@ def build(folder, outdir=None):
             'topic': head.get('유형', ''),
             'section': head.get('목차', '') or area or '',
             'difficulty': diff,
-            'type': 'choice' if is_choice else 'short',
+            'type': 'essay' if is_essay else 'choice' if is_choice else 'short',
             'stem': stem,
             'answer': answer,
             'solution': clean(body.get('해설', ''), figs, problems, where),
             'tags': [title],
         }
+        if is_essay:
+            rubric = parse_rubric(body.get('채점기준', ''))
+            if rubric:
+                p['rubric'] = rubric
+            if not p['solution']:
+                problems.append(f'{where}: 서술형은 스스로 채점할 때 볼 [해설] (모범 답안) 이 필요해요')
         if choices:
             p['choices'] = choices
         if box:
@@ -835,6 +858,24 @@ def selftest():
             f.write('- 학교: 없는대학교\n')
         rep = build(folder, None)
         assert any('없는대학교' in x for x in rep['issues']), rep['issues']
+
+    # 서술형: 정답 없어도 되고, [채점기준] → rubric, 모범 답안([해설]) 은 꼭
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = os.path.join(tmp, '공업수학1 서술')
+        os.makedirs(folder)
+        with open(os.path.join(folder, '정보.txt'), 'w', encoding='utf-8') as f:
+            f.write('- 교재명: 공업수학1 서술\n- 과목: 공업수학1\n- 학교: 인하대\n')
+        with open(os.path.join(folder, '문항.txt'), 'w', encoding='utf-8') as f:
+            f.write('#문항 1\n형식: 서술형\n[문제]\n$y\'+y=0$ 을 푸시오.\n[해설]\n$y=Ce^{-x}$\n'
+                    '[채점기준]\n- 변수분리 (2점)\n- 적분 | 2\n- 일반해 1점\n'
+                    '\n#문항 2\n형식: 서술형\n[문제]\n증명하시오.\n')
+        rep = build(folder, os.path.join(tmp, 'out'))
+        eq([x for x in rep['issues'] if '정답이 비어' in x], [], '서술형은 정답 없어도 됨')
+        assert any('모범 답안' in x for x in rep['issues']), rep['issues']
+        with gzip.open(rep['file']) as f:
+            ps = json.loads(f.read().decode('utf-8'))['courses'][0]['problems']
+        eq(ps[0]['type'], 'essay', '서술형')
+        eq([r['points'] for r in ps[0]['rubric']], [2, 2, 1], '채점 기준 점수')
 
     # 목록에 없는 과목 (국어·중등 수학 …) → 이름으로 새 과목을 만든다
     with tempfile.TemporaryDirectory() as tmp:

@@ -387,6 +387,14 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
         await _app.deleteDraft(p.id);
       }
       if (!mounted) return;
+      // 서술형은 한 문제씩 내 풀이를 띄워 놓고 스스로 채점한다
+      for (var i = 0; i < _problems.length; i++) {
+        if (!_problems[i].isEssay || _graded[i] != null) continue;
+        await _open(i);
+        if (!mounted) return;
+        await _selfGrade(exam: true);
+        if (!mounted) return;
+      }
     }
     final results = <SessionItem>[
       for (var i = 0; i < _problems.length; i++)
@@ -423,7 +431,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
   }
 
   void _scheduleRecognize({bool force = false}) {
-    if (!mounted || _ink == null || _p.isChoice || _locked) return;
+    if (!mounted || _ink == null || !_p.isShort || _locked) return;
     final strokes = _answerStrokes();
     final sig = strokes.map((s) => s.id).join(',');
     final empty = strokes.isEmpty;
@@ -547,13 +555,40 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// 서술형 스스로 채점 → 기록 (만점이 아니면 오답노트로).
+  Future<void> _selfGrade({bool exam = false}) async {
+    if (_locked && !exam) return;
+    final p = _p;
+    final i = _index;
+    final score = await showEssaySelfGrade(context, p, color: _colorOf(p));
+    if (score == null || !mounted) return;
+    final max = p.essayMax;
+    final time = _elapsedOf(i);
+    _elapsed[i] = time;
+    final g = GradedAnswer('$score/$max점', score >= max, expectedDisplay(p));
+    HapticFeedback.mediumImpact();
+    setState(() => _graded[i] = g);
+    if (!_retrying.contains(i)) {
+      await _app.record(p,
+          answer: g.given,
+          expected: g.expectedDisplay,
+          correct: g.correct,
+          timeMs: time,
+          mode: exam ? 'exam' : widget.mode,
+          inkDoc: _ink?.toDocument());
+      await _app.deleteDraft(p.id);
+    }
+  }
+
   Future<void> _confirmFinish() async {
-    final missing = _problems.length - _answers.length;
+    final missing = _problems.where((q) => !q.isEssay).length - _answers.length;
+    final essays = _problems.where((q) => q.isEssay).length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('시험을 마칠까요?'),
-        content: Text(missing > 0 ? '아직 답하지 않은 문제가 $missing개 있어요. 마치면 바로 채점돼요.' : '모든 문제에 답했어요. 채점할까요?'),
+        content: Text((missing > 0 ? '아직 답하지 않은 문제가 $missing개 있어요. 마치면 바로 채점돼요.' : '모든 문제에 답했어요. 채점할까요?') +
+            (essays > 0 ? '\n서술형 $essays문제는 채점이 끝난 뒤 하나씩 스스로 채점해요.' : '')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('계속 풀기')),
           FilledButton(
@@ -850,7 +885,7 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
           child: Icon(graded.correct ? Icons.circle_outlined : Icons.close_rounded, color: Colors.white, size: 24),
         ),
         const SizedBox(width: 10),
-        Text(graded.correct ? '정답이에요!' : '오답 · 정답 ${graded.expectedDisplay}',
+        Text(p.isEssay ? '${graded.given}${graded.correct ? ' · 만점!' : ''}' : (graded.correct ? '정답이에요!' : '오답 · 정답 ${graded.expectedDisplay}'),
             key: const Key('grade-result'),
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c)),
         const SizedBox(width: 8),
@@ -879,6 +914,40 @@ class _SolveScreenState extends State<SolveScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.refresh_rounded, size: 19),
             label: const Text('다시'),
           ),
+      ]);
+    }
+
+    // 서술형: 답칸 없이 풀이를 쓰고 스스로 채점 (시험 중에는 시험이 끝난 뒤 한꺼번에)
+    if (p.isEssay) {
+      final label = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(_exam ? '서술형 · 시험이 끝나면 스스로 채점해요' : '서술형 · 풀이를 다 썼으면',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+      );
+      if (_exam) {
+        return _pill(children: [
+          label,
+          Container(width: 1, height: 30, color: AppColors.line),
+          TextButton(
+            key: const Key('exam-finish'),
+            onPressed: _palmSafe(_confirmFinish),
+            child: Text('시험 종료 ${_answers.length}/${_problems.where((q) => !q.isEssay).length}'),
+          ),
+        ]);
+      }
+      return _pill(children: [
+        label,
+        FilledButton.icon(
+          key: const Key('self-grade'),
+          onPressed: _palmSafe(_selfGrade),
+          icon: const Icon(Icons.rule_rounded, size: 20),
+          label: const Text('스스로 채점'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            backgroundColor: color,
+          ),
+        ),
       ]);
     }
 

@@ -4,6 +4,7 @@ import '../app/app_state.dart';
 import '../app/records.dart';
 import '../app/theme.dart';
 import '../core/problem.dart';
+import '../widgets/answer_panel.dart' show expectedDisplay;
 import '../widgets/common.dart';
 import '../widgets/ink_preview.dart';
 import '../widgets/math_text.dart';
@@ -175,7 +176,7 @@ class _WrongCard extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (wrongAns != null)
                     _kv('내 답', p.isChoice ? circled(int.tryParse(wrongAns) ?? 0) : wrongAns, AppColors.wrong),
-                  _kv('정답', p.isChoice ? circled(int.tryParse(p.answer) ?? 0) : '${p.answer} ${p.answerUnit ?? ''}',
+                  _kv(p.isEssay ? '모범' : '정답', p.isEssay ? expectedDisplay(p) : p.isChoice ? circled(int.tryParse(p.answer) ?? 0) : '${p.answer} ${p.answerUnit ?? ''}',
                       AppColors.correct),
                   _kv('기록', '${state.attempts}번 풀이 · ${state.wrong}번 틀림', AppColors.inkSoft),
                 ]),

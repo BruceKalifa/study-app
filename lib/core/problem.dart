@@ -4,7 +4,34 @@ import 'pdf_ref.dart';
 
 export 'pdf_ref.dart';
 
-enum ProblemType { choice, short }
+/// choice 객관식 · short 단답형 · essay 서술형 (답칸 없이 풀이를 쓰고 스스로 채점)
+enum ProblemType { choice, short, essay }
+
+/// 서술형 채점 기준 한 줄 ("치환을 바르게 세웠다", 2점).
+class RubricItem {
+  const RubricItem(this.text, this.points);
+  final String text;
+  final int points;
+
+  /// {"text": "...", "points": 2} 또는 "치환을 세웠다 (2점)" / "치환을 세웠다 | 2"
+  static RubricItem? fromJson(Object? j) {
+    if (j is Map) {
+      final t = '${j['text'] ?? ''}'.trim();
+      final pts = j['points'];
+      if (t.isEmpty) return null;
+      return RubricItem(t, pts is num ? pts.toInt().clamp(0, 100) : 1);
+    }
+    if (j is String && j.trim().isNotEmpty) {
+      final m = RegExp(r'^(.*?)[\s|:·\-]*\(?\s*(\d+)\s*점?\s*\)?\s*$').firstMatch(j.trim());
+      if (m != null && m[1]!.trim().isNotEmpty) return RubricItem(m[1]!.trim(), int.parse(m[2]!));
+      return RubricItem(j.trim(), 1);
+    }
+    return null;
+  }
+
+  Map<String, dynamic> toJson() => {'text': text, 'points': points};
+}
+
 
 // ---------------------------------------------------------------------------
 // JSON helpers (JSON numbers may arrive as int or double; maps may be untyped)
@@ -271,9 +298,24 @@ class Problem {
     this.points,
     this.pdf,
     this.solutionPdf,
+    this.rubric = const <RubricItem>[],
   });
 
+  /// 서술형 채점 기준 (없으면 다 맞음 / 일부 / 틀림 세 단계로 스스로 매긴다).
+  final List<RubricItem> rubric;
+
   bool get isTwin => twinOf != null;
+  bool get isEssay => type == ProblemType.essay;
+
+  /// 답칸에 손글씨로 답을 쓰고 자동 채점하는 문항.
+  bool get isShort => type == ProblemType.short;
+
+  /// 서술형 만점 (채점 기준의 합 · 없으면 배점 · 그것도 없으면 10).
+  int get essayMax {
+    final r = rubric.fold<int>(0, (a, b) => a + b.points);
+    if (r > 0) return r;
+    return (points ?? 0) > 0 ? points! : 10;
+  }
 
   /// The problem whose 오답 record this problem feeds (variant/twin → original).
   String get familyId => variantOf ?? twinOf ?? id;
@@ -305,6 +347,8 @@ class Problem {
     final ProblemType type;
     if (typeStr == 'choice') {
       type = ProblemType.choice;
+    } else if (typeStr == 'essay' || typeStr == '서술형' || typeStr == '서술') {
+      type = ProblemType.essay;
     } else if (typeStr == 'short') {
       type = ProblemType.short;
     } else {
@@ -350,6 +394,11 @@ class Problem {
       points: _int(j['points']),
       pdf: PdfRegion.fromJson(j['pdf']),
       solutionPdf: PdfRegion.fromJson(j['solutionPdf']),
+      rubric: [
+        if (j['rubric'] is List)
+          for (final r in j['rubric'] as List)
+            if (RubricItem.fromJson(r) case final item?) item
+      ],
     );
   }
 
@@ -362,7 +411,7 @@ class Problem {
       'topic': topic,
       if (section.isNotEmpty) 'section': section,
       'difficulty': difficulty,
-      'type': type == ProblemType.choice ? 'choice' : 'short',
+      'type': switch (type) { ProblemType.choice => 'choice', ProblemType.essay => 'essay', _ => 'short' },
       'stem': stem,
       'answer': answer,
       'solution': solution,
@@ -388,6 +437,7 @@ class Problem {
     if (points != null) m['points'] = points;
     if (pdf != null) m['pdf'] = pdf!.toJson();
     if (solutionPdf != null) m['solutionPdf'] = solutionPdf!.toJson();
+    if (rubric.isNotEmpty) m['rubric'] = [for (final r in rubric) r.toJson()];
     return m;
   }
 
@@ -451,6 +501,7 @@ class Problem {
       points: points,
       pdf: pdf,
       solutionPdf: solutionPdf,
+      rubric: rubric,
     );
   }
 

@@ -280,7 +280,8 @@ class ProblemSheet extends StatelessWidget {
             color: color,
           ),
         ],
-        if (!p.isChoice) ...[
+        if (p.isEssay) ...[const SizedBox(height: 22), const _EssayHint()],
+        if (p.isShort) ...[
           const SizedBox(height: 22),
           _AnswerBox(
             boxKey: keys.answerBox,
@@ -362,7 +363,11 @@ class ProblemSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (!p.isChoice) ...[
+                  if (p.isEssay) ...[
+                    const SizedBox(height: 22),
+                    const Padding(padding: EdgeInsets.only(left: _indent), child: _EssayHint()),
+                  ],
+                  if (p.isShort) ...[
                     const SizedBox(height: 22),
                     Padding(
                       padding: const EdgeInsets.only(left: _indent),
@@ -655,6 +660,25 @@ class _ChoiceItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 서술형: 답칸 대신 풀이를 쓰라는 안내 한 줄 (아래 빈 곳 전체가 풀이 칸).
+class _EssayHint extends StatelessWidget {
+  const _EssayHint();
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          color: AppColors.ink,
+          child: const Text('서술형',
+              style: TextStyle(fontFamily: AppTheme.font, fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white, height: 1.3)),
+        ),
+        const SizedBox(width: 12),
+        const Flexible(
+          child: Text('풀이 과정을 아래에 자세히 쓰고, 다 쓰면 스스로 채점해요',
+              style: TextStyle(fontFamily: AppTheme.font, fontSize: 16, color: AppColors.inkMuted, fontWeight: FontWeight.w700)),
+        ),
+      ]);
 }
 
 class _AnswerBox extends StatelessWidget {

@@ -10,6 +10,7 @@
              문항번호 | PDF 쪽 | 단원 | 유형 | 객관식/단답형 | 정답 | 난이도(1~5) | 배점 | 쌍둥이 원본 번호 | 출처
   *.pdf      최종본 (정보.txt 의 '최종본', 없으면 폴더의 첫 PDF)
   영역.txt   (선택) 자동으로 못 찾은 문항의 영역을 직접: `문항번호 | 쪽 | x0,y0,x1,y1` (포인트, 쪽 왼쪽 위 원점)
+  채점기준.txt (선택) 서술형 문항의 채점 기준: `문항번호 | 기준 | 점수` (객관식/단답형 칸에 "서술형" 이라고 쓴 문항)
 
 하는 일
   1. 쪽마다 글자 위치(pdftotext -bbox)와 잉크(pdftoppm)를 읽어 단(column)을 나누고,
@@ -270,6 +271,23 @@ def section_of(no):
 
 # ───────────────────────── 만들기 ─────────────────────────
 
+def read_rubrics(path):
+    """채점기준.txt (서술형, 선택): `문항번호 | 기준 | 점수` 한 줄에 한 기준."""
+    out = {}
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding='utf-8-sig'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        parts = [x.strip() for x in line.split('|')]
+        if len(parts) < 2 or not parts[1]:
+            continue
+        pts = int(re.sub(r'[^0-9]', '', parts[2]) or 1) if len(parts) > 2 else 1
+        out.setdefault(parts[0], []).append({'text': parts[1], 'points': pts})
+    return out
+
+
 def build(folder, outdir=None, preview=True):
     meta = tb.read_info(os.path.join(folder, '정보.txt'))
     rows = read_table(os.path.join(folder, '정보.txt'))
@@ -288,6 +306,7 @@ def build(folder, outdir=None, preview=True):
     doc_id = f'{book_id}-{hashlib.sha1(raw_pdf).hexdigest()[:10]}'
     anchor_re = meta.get('문항 시작', '').strip() or DEFAULT_ANCHOR
     overrides = read_overrides(os.path.join(folder, '영역.txt'))
+    rubrics = read_rubrics(os.path.join(folder, '채점기준.txt'))
     total = page_count(pdf)
     issues = []
 
@@ -346,8 +365,9 @@ def build(folder, outdir=None, preview=True):
             'passages': [], 'problems': []})
         kind = r['객관식/단답형']
         is_choice = kind.startswith('객관')
+        is_essay = kind.startswith('서술')
         answer = r['정답'].strip()
-        if not answer:
+        if not answer and not is_essay:
             issues.append(f'{no}: 정답이 비어 있어요')
         if is_choice and not re.fullmatch(r'[1-9]', answer):
             issues.append(f'{no}: 객관식 정답은 번호로 — 지금 "{answer}"')
@@ -362,11 +382,13 @@ def build(folder, outdir=None, preview=True):
             region['choices'] = reg['choices']
         p = {
             'id': ids[no], 'unit': r['단원'] or cname, 'topic': r['유형'], 'section': section_of(no),
-            'difficulty': diff, 'type': 'choice' if is_choice else 'short',
+            'difficulty': diff, 'type': 'essay' if is_essay else 'choice' if is_choice else 'short',
             'stem': reg['text'] or no, 'answer': answer, 'solution': '', 'pdf': region,
         }
         if r['배점'].strip().isdigit():
             p['points'] = int(r['배점'])
+        if is_essay and rubrics.get(no):
+            p['rubric'] = rubrics[no]
         twin = r['쌍둥이 원본 번호'].strip()
         if twin and twin in ids:
             p['twinOf'] = ids[twin]

@@ -873,8 +873,11 @@ def validate_problem(p: dict, where: str, errs, warns, stats, rng):
         tol = p.get("tolerance", 0)
         if not isinstance(tol, (int, float)) or tol < 0:
             errs.append(f"{where}: tolerance must be a non-negative number")
+    elif t == "essay":
+        if not str(p.get("solution", "")).strip():
+            warns.append(f"{where}: essay problem should have a model solution")
     else:
-        errs.append(f"{where}: type must be 'choice' or 'short'")
+        errs.append(f"{where}: type must be 'choice', 'short' or 'essay'")
     for k in ("stem", "solution", "hint"):
         if k in p:
             check_text(p[k], f"{where}.{k}", errs, warns)

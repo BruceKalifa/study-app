@@ -452,7 +452,7 @@ class _ProblemRow extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
-          Pill(problem.isChoice ? '객관식' : '단답형', color: AppColors.inkSoft, dense: true),
+          Pill(problem.isChoice ? '객관식' : (problem.isEssay ? '서술형' : '단답형'), color: AppColors.inkSoft, dense: true),
           const SizedBox(width: 12),
           DifficultyDots(problem.difficulty, color: color, size: 6),
         ]),
