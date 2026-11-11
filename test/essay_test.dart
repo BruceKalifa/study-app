@@ -74,7 +74,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('스스로 채점'), findsWidgets);
-    expect(find.text('- / 5점'), findsOneWidget);
+    expect(find.text('0 / 5점'), findsOneWidget);
     await tester.tap(find.byKey(const Key('rubric-0')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('rubric-2')));
