@@ -74,34 +74,35 @@ class _WorkbookScreenState extends State<WorkbookScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(32, 8, 32, 40),
         children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Wrap(spacing: 8, children: [
+                Wrap(spacing: 6, runSpacing: 6, children: [
                   Pill(w.stage, color: stageColor(w.stage)),
                   Pill(w.level, color: workbookLevelColor(w.level)),
                   if (w.scope.isNotEmpty) Pill(w.scope, color: AppColors.inkSoft),
                   if (w.publisher.isNotEmpty) Pill(w.publisher, color: AppColors.inkSoft),
-                  if (concepts.isNotEmpty) Pill('개념 ${concepts.length}편', color: color),
+                  if (concepts.isNotEmpty) Pill('개념 ${concepts.length}편', color: AppColors.inkSoft),
                 ]),
-                const SizedBox(height: 10),
-                Text(w.title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1.1)),
+                const SizedBox(height: 12),
+                Text(w.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -1.0, height: 1.2)),
                 if (w.desc.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Text(w.desc, style: const TextStyle(fontSize: 15.5, color: AppColors.inkSoft)),
+                  Text(w.desc, style: const TextStyle(fontSize: 15.5, color: AppColors.inkSoft, fontWeight: FontWeight.w500)),
                 ],
               ]),
             ),
-            ProgressRing(
-              value: total == 0 ? 0 : done / total,
-              size: 96,
-              stroke: 10,
-              color: color,
-              child: Text('$done/$total', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-            ),
+            if (MediaQuery.sizeOf(context).width >= 600) ...[
+              const SizedBox(width: 24),
+              _BookProgress(done: done, total: total),
+            ],
           ]),
-          const SizedBox(height: 20),
-          Wrap(spacing: 10, runSpacing: 10, children: [
+          if (MediaQuery.sizeOf(context).width < 600) ...[
+            const SizedBox(height: 16),
+            Align(alignment: Alignment.centerLeft, child: _BookProgress(done: done, total: total)),
+          ],
+          const SizedBox(height: 22),
+          Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
             if (concepts.isNotEmpty)
               FilledButton.tonalIcon(
                 key: const Key('wb-concepts'),
@@ -115,7 +116,7 @@ class _WorkbookScreenState extends State<WorkbookScreen> {
               ),
             FilledButton.icon(
               key: const Key('wb-continue'),
-              style: FilledButton.styleFrom(backgroundColor: color, minimumSize: const Size(0, 52)),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.accent, minimumSize: const Size(0, 52)),
               onPressed: ps.isEmpty
                   ? null
                   : () => solve(() => SolveScreen.open(context,
@@ -125,7 +126,7 @@ class _WorkbookScreenState extends State<WorkbookScreen> {
                   ? '내 교재에 담고 풀기'
                   : done == 0
                       ? '처음부터 풀기'
-                      : (unsolved.isEmpty ? '다시 풀기' : '이어 풀기 · ${unsolved.length}문항 남음')),
+                      : (unsolved.isEmpty ? '다시 풀기' : '이어 풀기 (${unsolved.length}문항 남음)')),
             ),
             if (kEndlessEnabled && onShelf)
               OutlinedButton.icon(
@@ -169,7 +170,7 @@ class _WorkbookScreenState extends State<WorkbookScreen> {
               label: Text(onShelf ? '내 교재에서 빼기' : '내 교재에 담기'),
             ),
           ]),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           if (concepts.isNotEmpty) ...[
             SegmentedButton<String>(
               key: const Key('wb-show'),
@@ -222,10 +223,54 @@ class _WorkbookScreenState extends State<WorkbookScreen> {
                     ],
                   ]),
                 ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
             ],
         ],
       ),
+    );
+  }
+}
+
+/// 교재 진도 — 큰 고정폭 숫자, 그 아래 형광펜으로 칠한 막대 (이 화면에서 단 하나 눈에 띄는 것).
+class _BookProgress extends StatelessWidget {
+  const _BookProgress({required this.done, required this.total});
+  final int done, total;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
+    return SizedBox(
+      width: 168,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(
+                text: '$done',
+                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: AppColors.ink)),
+            TextSpan(
+                text: ' / $total',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.inkMuted)),
+          ]),
+          style: const TextStyle(fontFeatures: AppColors.tabular, height: 1.1),
+        ),
+        const SizedBox(height: 2),
+        Text(total > 0 && done >= total ? '모두 풀었어요' : '문항 풀이',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inkMuted)),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: Container(
+            height: 10,
+            color: AppColors.paperDeep,
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: v,
+              heightFactor: 1,
+              child: const ColoredBox(color: AppColors.highlight),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -317,14 +362,20 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      padding: const EdgeInsets.only(bottom: 10, top: 6),
       child: Row(children: [
-        Container(width: 5, height: 20, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+        Container(width: 4, height: 18, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 10),
-        Text(name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-        const SizedBox(width: 8),
-        Text([if (concepts > 0) '개념 $concepts', if (count > 0 || concepts == 0) '$count문항'].join(' · '),
-            style: const TextStyle(color: AppColors.inkMuted, fontWeight: FontWeight.w700, fontSize: 13)),
+        Flexible(
+          child: Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+        ),
+        const SizedBox(width: 10),
+        Text([if (concepts > 0) '개념 $concepts', if (count > 0 || concepts == 0) '$count문항'].join(', '),
+            style: const TextStyle(
+                color: AppColors.inkMuted, fontWeight: FontWeight.w600, fontSize: 13, fontFeatures: AppColors.tabular)),
         const Spacer(),
         if (onSolve != null)
           TextButton.icon(
@@ -353,11 +404,13 @@ class _Row extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(children: [
           SizedBox(
             width: 36,
-            child: Text('$n', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.inkSoft)),
+            child: Text('$n',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.inkMuted, fontFeatures: AppColors.tabular)),
           ),
           ResultMark(correct: st.attempts == 0 ? null : st.lastCorrect, size: 26),
           const SizedBox(width: 14),
